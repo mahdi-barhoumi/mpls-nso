@@ -1,0 +1,4 @@
+https://www.cisco.com/c/en/us/support/docs/multiprotocol-label-switching-mpls/mpls/13736-mplsospf.html - How to configure an MPLS network using OSPF/IS-IS
+https://www.networkpcworld.com/2024/09/basic-mpls-bgp-and-l3vpn-lab-setup.html - Basic MPLS BGP and L3VPN Lab Setup
+https://networklessons.com/mpls/introduction-to-mpls - MPLS Course
+https://www.cisco.com/c/en/us/support/docs/multiprotocol-label-switching-mpls/mpls/4649-mpls-faq-4649.html#anc4 - MPLS FAQ
