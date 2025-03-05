@@ -1,0 +1,69 @@
+{
+    "Cisco-IOS-XE-device-hardware-oper:device-hardware": {
+        "device-inventory": [
+            {
+                "dev-name": "Chassis",
+                "field-replaceable": false,
+                "hw-class": "hw-class-physical",
+                "hw-description": "Cisco CSR1000V Chassis",
+                "hw-dev-index": 0,
+                "hw-type": "hw-type-chassis",
+                "part-number": "CSR1000V",
+                "serial-number": "9WXXN9KZTR6",
+                "version": "V00"
+            },
+            {
+                "dev-name": "module R0",
+                "field-replaceable": false,
+                "hw-class": "hw-class-virtual",
+                "hw-description": "Cisco CSR1000V Route Processor",
+                "hw-dev-index": 1,
+                "hw-type": "hw-type-pim",
+                "part-number": "CSR1000V",
+                "serial-number": "JAB1303001C",
+                "version": "V00"
+            },
+            {
+                "dev-name": "module F0",
+                "field-replaceable": false,
+                "hw-class": "hw-class-virtual",
+                "hw-description": "Cisco CSR1000V Embedded Services Processor",
+                "hw-dev-index": 2,
+                "hw-type": "hw-type-pim",
+                "part-number": "CSR1000V",
+                "serial-number": "",
+                "version": ""
+            },
+            {
+                "dev-name": "Memory",
+                "field-replaceable": false,
+                "hw-class": "hw-class-physical",
+                "hw-description": "Physical Memory",
+                "hw-dev-index": 3,
+                "hw-type": "hw-type-dram",
+                "part-number": "",
+                "serial-number": "",
+                "version": ""
+            },
+            {
+                "dev-name": "CPU",
+                "field-replaceable": false,
+                "hw-class": "hw-class-physical",
+                "hw-description": " Intel Core i7 9xx (Nehalem Class Core ",
+                "hw-dev-index": 4,
+                "hw-type": "hw-type-cpu",
+                "part-number": " AuthenticAMD",
+                "serial-number": "",
+                "version": " 6"
+            }
+        ],
+        "device-system-data": {
+            "boot-time": "2025-03-05T13:29:46+00:00",
+            "current-time": "2025-03-05T14:52:04.705+00:00",
+            "last-reboot-reason": "Unknown reason",
+            "reason-severity": "abnormal",
+            "rommon-version": "IOS-XE ROMMON",
+            "software-version": "Cisco IOS Software [Amsterdam], Virtual XE Software (X86_64_LINUX_IOSD-UNIVERSALK9-M), Version 17.3.5, RELEASE SOFTWARE (fc2)\nTechnical Support: http://www.cisco.com/techsupport\nCopyright (c) 1986-2022 by Cisco Systems, Inc.\nCompiled Wed 09-Feb-22 10:35 by mcpre"
+        }
+    }
+}
