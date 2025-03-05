@@ -140,7 +140,7 @@ class TFTPServer:
 
 if __name__ == '__main__':
     server = TFTPServer(
-        root_dir='./src/tftp-service/tftp_files',
+        root_dir='./tftp_files',
         server_ip='192.168.100.1',
         port=69,
         max_block_size=512
