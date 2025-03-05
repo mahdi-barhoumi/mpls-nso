@@ -4,7 +4,7 @@ from requests.auth import HTTPBasicAuth
 
 requests.packages.urllib3.disable_warnings()
 
-ip = "192.168.100.100"
+ip = "192.168.100.101"
 username = "mgmt"
 password = "mgmtapp"
 method = "GET"
