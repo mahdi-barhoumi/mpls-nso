@@ -1,33 +1,69 @@
+import socket
 import os
-import tftpy
+import struct
 
-def main():
-    # Directory where files will be served from
-    serve_directory = './configs'
-    
-    # Create the serve directory if it doesn't exist
-    if not os.path.exists(serve_directory):
-        os.makedirs(serve_directory)
-    
-    try:
-        # Create TFTP server
-        server = tftpy.TftpServer(serve_directory)
-        
-        # Configuration parameters
-        host = '192.168.100.1'  # Listen on all available interfaces
-        port = 69  # Standard TFTP port
-        
-        print(f"Starting TFTP server on {host}:{port}")
-        print(f"Serving files from: {os.path.abspath(serve_directory)}")
-        
-        # Start the server (blocking call)
-        server.listen(host, port)
-    
-    except PermissionError:
-        print("Error: Need root/admin privileges to bind to port 69")
+tftp_root = "./tftp_files"
+tftp_port = 69
+tftp_block_size = 512
+tftp_timeout = 10
 
-    except Exception as e:
-        print(f"An error occurred: {e}")
+def handle_tftp_request(sock, addr, data):
+    opcode = int.from_bytes(data[:2], byteorder='big')
+    parts = data[2:].split(b'\x00')
+    
+    if len(parts) < 2:
+        return 
+    
+    filename, mode = parts[0].decode(), parts[1].decode()
+    filepath = os.path.join(tftp_root, filename)
+    
+    if opcode == 1:  
+        if os.path.exists(filepath):
+            with open(filepath, 'rb') as file:
+                block_num = 1
+                while True:
+                    chunk = file.read(tftp_block_size)
+                    response = struct.pack('!HH', 3, block_num) + chunk
+                    sock.sendto(response, addr)
+                    
+                    
+                    try:
+                        ack, _ = sock.recvfrom(4)
+                        ack_opcode, ack_block = struct.unpack('!HH', ack)
+                        if ack_opcode != 4 or ack_block != block_num:
+                            print("ACK incorrect, arrêt de la transmission")
+                            break
+                    except socket.timeout:
+                        print("Timeout, ACK non reçu")
+                        break
+                    
+                    if len(chunk) < tftp_block_size:
+                        break  
+                    
+                    block_num += 1
+                
+                print(f"File {filename} sent to {addr}")
+        else:
+            error_msg = struct.pack('!HH', 5, 1) + b'File not found\x00'
+            sock.sendto(error_msg, addr)
+    else:
+        error_msg = struct.pack('!HH', 5, 4) + b'Unsupported operation\x00'
+        sock.sendto(error_msg, addr)
 
-if __name__ == '__main__':
-    main()
+def tftp_server():
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.bind(("192.168.119.1", tftp_port))  
+    sock.settimeout(tftp_timeout) 
+    
+    print("TFTP Server running on port ",tftp_port)
+    
+    while True:
+        try:
+            data, addr = sock.recvfrom(1024)
+            handle_tftp_request(sock, addr, data)
+        except socket.timeout:
+            pass  # 
+
+if __name__ == "__main__":
+    os.makedirs(tftp_root, exist_ok=True)
+    tftp_server()
