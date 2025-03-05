@@ -1,3 +1,0 @@
-device_id,ipv4,platform,os,distance,logged_in
-192.168.100.100,192.168.100.100,Unknown,cisco_ios,0,True
-PE1,10.0.12.1,Unknown,cisco_ios,100,False

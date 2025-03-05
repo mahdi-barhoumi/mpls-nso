@@ -19,4 +19,6 @@ payload = ""
 url = f"https://{ip}/restconf/data/{container}/{leaf}"
 
 response = requests.request(method, url, auth=(username, password), headers=headers, verify=False, data=payload)
-print(response.json())
+
+with open('response-data.json', 'w') as file:
+    json.dump(response.json(), file, sort_keys=True, indent=4)
