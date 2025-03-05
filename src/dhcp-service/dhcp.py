@@ -157,8 +157,9 @@ class DHCPServer:
         packet += struct.pack('!BB4s', DHCP_TFTP_SERVER_IP, 4, socket.inet_aton(self.tftp_server_ip))
         
         # TFTP Server Name
-        packet += struct.pack('!BB', DHCP_TFTP_SERVER_NAME, len(self.tftp_server_name))
-        packet += self.tftp_server_name.encode('ascii')
+        if self.tftp_server_name:
+            packet += struct.pack('!BB', DHCP_TFTP_SERVER_NAME, len(self.tftp_server_name))
+            packet += self.tftp_server_name.encode('ascii')
         
         # Config File Name
         packet += struct.pack('!BB', DHCP_BOOTFILE, len(self.config_filename))
@@ -346,7 +347,6 @@ if __name__ == '__main__':
         subnet_mask='255.255.255.0',
         config_filename='router-confg', 
         tftp_server_ip='192.168.100.1',
-        tftp_server_name=None,
         lease_time=86400,
         lease_file='dhcp_leases.json'
     )
