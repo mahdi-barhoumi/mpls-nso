@@ -362,5 +362,7 @@ exec-timeout 0
 transport input ssh
 login local
 exit
-netconf ssh
+restconf
+lldp run
+exit
 end
