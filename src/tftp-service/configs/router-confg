@@ -1,0 +1,36 @@
+hostname AutoConfigRouter
+
+interface GigabitEthernet1
+ ip address 192.168.1.1 255.255.255.0
+ no shutdown
+ ip dhcp pool pool1
+  network 192.168.1.1 255.255.255.0
+
+interface GigabitEthernet2
+ ip address 192.168.2.1 255.255.255.0
+ no shutdown
+ ip dhcp pool pool2
+  network 192.168.2.1 255.255.255.0
+
+interface GigabitEthernet3
+ ip address 192.168.3.1 255.255.255.0
+ no shutdown
+ ip dhcp pool pool3
+  network 192.168.3.1 255.255.255.0
+
+interface GigabitEthernet4
+ ip address 192.168.4.1 255.255.255.0
+ no shutdown
+ ip dhcp pool pool4
+  network 192.168.4.1 255.255.255.0
+
+interface Loopback0
+ ip address 10.10.10.1 255.255.255.255
+
+ip domain-name example.com
+ip tftp source-interface GigabitEthernet1
+service timestamps debug datetime msec
+service timestamps log datetime msec
+
+
+end

@@ -14,7 +14,7 @@ def main():
         server = tftpy.TftpServer(serve_directory)
         
         # Configuration parameters
-        host = '0.0.0.0'  # Listen on all available interfaces
+        host = '192.168.100.1'  # Listen on all available interfaces
         port = 69  # Standard TFTP port
         
         print(f"Starting TFTP server on {host}:{port}")
@@ -25,7 +25,7 @@ def main():
     
     except PermissionError:
         print("Error: Need root/admin privileges to bind to port 69")
-        
+
     except Exception as e:
         print(f"An error occurred: {e}")
 
