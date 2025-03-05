@@ -1,0 +1,81 @@
+2025-03-03 20:53:23,217 ndlib.topology:INFO: Processing 192.168.100.100
+2025-03-03 20:53:23,218 ndlib.topology:INFO: Gathering Neighbors on 192.168.100.100: 8188
+2025-03-03 20:53:23,218 ndlib.topology:INFO: Joining all active threads
+2025-03-03 20:53:25,685 ndlib.topology:INFO: Failed to connect to 192.168.100.100, trying 192.168.100.100
+2025-03-03 20:53:28,107 ndlib.topology:WARNING: Failed to scrape 192.168.100.100: Authentication to device failed.
+
+Common causes of this problem are:
+1. Invalid username and password
+2. Incorrect SSH-key file
+3. Connecting to the wrong device
+
+Device settings: cisco_xe 192.168.100.100:22
+
+
+Authentication failed.
+2025-03-03 20:53:28,107 ndlib.topology:INFO: Processing output queue
+2025-03-03 20:53:28,108 ndlib.topology:INFO: Total neighbors: 0
+2025-03-03 21:51:56,200 ndlib.topology:INFO: Processing 192.168.100.100
+2025-03-03 21:51:56,201 ndlib.topology:INFO: Gathering Neighbors on 192.168.100.100: 17836
+2025-03-03 21:51:56,201 ndlib.topology:INFO: Joining all active threads
+2025-03-03 21:51:57,385 ndlib.topology:WARNING: Unknown OS Type to Parse on 192.168.100.100: cisco_xe
+2025-03-03 21:51:57,386 ndlib.topology:INFO: Failed to connect to 192.168.100.100, trying 192.168.100.100
+2025-03-03 21:51:58,515 ndlib.topology:WARNING: Unknown OS Type to Parse on 192.168.100.100: cisco_xe
+2025-03-03 21:51:58,515 ndlib.topology:WARNING: Failed to scrape 192.168.100.100: cannot access local variable 'nd_cdp' where it is not associated with a value
+2025-03-03 21:51:58,515 ndlib.topology:INFO: Processing output queue
+2025-03-03 21:51:58,515 ndlib.topology:INFO: Total neighbors: 0
+2025-03-04 16:45:01,252 ndlib.topology:INFO: Processing 192.168.100.100
+2025-03-04 16:45:01,253 ndlib.topology:INFO: Gathering Neighbors on 192.168.100.100: 3080
+2025-03-04 16:45:01,253 ndlib.topology:INFO: Joining all active threads
+2025-03-04 16:45:02,397 ndlib.topology:WARNING: Unknown OS Type to Parse on 192.168.100.100: cisco_xe
+2025-03-04 16:45:02,397 ndlib.topology:INFO: Failed to connect to 192.168.100.100, trying 192.168.100.100
+2025-03-04 16:45:03,506 ndlib.topology:WARNING: Unknown OS Type to Parse on 192.168.100.100: cisco_xe
+2025-03-04 16:45:03,506 ndlib.topology:WARNING: Failed to scrape 192.168.100.100: cannot access local variable 'nd_cdp' where it is not associated with a value
+2025-03-04 16:45:03,507 ndlib.topology:INFO: Processing output queue
+2025-03-04 16:45:03,507 ndlib.topology:INFO: Total neighbors: 0
+2025-03-04 17:07:11,058 ndlib.topology:INFO: Processing 192.168.100.100
+2025-03-04 17:07:11,059 ndlib.topology:INFO: Gathering Neighbors on 192.168.100.100: 13188
+2025-03-04 17:07:11,059 ndlib.topology:INFO: Joining all active threads
+2025-03-04 17:07:12,181 ndlib.parse:INFO: No LLDP mapping for Gi2 on 192.168.100.100
+2025-03-04 17:07:12,192 ndlib.topology:INFO: Completed Scraping 192.168.100.100: 13188
+2025-03-04 17:07:12,192 ndlib.topology:INFO: Processing output queue
+2025-03-04 17:07:12,192 ndlib.topology:INFO: Processing Out_q entry PE1 on 192.168.100.100
+2025-03-04 17:07:12,308 ndlib.topology:INFO: Processing PE1
+2025-03-04 17:07:12,308 ndlib.topology:INFO: Gathering Neighbors on PE1: 11728
+2025-03-04 17:07:12,308 ndlib.topology:INFO: Joining all active threads
+2025-03-04 17:07:14,595 ndlib.topology:INFO: Failed to connect to PE1, trying 10.0.12.1
+2025-03-04 17:07:24,601 ndlib.topology:WARNING: Failed to scrape PE1: TCP connection to device failed.
+
+Common causes of this problem are:
+1. Incorrect hostname or IP address.
+2. Wrong TCP port.
+3. Intermediate firewall blocking access.
+
+Device settings: cisco_ios 10.0.12.1:22
+
+
+2025-03-04 17:07:27,315 ndlib.topology:INFO: Processing output queue
+2025-03-04 17:07:27,315 ndlib.topology:INFO: Total neighbors: 1
+2025-03-04 17:09:31,830 ndlib.topology:INFO: Processing 192.168.100.100
+2025-03-04 17:09:31,831 ndlib.topology:INFO: Gathering Neighbors on 192.168.100.100: 15800
+2025-03-04 17:09:31,831 ndlib.topology:INFO: Joining all active threads
+2025-03-04 17:09:32,948 ndlib.parse:INFO: No LLDP mapping for Gi2 on 192.168.100.100
+2025-03-04 17:09:32,960 ndlib.topology:INFO: Completed Scraping 192.168.100.100: 15800
+2025-03-04 17:09:32,960 ndlib.topology:INFO: Processing output queue
+2025-03-04 17:09:32,960 ndlib.topology:INFO: Processing Out_q entry PE1 on 192.168.100.100
+2025-03-04 17:09:33,068 ndlib.topology:INFO: Processing PE1
+2025-03-04 17:09:33,068 ndlib.topology:INFO: Gathering Neighbors on PE1: 6256
+2025-03-04 17:09:33,068 ndlib.topology:INFO: Joining all active threads
+2025-03-04 17:09:35,350 ndlib.topology:INFO: Failed to connect to PE1, trying 10.0.12.1
+2025-03-04 17:09:45,352 ndlib.topology:WARNING: Failed to scrape PE1: TCP connection to device failed.
+
+Common causes of this problem are:
+1. Incorrect hostname or IP address.
+2. Wrong TCP port.
+3. Intermediate firewall blocking access.
+
+Device settings: cisco_ios 10.0.12.1:22
+
+
+2025-03-04 17:09:48,082 ndlib.topology:INFO: Processing output queue
+2025-03-04 17:09:48,082 ndlib.topology:INFO: Total neighbors: 1
