@@ -1,2 +1,4 @@
 images/*
 !images/.gitkeep
+**/__pycache__/
+**/db.sqlite3

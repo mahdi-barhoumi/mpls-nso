@@ -2,6 +2,7 @@ from django.urls import path
 from core.views.dhcp import *
 from core.views.tftp import *
 from core.views.mapper import *
+from core.views.interface_control import *
 
 urlpatterns = [
     # DHCP service endpoints
@@ -20,4 +21,15 @@ urlpatterns = [
 
     # Network mapper endpoints
     path('network/discover/', discover_network, name='get_network_map'),
+
+    # Interface_controle endpoints
+    path('interfaces/conncet/', connect_routers, name='connect-router'),
+    path('interfaces/list/', list_interfaces, name='list-interfaces'),
+    path('interface/<str:interface_name>/', get_interface, name='get-interface'),
+    path('interface/<str:interface_name>/enable/', enable_interface, name='enable-interface'),
+    path('interface/<str:interface_name>/disable/', disable_interface, name='disable-interface'),
+    path('interfaces/all/enable/', enable_all_interfaces, name='enable_all_interfaces'),
+    path('interfaces/all/disable/', disable_all_interfaces, name='disable_all_interfaces'),
+
+
 ]
