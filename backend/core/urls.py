@@ -1,7 +1,7 @@
 from django.urls import path
 from core.views.dhcp import *
 from core.views.tftp import *
-from core.views.mapper import *
+from core.views.discovery import *
 from core.views.interface_control import *
 
 urlpatterns = [
@@ -19,11 +19,11 @@ urlpatterns = [
     path('tftp/upload/', upload_file, name='upload_tftp_file'),
     path('tftp/files/<str:filename>', delete_file, name='delete_tftp_file'),
 
-    # Network mapper endpoints
+    # Network discovery service endpoints
     path('network/discover/', discover_network, name='get_network_map'),
 
-    # Interface_controle endpoints
-    path('interfaces/conncet/', connect_routers, name='connect-router'),
+    # Interface control endpoints
+    path('interfaces/connect/', connect_routers, name='connect-router'),
     path('interfaces/list/', list_interfaces, name='list-interfaces'),
     path('interface/<str:interface_name>/', get_interface, name='get-interface'),
     path('interface/<str:interface_name>/enable/', enable_interface, name='enable-interface'),

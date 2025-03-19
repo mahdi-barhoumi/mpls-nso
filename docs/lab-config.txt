@@ -362,6 +362,15 @@ exec-timeout 0
 transport input ssh
 login local
 exit
+vrf definition management
+address-family ipv4
+exit
+exit
+interface GigabitEthernet1
+vrf forwarding management
+ip address dhcp
+no shutdown
+exit
 restconf
 lldp run
 exit
