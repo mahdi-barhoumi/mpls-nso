@@ -1,0 +1,112 @@
+{
+    "Cisco-IOS-XE-lldp-oper:lldp-entries": {
+        "lldp-entry": [
+            {
+                "capabilities": {
+                    "router": [
+                        null
+                    ]
+                },
+                "connecting-interface": "Gi2",
+                "device-id": "UnassignedRouter",
+                "local-interface": "Gi3",
+                "mau-type": 0,
+                "port-vlan-id": 0,
+                "ttl": 120
+            }
+        ],
+        "lldp-intf-details": [
+            {
+                "if-name": "GigabitEthernet1",
+                "isenabled": true,
+                "rx": "wait-for-frame",
+                "tx": "idle"
+            },
+            {
+                "if-name": "GigabitEthernet2",
+                "isenabled": true,
+                "rx": "wait-for-frame",
+                "tx": "idle"
+            },
+            {
+                "if-name": "GigabitEthernet3",
+                "isenabled": true,
+                "lldp-neighbor-details": [
+                    {
+                        "age": 0,
+                        "chassis-id": "001e.e5d7.5f00",
+                        "chassis-id-type": "chassis-mac",
+                        "enabled-capabilities": {
+                            "router": [
+                                null
+                            ]
+                        },
+                        "identifier": "001e.e5d7.5f00Gi2",
+                        "media-caps": "unknown",
+                        "mgmt-addrs": [
+                            {
+                                "mgmt-addr": "192.168.100.101",
+                                "mgmt-addr-type": "mgmt-ip"
+                            }
+                        ],
+                        "port-desc": "GigabitEthernet2",
+                        "port-id": "Gi2",
+                        "port-id-type": "port-ifname",
+                        "system-capabilities": {
+                            "bridge": [
+                                null
+                            ],
+                            "router": [
+                                null
+                            ]
+                        },
+                        "system-desc": "Cisco IOS Software [Amsterdam], Virtual XE Software (X86_64_LINUX_IOSD-UNIVERSALK9-M), Version 17.3.5, RELEASE SOFTWARE (fc2)\nTechnical Support: http://www.cisco.com/techsupport\nCopyright (c) 1986-2022 by Cisco Systems, Inc.\nCompiled Wed 09-Feb-22 10:35 b",
+                        "system-name": "UnassignedRouter",
+                        "time-remaining": 93,
+                        "time-since-last-update": 0,
+                        "ttl": 120
+                    }
+                ],
+                "rx": "wait-for-frame",
+                "tx": "idle"
+            },
+            {
+                "if-name": "GigabitEthernet4",
+                "isenabled": true,
+                "rx": "wait-for-frame",
+                "tx": "idle"
+            },
+            {
+                "if-name": "GigabitEthernet5",
+                "isenabled": true,
+                "rx": "wait-for-frame",
+                "tx": "idle"
+            },
+            {
+                "if-name": "GigabitEthernet6",
+                "isenabled": true,
+                "rx": "wait-for-frame",
+                "tx": "idle"
+            }
+        ],
+        "lldp-state-details": {
+            "chassis-id": "001e.1469.6300",
+            "chassis-id-type": "chassis-mac",
+            "enabled": true,
+            "encap-failures": "0",
+            "entries-aged-out": "0",
+            "frame-discard": "0",
+            "frame-error-in": "0",
+            "frame-in": "2",
+            "frame-out": "24",
+            "hello-timer": "30",
+            "inqueue-overflow": "0",
+            "mem-failures": "0",
+            "system-desc": "Cisco IOS Software [Amsterdam], Virtual XE Software (X86_64_LINUX_IOSD-UNIVERSALK9-M), Version 17.3.5, RELEASE SOFTWARE (fc2)\nTechnical Support: http://www.cisco.com/techsupport\nCopyright (c) 1986-2022 by Cisco Systems, Inc.\nCompiled Wed 09-Feb-22 10:35 b",
+            "system-name": "UnassignedRouter",
+            "table-overflow": "0",
+            "tlv-discard": "0",
+            "tlv-unknown": "0"
+        }
+    }
+}

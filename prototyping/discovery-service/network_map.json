@@ -1,0 +1,44 @@
+{
+    "001e.1469.6300": {
+        "ip": "192.168.100.100",
+        "hostname": "UnassignedRouter",
+        "connected_routers": [
+            {
+                "local_interface": "GigabitEthernet3",
+                "remote_chassis_id": "001e.e5d7.5f00",
+                "remote_system_name": "UnassignedRouter",
+                "remote_port": "Gi2"
+            }
+        ]
+    },
+    "001e.e5d7.5f00": {
+        "ip": "192.168.100.101",
+        "hostname": "UnassignedRouter",
+        "connected_routers": [
+            {
+                "local_interface": "GigabitEthernet2",
+                "remote_chassis_id": "001e.1469.6300",
+                "remote_system_name": "UnassignedRouter",
+                "remote_port": "Gi3"
+            },
+            {
+                "local_interface": "GigabitEthernet3",
+                "remote_chassis_id": "001e.4944.f400",
+                "remote_system_name": "UnassignedRouter",
+                "remote_port": "Gi3"
+            }
+        ]
+    },
+    "001e.4944.f400": {
+        "ip": "192.168.100.102",
+        "hostname": "UnassignedRouter",
+        "connected_routers": [
+            {
+                "local_interface": "GigabitEthernet3",
+                "remote_chassis_id": "001e.e5d7.5f00",
+                "remote_system_name": "UnassignedRouter",
+                "remote_port": "Gi3"
+            }
+        ]
+    }
+}

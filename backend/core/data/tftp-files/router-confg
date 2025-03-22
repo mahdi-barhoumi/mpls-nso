@@ -1,0 +1,18 @@
+hostname UnassignedRouter
+
+username mgmt privilege 15 secret mgmtapp
+
+crypto key generate rsa usage-keys label sshkeys modulus 2048
+
+ip ssh rsa keypair-name sshkeys
+ip ssh version 2
+  line vty 0 4
+  exec-timeout 0
+  transport input ssh
+  login local
+exit
+
+restconf
+lldp run
+
+end

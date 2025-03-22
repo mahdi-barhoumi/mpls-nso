@@ -1,3 +1,0 @@
-pylint
-netmiko
-tqdm

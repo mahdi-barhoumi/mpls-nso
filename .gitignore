@@ -1,2 +1,6 @@
-images
-src\dhcp-service\dhcp_leases.json
+images/*
+!images/.gitkeep
+**/__pycache__/
+**/db.sqlite3
+backend/core/migrations/*
+!backend/core/migrations/__init__.py
