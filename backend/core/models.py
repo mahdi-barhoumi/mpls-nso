@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 
 class DHCPLease(models.Model):
     mac_address = models.CharField(max_length=17, primary_key=True, help_text="MAC address of the client")
@@ -58,16 +59,72 @@ class Customer(models.Model):
     def __str__(self):
         return self.name
 
+class VPN(models.Model):
+    name = models.CharField(max_length=255, unique=True, help_text="VPN name")
+    customer = models.ForeignKey('Customer', null=True, blank=True, on_delete=models.SET_NULL, related_name='vpns', help_text="Customer who owns this VPN, if applicable")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "VPN"
+        verbose_name_plural = "VPNs"
+        ordering = ["name"]
+    
+    def __str__(self):
+        if self.customer:
+            return f"{self.name} ({self.customer.name})"
+        return self.name
+    
+    def validate_route_targets(self):
+        vpn_vrfs = self.vrfs.all()
+        
+        # If there's only one VRF, no validation needed
+        if vpn_vrfs.count() <= 1:
+            return True
+            
+        # For VPNs with multiple VRFs, perform validation
+        for vrf in vpn_vrfs:
+            # Get all export RTs from other VRFs in this VPN
+            other_vrfs = vpn_vrfs.exclude(pk=vrf.pk)
+            required_imports = set()
+            
+            for other_vrf in other_vrfs:
+                # Add all export RTs from other VRFs to required imports
+                export_rts = set(other_vrf.export_targets)
+                required_imports.update(export_rts)
+            
+            # Get current import RTs for this VRF
+            current_imports = set(vrf.import_targets)
+            
+            # Check if any required RTs are missing
+            missing_rts = required_imports - current_imports
+            
+            if missing_rts:
+                missing_list = ", ".join(missing_rts)
+                raise ValidationError(
+                    f"VRF '{vrf.name}' is missing required import route targets: {missing_list}"
+                )
+        
+        return True
+
+    def clean(*args, **kwargs):
+        if self.pk:
+            self.validate_route_targets()
+        super().save(*args, **kwargs)
+
 class VRF(models.Model):
     name = models.CharField(max_length=255, help_text="VRF name")
     route_distinguisher = models.CharField(max_length=50, blank=True, help_text="Route distinguisher")
     customer = models.ForeignKey(Customer, null=True, on_delete=models.CASCADE, related_name='vrfs')
+    router = models.ForeignKey(Router, on_delete=models.CASCADE, related_name='vrfs', help_text="Router where this VRF is configured")
+    vpn = models.ForeignKey('VPN', null=True, blank=True, on_delete=models.SET_NULL, related_name='vrfs',
+                          help_text="VPN this VRF belongs to")
     
     class Meta:
-        unique_together = [['name', 'route_distinguisher']]
+        unique_together = [['name', 'router'], ['route_distinguisher', 'router']]
     
     def __str__(self):
-        return f"{self.name} (RD: {self.route_distinguisher})"
+        return f"{self.name} (RD: {self.route_distinguisher}) on {self.router.hostname}"
     
     @property
     def import_targets(self):
@@ -120,6 +177,13 @@ class Interface(models.Model):
     
     def __str__(self):
         return f"{self.router.hostname} - {self.name}"
+
+    def save(self, *args, **kwargs):
+        if self.vrf and self.vrf.router != self.router:
+            raise ValidationError({
+                'vrf': f"VRF '{self.vrf}' does not exist on router '{self.router.hostname}'"
+            })
+        super().save(*args, **kwargs)
     
     @property
     def is_connected(self):

@@ -8,8 +8,9 @@ from requests.auth import HTTPBasicAuth
 from concurrent.futures import ThreadPoolExecutor
 from ipaddress import IPv4Network
 from django.db import transaction, OperationalError
+from collections import defaultdict
 
-from core.models import DHCPLease, Router, VRF, RouteTarget, Interface
+from core.models import DHCPLease, Router, VRF, RouteTarget, Interface, VPN
 
 requests.packages.urllib3.disable_warnings()
 
@@ -48,6 +49,9 @@ class NetworkDiscoverer:
         # Update connections between interfaces
         self.update_interface_connections()
         
+        # Discover VPNs based on VRF route targets
+        vpn_count = self.discover_vpns()
+        
         return {
             "discovered_devices": len(discovered_devices),
             "routers": {
@@ -57,8 +61,94 @@ class NetworkDiscoverer:
                 "customer_edge": Router.objects.filter(role='CE').count(),
             },
             "vrfs": VRF.objects.count(),
+            "vpns": vpn_count,
             "interfaces": Interface.objects.count(),
         }
+    
+    def discover_vpns(self):
+        """Discover VPNs by analyzing route targets across VRFs."""
+        logger.info("Starting VPN discovery process")
+        
+        # Group VRFs by their export route targets
+        rt_to_vrfs = defaultdict(set)
+        vrf_export_rts = {}
+        
+        # Get all VRFs and their route targets
+        all_vrfs = VRF.objects.all().prefetch_related('route_targets')
+        
+        # First pass: Collect export RTs for each VRF
+        for vrf in all_vrfs:
+            export_rts = set(vrf.export_targets)
+            vrf_export_rts[vrf.id] = export_rts
+            
+            # Map each export RT to the VRFs that export it
+            for rt in export_rts:
+                rt_to_vrfs[rt].add(vrf.id)
+        
+        # Group VRFs into potential VPNs based on route target relationships
+        vpn_groups = []
+        processed_vrfs = set()
+        
+        # First, handle VRFs that are related to other VRFs
+        for vrf_id, export_rts in vrf_export_rts.items():
+            if vrf_id in processed_vrfs:
+                continue
+                
+            # Start a new potential VPN group with this VRF
+            vpn_group = {vrf_id}
+            processed_vrfs.add(vrf_id)
+            
+            # Find other VRFs that import this VRF's exports or export what this VRF imports
+            related_vrfs = set()
+            for rt in export_rts:
+                # Add VRFs that export this RT
+                related_vrfs.update(rt_to_vrfs[rt])
+            
+            # Add all related VRFs to this VPN group
+            for related_vrf_id in related_vrfs:
+                if related_vrf_id not in processed_vrfs:
+                    vpn_group.add(related_vrf_id)
+                    processed_vrfs.add(related_vrf_id)
+            
+            # Add this group regardless of size (allows single VRF VPNs)
+            vpn_groups.append(vpn_group)
+        
+        # Now, process any VRFs that weren't included in any group yet
+        for vrf in all_vrfs:
+            if vrf.id not in processed_vrfs:
+                # Create a single-VRF VPN group
+                vpn_groups.append({vrf.id})
+                processed_vrfs.add(vrf.id)
+        
+        # Create VPN objects for each VPN group
+        vpn_count = 0
+        for i, vpn_group in enumerate(vpn_groups):
+            try:
+                with transaction.atomic():
+                    # Create a generic VPN name
+                    vpn_name = f"VPN-{i+1}"
+                    
+                    # Create or get the VPN
+                    vpn, created = VPN.objects.get_or_create(
+                        name=vpn_name,
+                        defaults={'customer': None}  # No customer association as requested
+                    )
+                    
+                    if created:
+                        logger.info(f"Created new VPN: {vpn_name}")
+                    else:
+                        logger.info(f"Using existing VPN: {vpn_name}")
+                    
+                    # Associate VRFs with this VPN
+                    VRF.objects.filter(id__in=vpn_group).update(vpn=vpn)
+                    
+                    logger.info(f"Associated {len(vpn_group)} VRFs with VPN: {vpn_name}")
+                    vpn_count += 1
+            except Exception as e:
+                logger.error(f"Error creating VPN for group {i+1}: {str(e)}")
+        
+        logger.info(f"Finished VPN discovery, created/updated {vpn_count} VPNs")
+        return vpn_count
     
     def process_device(self, lease):
         """Process a single device using its DHCP lease information."""
@@ -253,11 +343,13 @@ class NetworkDiscoverer:
             # Extract route distinguisher
             rd = vrf_def.get('rd', '')
             
-            # Create or update VRF
+            # Create or update VRF - now with router reference
             vrf, created = VRF.objects.update_or_create(
                 name=vrf_name,
-                route_distinguisher=rd,
-                defaults={}
+                router=router,  # Add router as part of lookup
+                defaults={
+                    'route_distinguisher': rd
+                }
             )
             
             # Process route targets
@@ -288,9 +380,9 @@ class NetworkDiscoverer:
                     )
             
             if created:
-                logger.info(f"Created new VRF: {vrf_name} with RD: {rd}")
+                logger.info(f"Created new VRF: {vrf_name} with RD: {rd} on router {router.hostname}")
             else:
-                logger.info(f"Updated existing VRF: {vrf_name}")
+                logger.info(f"Updated existing VRF: {vrf_name} on router {router.hostname}")
     
     def process_interfaces(self, router, interfaces_data):
         """Process interfaces data and create/update Interface models."""
@@ -316,9 +408,10 @@ class NetworkDiscoverer:
             vrf = None
             if vrf_name and vrf_name != 'management':
                 try:
-                    vrf = VRF.objects.get(name=vrf_name)
+                    # Look for VRF on this specific router now
+                    vrf = VRF.objects.get(name=vrf_name, router=router)
                 except VRF.DoesNotExist:
-                    logger.warning(f"VRF {vrf_name} referenced by interface {name} does not exist")
+                    logger.warning(f"VRF {vrf_name} on router {router.hostname} not found")
             
             # Create or update interface
             interface, created = Interface.objects.update_or_create(
