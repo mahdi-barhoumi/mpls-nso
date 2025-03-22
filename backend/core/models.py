@@ -1,6 +1,207 @@
+import re
+import logging
+import ipaddress
+import subprocess
 from django.db import models
 from django.utils import timezone
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator, MaxValueValidator, RegexValidator
+
+class Settings(models.Model):
+    # RESTCONF credentials
+    restconf_username = models.CharField(max_length=50)
+    restconf_password = models.CharField(max_length=100)
+    
+    # Host network settings - using interface index instead of name
+    host_interface_id = models.PositiveIntegerField(
+        null=True,
+        validators=[MinValueValidator(1)],
+        help_text='Network interface index'
+    )
+    host_ip = models.GenericIPAddressField(protocol='IPv4')
+    host_subnet_mask = models.CharField(
+        max_length=15,
+        validators=[
+            RegexValidator(
+                regex=r'^(255\.(0|128|192|224|240|248|252|254|255)\.){2}(0|128|192|224|240|248|252|254|255)$|^255\.255\.255\.(0|128|192|224|240|248|252|254)$',
+                message='Enter a valid subnet mask',
+            )
+        ]
+    )
+    
+    # BGP settings
+    bgp_as = models.PositiveIntegerField(
+        validators=[
+            MinValueValidator(1),
+            MaxValueValidator(4294967295)  # Max AS number in BGP
+        ],
+        help_text='BGP Autonomous System number'
+    )
+    
+    # DHCP settings
+    dhcp_ip_range_start = models.GenericIPAddressField(protocol='IPv4')
+    dhcp_ip_range_end = models.GenericIPAddressField(protocol='IPv4')
+    dhcp_lease_time = models.PositiveIntegerField(
+        validators=[MinValueValidator(1)],
+        help_text='DHCP lease time in seconds'
+    )
+    
+    # Management VRF
+    management_vrf = models.CharField(max_length=100)
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = 'Settings'
+        verbose_name_plural = 'Settings'
+    
+    def __str__(self):
+        return f"Settings (last updated: {self.updated_at})"
+    
+    def save(self, *args, **kwargs):
+        # Check if this is an update or a new instance
+        is_update = self.pk is not None
+        
+        # If it's an update, get the original instance to detect changes
+        if is_update:
+            original = Settings.objects.get(pk=self.pk)
+            ip_changed = original.host_ip != self.host_ip
+            mask_changed = original.host_subnet_mask != self.host_subnet_mask
+            interface_changed = original.host_interface_id != self.host_interface_id
+        else:
+            # For new instances, we'll consider these as changes
+            ip_changed = mask_changed = interface_changed = True
+        
+        # Before saving, perform validations
+        if Settings.objects.exists() and not self.pk:
+            raise ValidationError('There can only be one Settings instance')
+        
+        # Validate interface index
+        self.validate_interface_id()
+        
+        # Validate that DHCP range is within subnet
+        self.validate_dhcp_range()
+        
+        # Save the model first
+        super().save(*args, **kwargs)
+        
+        # After saving, if IP or subnet mask changed and interface is set, apply to the network interface
+        network_changes = ip_changed or mask_changed or interface_changed
+        if self.host_interface_id and is_update and network_changes:
+            self.apply_network_configuration()
+    
+    def validate_interface_id(self):
+        # Skip validation if host_interface_id is None
+        if not self.host_interface_id:
+            return
+            
+        try:
+            # Run netsh command to get interfaces
+            result = subprocess.run(
+                ['netsh', 'interface', 'ipv4', 'show', 'interfaces'],
+                capture_output=True, 
+                text=True,
+                check=True
+            )
+            
+            # Parse the output to find interface indices
+            output = result.stdout
+            pattern = r'^\s*(\d+)\s+\d+\s+\d+\s+\w+\s+'
+            valid_indices = set()
+            
+            for line in output.splitlines():
+                match = re.match(pattern, line)
+                if match:
+                    valid_indices.add(int(match.group(1)))
+            
+            # Check if our index is valid
+            if self.host_interface_id not in valid_indices:
+                raise ValidationError(f'Interface index {self.host_interface_id} does not exist, Valid indices: {sorted(valid_indices)}')
+                
+        except subprocess.SubprocessError as e:
+            raise ValidationError(f'Failed to validate interface: {str(e)}')
+    
+    def validate_dhcp_range(self):
+        try:
+            # Calculate the network from host IP and subnet mask
+            ip_interface = ipaddress.IPv4Interface(f"{self.host_ip}/{self.host_subnet_mask}")
+            network = ip_interface.network
+            
+            # Check if DHCP range is within network
+            start_ip = ipaddress.IPv4Address(self.dhcp_ip_range_start)
+            end_ip = ipaddress.IPv4Address(self.dhcp_ip_range_end)
+            
+            if start_ip not in network or end_ip not in network:
+                raise ValidationError('DHCP IP range must be within the host subnet')
+            
+            if start_ip > end_ip:
+                raise ValidationError('DHCP start IP must be less than or equal to end IP')
+                
+        except (ValueError, TypeError) as e:
+            raise ValidationError(f'IP validation error: {str(e)}')
+    
+    def apply_network_configuration(self):
+        if not self.host_interface_id:
+            return False
+            
+        try:
+            # Format the command
+            cmd = [
+                'netsh', 'interface', 'ipv4', 'set', 'address',
+                f'name={self.host_interface_id}',
+                'static',
+                self.host_ip,
+                self.host_subnet_mask
+            ]
+            
+            # Execute the command
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            
+            # Log the result
+            logger = logging.getLogger(__name__)
+            logger.info(f"Network configuration applied to interface {self.host_interface_id}: {self.host_ip}/{self.host_subnet_mask}")
+            
+            return True
+            
+        except subprocess.SubprocessError as e:
+            # Log the error
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to apply network configuration: {str(e)}")
+            if hasattr(e, 'stderr'):
+                logger.error(f"Command stderr: {e.stderr}")
+            
+            # We don't raise an exception here because the model has already been saved
+            # But you might want to add a way to notify the user or admin
+            return False
+    
+    @classmethod
+    def get_settings(cls):
+        settings, created = cls.objects.get_or_create(
+            defaults={
+                'restconf_username': 'mgmt',
+                'restconf_password': 'mgmtapp',
+                'host_ip': '192.168.100.1',
+                'host_subnet_mask': '255.255.255.0',
+                'bgp_as': 1,  # Provider iBGP AS number
+                'dhcp_ip_range_start': '192.168.100.100',
+                'dhcp_ip_range_end': '192.168.100.200',
+                'dhcp_lease_time': 86400,  # 24 hours in seconds
+                'management_vrf': 'management'
+            }
+        )
+        
+        # If settings were just created and interface is set, apply network configuration
+        if created and settings.host_interface_id:
+            settings.apply_network_configuration()
+            
+        return settings
 
 class DHCPLease(models.Model):
     mac_address = models.CharField(max_length=17, primary_key=True, help_text="MAC address of the client")
