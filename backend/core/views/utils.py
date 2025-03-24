@@ -34,8 +34,6 @@ def list_host_interfaces(request):
             
             if match:
                 idx = int(match.group(1))
-                metric = int(match.group(2))
-                mtu = int(match.group(3))
                 state = match.group(4)
                 name = match.group(5)
                 
@@ -43,9 +41,6 @@ def list_host_interfaces(request):
                     'id': idx,
                     'name': name,
                     'state': state,
-                    'active': state.lower() == 'connected',
-                    'metric': metric,
-                    'mtu': mtu
                 })
         
         # Sort interfaces by ID

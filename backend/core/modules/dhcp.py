@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 
 from django.utils import timezone
 from core.models import DHCPLease
+from core.settings import Settings
 
 # DHCP Message Type Options
 DHCP_DISCOVER = 1
@@ -30,7 +31,10 @@ DHCP_HOSTNAME = 12
 DHCP_END = 255
 DHCP_BOOTFILE = 67
 DHCP_TFTP_SERVER_NAME = 66
-DHCP_TFTP_SERVER_IP = 150 
+DHCP_TFTP_SERVER_IP = 150
+
+# Fixed config filename
+CONFIG_FILENAME = "router-confg"
 
 class DHCPServer:
     def __init__(self): 
@@ -39,14 +43,13 @@ class DHCPServer:
         self.end_ip = None
         self.subnet_mask = None
         self.tftp_server_ip = None
-        self.tftp_server_name = None
-        self.config_filename = None
+        self.config_filename = CONFIG_FILENAME
         self.lease_time = None
         self.sock = None
         self.running = False
         self.stop_event = Event()
         self.server_thread = None
-        self.logger = logging.getLogger('DHCP')
+        self.logger = logging.getLogger('dhcp')
     
     def ip_to_int(self, ip):
         return struct.unpack('!I', socket.inet_aton(ip))[0]
@@ -135,10 +138,6 @@ class DHCPServer:
         packet += struct.pack('!BB4s', DHCP_ROUTER, 4, socket.inet_aton(self.server_ip))
         packet += struct.pack('!BB4s', DHCP_DNS, 4, socket.inet_aton(self.server_ip))
         packet += struct.pack('!BB4s', DHCP_TFTP_SERVER_IP, 4, socket.inet_aton(self.tftp_server_ip))
-        
-        if self.tftp_server_name:
-            packet += struct.pack('!BB', DHCP_TFTP_SERVER_NAME, len(self.tftp_server_name))
-            packet += self.tftp_server_name.encode('ascii')
         
         packet += struct.pack('!BB', DHCP_BOOTFILE, len(self.config_filename))
         packet += self.config_filename.encode('ascii')
@@ -287,7 +286,7 @@ class DHCPServer:
                 self.process_dhcp_release(data, addr)
     
     def server_loop(self):
-        self.logger.info(f'DHCP Server running on {self.server_ip}')
+        self.logger.info(f'DHCP server running on {self.server_ip}')
         self.logger.info(f'Offering IP range: {self.int_to_ip(self.start_ip)} - {self.int_to_ip(self.end_ip)}')
         
         try:
@@ -307,28 +306,30 @@ class DHCPServer:
                 self.sock.close()
                 self.sock = None
             self.running = False
-            self.logger.info('DHCP Server stopped')
+            self.logger.info('DHCP server stopped')
     
-    def start(self, server_ip, start_ip, end_ip, subnet_mask, config_filename, tftp_server_ip, tftp_server_name=None, lease_time=86400):
+    def start(self):
         if self.running:
-            self.logger.warning("DHCP Server is already running")
+            self.logger.warning("DHCP server is already running")
             return False
-            
-        self.server_ip = server_ip
-        self.start_ip = self.ip_to_int(start_ip)
-        self.end_ip = self.ip_to_int(end_ip)
-        self.subnet_mask = subnet_mask
-        self.tftp_server_ip = tftp_server_ip
-        self.tftp_server_name = tftp_server_name
-        self.config_filename = config_filename
-        self.lease_time = lease_time
-        self.stop_event.clear()
         
         try:
+            # Get settings from the Settings model
+            settings = Settings.get_settings()
+            
+            # Set server parameters from settings
+            self.server_ip = settings.host_ip
+            self.start_ip = self.ip_to_int(settings.dhcp_ip_range_start)
+            self.end_ip = self.ip_to_int(settings.dhcp_ip_range_end)
+            self.subnet_mask = settings.host_subnet_mask
+            self.tftp_server_ip = settings.host_ip  # Using host IP as TFTP server IP
+            self.lease_time = settings.dhcp_lease_time
+            self.stop_event.clear()
+            
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-            self.sock.bind((server_ip, 67))
+            self.sock.bind((self.server_ip, 67))
             
             self.running = True
             self.server_thread = Thread(target=self.server_loop, daemon=True)
@@ -345,10 +346,10 @@ class DHCPServer:
     
     def stop(self):
         if not self.running:
-            self.logger.warning("DHCP Server is not running")
+            self.logger.warning("DHCP server is not running")
             return False
             
-        self.logger.info("Stopping DHCP Server...")
+        self.logger.info("Stopping DHCP server...")
         self.stop_event.set()
         
         if self.server_thread and self.server_thread.is_alive():
@@ -370,13 +371,11 @@ class DHCPServer:
     def get_status(self):
         status = {
             "running": self.running,
-            "lease_count": DHCPLease.objects.filter(expiry_time__gt=timezone.now()).count() if self.running else 0,
             "config": {
                 "server_ip": self.server_ip,
                 "ip_range": f"{self.int_to_ip(self.start_ip) if self.start_ip else None} - {self.int_to_ip(self.end_ip) if self.end_ip else None}",
                 "subnet_mask": self.subnet_mask,
                 "lease_time": self.lease_time,
-                "config_filename": self.config_filename,
                 "tftp_server_ip": self.tftp_server_ip
             } if self.running else None
         }

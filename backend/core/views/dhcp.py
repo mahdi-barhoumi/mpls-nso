@@ -11,48 +11,18 @@ dhcp_server = DHCPServer()
 @csrf_exempt
 @require_http_methods(["POST"])
 def start_dhcp_server(request):
-    try:
-        data = json.loads(request.body)
-
-        # Required parameters
-        server_ip = data.get('server_ip')
-        start_ip = data.get('start_ip')
-        end_ip = data.get('end_ip')
-        subnet_mask = data.get('subnet_mask')
-        config_filename = data.get('config_filename')
-        tftp_server_ip = data.get('tftp_server_ip')
-        
-        # Optional parameters
-        tftp_server_name = data.get('tftp_server_name')
-        lease_time = int(data.get('lease_time', 86400))
-        
-        # Validate required parameters
-        if not all([server_ip, start_ip, end_ip, subnet_mask, config_filename, tftp_server_ip]):
-            return JsonResponse({
-                'success': False,
-                'error': 'Missing required parameters'
-            }, status=400)
-        
-        success = dhcp_server.start(
-            server_ip=server_ip,
-            start_ip=start_ip,
-            end_ip=end_ip,
-            subnet_mask=subnet_mask,
-            config_filename=config_filename,
-            tftp_server_ip=tftp_server_ip,
-            tftp_server_name=tftp_server_name,
-            lease_time=lease_time
-        )
+    try:        
+        success = dhcp_server.start()
         
         return JsonResponse({
-            'success': success,
+            'status': 'success' if success else 'error',
             'message': 'DHCP server started successfully' if success else 'DHCP server already started' if dhcp_server.is_running() else 'Failed to start DHCP server'
         })
     
     except Exception as e:
         return JsonResponse({
-            'success': False,
-            'error': str(e)
+            'status': 'error',
+            'message': str(e)
         }, status=500)
 
 @csrf_exempt
@@ -61,14 +31,14 @@ def stop_dhcp_server(request):
     try:
         success = dhcp_server.stop()
         return JsonResponse({
-            'success': success,
+            'status': 'success' if success else 'error',
             'message': 'DHCP server stopped successfully' if success else 'DHCP server was not running'
         })
     
     except Exception as e:
         return JsonResponse({
-            'success': False,
-            'error': str(e)
+            'status': 'error',
+            'message': str(e)
         }, status=500)
 
 @csrf_exempt
@@ -76,12 +46,15 @@ def stop_dhcp_server(request):
 def dhcp_server_status(request):
     try:
         status = dhcp_server.get_status()
-        return JsonResponse(status)
+        return JsonResponse({
+            'status': 'success',
+            'data': status
+        })
     
     except Exception as e:
         return JsonResponse({
-            'success': False,
-            'error': str(e)
+            'status': 'error',
+            'message': str(e)
         }, status=500)
 
 @csrf_exempt
@@ -101,12 +74,12 @@ def dhcp_leases(request):
             })
         
         return JsonResponse({
-            'count': len(leases),
+            'status': 'success',
             'leases': leases
         })
     
     except Exception as e:
         return JsonResponse({
-            'success': False,
-            'error': str(e)
+            'status': 'error',
+            'message': str(e)
         }, status=500)

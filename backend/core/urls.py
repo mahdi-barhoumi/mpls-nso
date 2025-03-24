@@ -5,6 +5,8 @@ from core.views.utils import *
 from core.views.settings import *
 from core.views.discovery import *
 from core.views.interface_control import *
+from core.views.customers import *
+from core.views.sites import *
 
 urlpatterns = [
     # Settings endpoint
@@ -12,6 +14,14 @@ urlpatterns = [
 
     # Utility endpoints
     path('utils/host-interfaces/', list_host_interfaces, name='host-interfaces'),
+
+    # Models endpoints
+    path('sites/', list_sites, name='list-sites'),
+    path('sites/create/', create_site, name='create-site'),
+    path('sites/<int:site_id>/', get_site, name='get-site'),
+    path('customers/', list_customers, name='list-customers'),
+    path('customers/create/', create_customer, name='create-customer'),
+    path('customers/<int:customer_id>/', get_customer, name='get-customer'),
 
     # DHCP service endpoints
     path('dhcp/start/', start_dhcp_server, name='start-dhcp-server'),
@@ -38,6 +48,5 @@ urlpatterns = [
     path('interface/<str:interface_name>/disable/', disable_interface, name='disable-interface'),
     path('interfaces/all/enable/', enable_all_interfaces, name='enable-all-interfaces'),
     path('interfaces/all/disable/', disable_all_interfaces, name='disable-all-interfaces'),
-
 
 ]
