@@ -7,6 +7,7 @@ from core.views.discovery import *
 from core.views.interface_control import *
 from core.views.customers import *
 from core.views.sites import *
+from core.views.routers import *
 
 urlpatterns = [
     # Settings endpoint
@@ -40,13 +41,19 @@ urlpatterns = [
     # Network discovery service endpoints
     path('network/discover/', discover_network, name='discover-network'),
 
+    # Router-related endpoins
+    path('routers/', list_routers, name='list-routers'),
+    path('routers/<str:router_id>/', get_router, name='get-router'),
+    path('routers/<str:router_id>/interfaces/', list_router_interfaces, name='list-router-interfaces'),
+    path('routers/<str:router_id>/interfaces/<int:interface_id>/', get_router_interface, name='get-router-interface'),
+
     # Interface control endpoints
-    path('interfaces/connect/', connect_routers, name='connect-router'),
-    path('interfaces/list/', list_interfaces, name='list-interfaces'),
-    path('interface/<str:interface_name>/', get_interface, name='get-interface'),
-    path('interface/<str:interface_name>/enable/', enable_interface, name='enable-interface'),
-    path('interface/<str:interface_name>/disable/', disable_interface, name='disable-interface'),
-    path('interfaces/all/enable/', enable_all_interfaces, name='enable-all-interfaces'),
-    path('interfaces/all/disable/', disable_all_interfaces, name='disable-all-interfaces'),
+    # path('interfaces/connect/', connect_routers, name='connect-router'),
+    # path('interfaces/list/', list_interfaces, name='list-interfaces'),
+    # path('interface/<str:interface_name>/', get_interface, name='get-interface'),
+    # path('interface/<str:interface_name>/enable/', enable_interface, name='enable-interface'),
+    # path('interface/<str:interface_name>/disable/', disable_interface, name='disable-interface'),
+    # path('interfaces/all/enable/', enable_all_interfaces, name='enable-all-interfaces'),
+    # path('interfaces/all/disable/', disable_all_interfaces, name='disable-all-interfaces'),
 
 ]

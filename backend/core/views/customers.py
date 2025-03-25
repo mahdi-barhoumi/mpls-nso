@@ -4,7 +4,6 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
-
 from core.models import Site, Customer
 
 @csrf_exempt

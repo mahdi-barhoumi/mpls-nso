@@ -3,10 +3,16 @@ from django.utils import timezone
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
+from core.settings import Settings
 from core.models import DHCPLease
 from core.modules.dhcp import DHCPServer
 
 dhcp_server = DHCPServer()
+try:
+    Settings.get_settings()
+    dhcp_server.start()
+except:
+    pass
 
 @csrf_exempt
 @require_http_methods(["POST"])

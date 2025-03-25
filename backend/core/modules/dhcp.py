@@ -6,7 +6,6 @@ import os
 import logging
 from threading import Thread, Event
 from datetime import datetime, timedelta
-
 from django.utils import timezone
 from core.models import DHCPLease
 from core.settings import Settings

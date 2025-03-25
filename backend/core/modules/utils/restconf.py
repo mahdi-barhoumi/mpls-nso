@@ -3,7 +3,6 @@ import json
 import logging
 import time
 from requests.auth import HTTPBasicAuth
-
 from core.settings import Settings
 
 requests.packages.urllib3.disable_warnings()
@@ -17,13 +16,11 @@ class RestconfWrapper:
         self.timeout = timeout
         self.verify_ssl = verify_ssl
         self.logger = logging.getLogger('restconf')
-        
+        self.auth = HTTPBasicAuth(self.username, self.password)
         self.headers = {
             'Accept': 'application/yang-data+json',
             'Content-Type': 'application/yang-data+json'
         }
-        
-        self.auth = HTTPBasicAuth(self.username, self.password)
     
     def get(self, ip_address, path):
         url = f"https://{ip_address}/restconf/data/{path}"

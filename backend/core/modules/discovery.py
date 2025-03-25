@@ -5,8 +5,7 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from django.utils import timezone
 from django.db import transaction, OperationalError
-
-from core.modules.restconf import RestconfWrapper
+from core.modules.utils.restconf import RestconfWrapper
 from core.models import DHCPLease, Router, VRF, RouteTarget, Interface, VPN
 
 class NetworkDiscoverer:
