@@ -11,18 +11,33 @@
     "format": "prettier --write src/"
   },
   "dependencies": {
+    "@primeuix/themes": "^1.0.0",
+    "axios": "^1.8.4",
+    "chart.js": "3.3.2",
+    "primeicons": "^7.0.0",
+    "d3": "^7.9.0",
+    "primevue": "^4.3.2",
+    "v-network-graph": "^0.9.20",
+    "tailwindcss-primeui": "^0.5.0",
     "vue": "^3.5.13",
     "vue-router": "^4.5.0"
   },
   "devDependencies": {
+    "@primevue/auto-import-resolver": "^4.3.1",
+    "@rushstack/eslint-patch": "^1.8.0",
     "@eslint/js": "^9.20.0",
     "@vitejs/plugin-vue": "^5.2.1",
     "@vitejs/plugin-vue-jsx": "^4.1.1",
     "@vue/eslint-config-prettier": "^10.2.0",
+    "autoprefixer": "^10.4.19",
     "eslint": "^9.20.1",
     "eslint-plugin-vue": "^9.32.0",
+    "sass": "^1.55.0",
+    "postcss": "^8.4.40",
     "prettier": "^3.5.1",
     "vite": "^6.1.0",
-    "vite-plugin-vue-devtools": "^7.7.2"
+    "tailwindcss": "^3.4.6",
+    "vite-plugin-vue-devtools": "^7.7.2",
+    "unplugin-vue-components": "^0.27.3"
   }
 }

@@ -5,6 +5,7 @@ from core.views.utils import *
 from core.views.settings import *
 from core.views.discovery import *
 from core.views.interface_control import *
+from core.views.network_map import *    
 
 urlpatterns = [
     # Settings endpoint
@@ -39,5 +40,8 @@ urlpatterns = [
     path('interfaces/all/enable/', enable_all_interfaces, name='enable-all-interfaces'),
     path('interfaces/all/disable/', disable_all_interfaces, name='disable-all-interfaces'),
 
-
+    #   Network Map API endpoints
+    path('network/map/', NetworkMapView.as_view(), name='map_data'),
+    path('network/map/<str:chassis_id>/', NetworkMapDetailView.as_view(), name='router_detail_data'),
+    
 ]

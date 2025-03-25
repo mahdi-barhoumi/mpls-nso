@@ -1,7 +1,5 @@
 <script setup></script>
 
 <template>
-  <router-view />
+  <div class="layout-footer">Footer</div>
 </template>
-
-<style scoped></style>
