@@ -43,6 +43,7 @@
       >
         <!-- Define custom node rendering -->
         <template #override-node="{ nodeId, scale, config, ...slotProps }">
+          <circle :r="config.radius * scale" :fill="config.color" v-bind="slotProps" />
           <text
             :x="0"
             :y="(config.radius + 10) * scale"
@@ -52,13 +53,12 @@
             fill="00000"
             >{{ getNodeName(nodeId) }}</text
           >
-          <circle :r="config.radius * scale" :fill="config.color" v-bind="slotProps" />
           <image
             :xlink:href="getNodeIcon(nodeId)"
-            :x="-config.radius * scale"
-            :y="-config.radius * scale"
-            :width="config.radius * 2 * scale"
-            :height="config.radius * 2 * scale"
+            :x="-(config.radius - 8) * scale"
+            :y="-(config.radius - 8) * scale"
+            :width="(config.radius - 8) * 2 * scale"
+            :height="(config.radius - 8) * 2 * scale"
           />
         </template>
 
