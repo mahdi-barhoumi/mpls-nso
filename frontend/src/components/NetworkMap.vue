@@ -44,8 +44,8 @@
         <!-- Define custom node rendering -->
         <template #override-node="{ nodeId, scale, config, ...slotProps }">
           <text
-            x="0"
-            y="32"
+            :x="0"
+            :y="(config.radius + 10) * scale"
             :font-size="9 * scale"
             text-anchor="middle"
             dominant-baseline="central"
@@ -64,12 +64,7 @@
 
         <!-- Define custom edge labels -->
         <template #edge-label="{ edge, ...slotProps }">
-          <v-edge-label
-            :text="edge.label"
-            align="center"
-            vertical-align="above"
-            v-bind="slotProps"
-          />
+          <v-edge-label :text="edge.id" align="center" vertical-align="above" v-bind="slotProps" />
           <v-edge-label
             :text="edge.sourceInterfaceName"
             align="source"
@@ -205,6 +200,11 @@ export default {
         }
 
         this.generateCircularLayout()
+
+        // Ensure the graph is centered after data is loaded
+        this.$nextTick(() => {
+          this.$refs.graph.fitToContents()
+        })
       } catch (error) {
         console.error('Error fetching network data:', error)
       }
