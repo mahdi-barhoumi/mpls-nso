@@ -1,11 +1,13 @@
 from django.urls import path
-from core.views import control, utils, settings, discovery, customers, sites, routers
+from core.views import control, utils, settings, discovery, customers, sites, routers,network_map 
+
 
 urlpatterns = [
     # Settings endpoint
     path('settings/', settings.global_settings, name='settings'),
 
     # Utility endpoints
+
     path('utils/host-interfaces/', utils.list_host_interfaces, name='host-interfaces'),
 
     # Models endpoints
@@ -37,4 +39,6 @@ urlpatterns = [
 
     # Network discovery endpoints
     path('network/discover/', discovery.discover_network, name='discover-network'),
+    path('network/map/', NetworkMapView.as_view(), name='map_data'),
+    path('network/map/<str:chassis_id>/', NetworkMapDetailView.as_view(), name='router_detail_data'),
 ]
