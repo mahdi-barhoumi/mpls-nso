@@ -40,7 +40,19 @@
         @node-click="onNodeClick"
         @edge-click="onEdgeClick"
         class="h-full w-full"
-      />
+      >
+        <!-- Define custom node rendering -->
+        <template #override-node="{ nodeId, scale, config, ...slotProps }">
+          <circle :r="config.radius * scale" :fill="config.color" v-bind="slotProps" />
+          <image
+            :xlink:href="getNodeIcon(nodeId)"
+            :x="-config.radius * scale"
+            :y="-config.radius * scale"
+            :width="config.radius * 2 * scale"
+            :height="config.radius * 2 * scale"
+          />
+        </template>
+      </v-network-graph>
     </div>
 
     <!-- Details Dialog -->
@@ -108,7 +120,7 @@ export default {
           normal: {
             type: 'circle',
             radius: 25,
-            color: (node) => this.getNodeColor(node),
+            color: '#ffffff', // Default background color for nodes
             label: {
               visible: true,
               fontSize: 10,
@@ -181,15 +193,14 @@ export default {
 
       this.layouts = { nodes: layouts }
     },
-    getNodeColor(node) {
-      switch (node.role) {
-        case 'P':
-          return '#3498db' // Blue for P routers
-        case 'PE':
-          return '#e74c3c' // Red for PE routers
-        default:
-          return '#95a5a6' // Grey for others
+    getNodeIcon(nodeId) {
+      const node = this.graphData.nodes[nodeId]
+      if (node.role === 'P') {
+        return '/demo/images/routers/router_black.svg' // Black router image for P routers
+      } else if (node.role === 'PE') {
+        return '/demo/images/routers/router_blue.svg' // Blue router image for PE routers
       }
+      return null // Default to no image for other types
     },
     onNodeClick(event) {
       const nodeId = event.node
@@ -222,35 +233,6 @@ export default {
     },
     resetView() {
       this.$refs.graph.fitToContents()
-    },
-    applyFilter() {
-      // Implement filter logic based on selectedFilter
-      const filteredNodes = {}
-      const filteredEdges = {}
-
-      Object.entries(this.graphData.nodes).forEach(([id, node]) => {
-        if (this.selectedFilter === 'all' || node.role.toLowerCase() === this.selectedFilter) {
-          filteredNodes[id] = node
-        }
-      })
-
-      Object.entries(this.graphData.edges).forEach(([id, edge]) => {
-        const sourceNode = this.graphData.nodes[edge.source]
-        const targetNode = this.graphData.nodes[edge.target]
-
-        if (
-          this.selectedFilter === 'all' ||
-          (sourceNode.role.toLowerCase() === this.selectedFilter &&
-            targetNode.role.toLowerCase() === this.selectedFilter)
-        ) {
-          filteredEdges[id] = edge
-        }
-      })
-
-      // You might want to update this.graphData or use a computed property
-      // Depending on your specific requirements
-      console.log('Filtered Nodes:', filteredNodes)
-      console.log('Filtered Edges:', filteredEdges)
     },
   },
 }
