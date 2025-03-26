@@ -1,14 +1,11 @@
 import socket
 import struct
-import time
-import random
-import os
 import logging
+import ipaddress
 from threading import Thread, Event
-from datetime import datetime, timedelta
+from datetime import timedelta
 from django.utils import timezone
-from core.models import DHCPLease
-from core.settings import Settings
+from core.models import DHCPLease, DHCPScope
 
 # DHCP Message Type Options
 DHCP_DISCOVER = 1
@@ -38,16 +35,15 @@ CONFIG_FILENAME = "router-confg"
 class DHCPServer:
     def __init__(self): 
         self.server_ip = None
-        self.start_ip = None
-        self.end_ip = None
-        self.subnet_mask = None
         self.tftp_server_ip = None
-        self.config_filename = CONFIG_FILENAME
+        self.main_scope_address = None
+        self.main_scope_subnet_mask = None
+        self.config_filename = None
         self.lease_time = None
-        self.sock = None
         self.running = False
-        self.stop_event = Event()
+        self.sock = None
         self.server_thread = None
+        self.stop_event = Event()
         self.logger = logging.getLogger('dhcp')
     
     def ip_to_int(self, ip):
@@ -65,12 +61,62 @@ class DHCPServer:
         except DHCPLease.DoesNotExist:
             return None
     
-    def create_or_update_lease(self, mac_address, ip_address, hostname, lease_time_seconds):
-        expiry_time = timezone.now() + timedelta(seconds=lease_time_seconds)
+    def get_available_ip(self, client_mac, relay_ip=None):
+        # First, check if client already has a lease
+        existing_lease = self.get_lease_by_mac(client_mac)
+        if existing_lease:
+            return existing_lease.ip_address
+        
+        # Get all active leases
+        active_leases = set(lease.ip_address for lease in self.get_active_leases_from_db())
+        
+        # If no relay agent is involved, only check the main scope
+        if not relay_ip or relay_ip == '0.0.0.0':
+            network = ipaddress.IPv4Network(f"{self.main_scope_address}/{self.main_scope_subnet_mask}", strict=False)
+            
+            # Normal IP allocation for main scope
+            for ip in network.hosts():
+                ip_str = str(ip)
+                
+                # Skip server IP
+                if (ip_str == self.server_ip or 
+                    ip_str in active_leases):
+                    continue
+                
+                return ip_str
+            
+            return None
+        
+        # If relay agent is involved, find the matching secondary scope
+        secondary_scopes = DHCPScope.objects.all()
+        for scope in secondary_scopes:
+            # Check if the scope is active
+            if not scope.is_active:
+                continue
+
+            network = ipaddress.IPv4Network(f"{scope.network}/{scope.subnet_mask}", strict=False)
+            
+            # Check if relay IP is in this scope
+            if ipaddress.ip_address(relay_ip) in network:
+                # Offer the last host address of this scope
+                last_host = str(list(network.hosts())[-1])
+                
+                # Check if last host is available
+                if last_host not in active_leases:
+                    return last_host
+                
+                # If last host is not available, return None
+                return None
+        
+        # If no matching scope found for relay IP
+        return None
+    
+    def create_or_update_lease(self, mac_address, ip_address, hostname=None, lease_time_seconds=None):
+        expiry_time = timezone.now() + timedelta(seconds=lease_time_seconds or self.lease_time)
         
         updated = DHCPLease.objects.filter(mac_address=mac_address).update(
             ip_address=ip_address,
-            hostname=hostname,
+            hostname=hostname or 'Unknown',
             expiry_time=expiry_time,
             last_updated=timezone.now()
         )
@@ -79,33 +125,13 @@ class DHCPServer:
             DHCPLease.objects.create(
                 mac_address=mac_address,
                 ip_address=ip_address,
-                hostname=hostname,
+                hostname=hostname or 'Unknown',
                 expiry_time=expiry_time,
                 last_updated=timezone.now()
             )
     
     def delete_lease(self, mac_address):
         DHCPLease.objects.filter(mac_address=mac_address).delete()
-    
-    def get_available_ip(self, client_mac, requested_ip=None):
-        existing_lease = self.get_lease_by_mac(client_mac)
-        if existing_lease:
-            return existing_lease.ip_address
-            
-        if requested_ip:
-            requested_ip_int = self.ip_to_int(requested_ip)
-            if self.start_ip <= requested_ip_int <= self.end_ip:
-                if not DHCPLease.objects.filter(ip_address=requested_ip, expiry_time__gt=timezone.now()).exclude(mac_address=client_mac).exists():
-                    return requested_ip
-        
-        allocated_ips = set(lease.ip_address for lease in self.get_active_leases_from_db() if lease.mac_address != client_mac)
-        
-        for ip_int in range(self.start_ip, self.end_ip + 1):
-            ip = self.int_to_ip(ip_int)
-            if ip not in allocated_ips:
-                return ip
-                
-        return None
     
     def create_dhcp_packet(self, client_packet, message_type, yiaddr='0.0.0.0'):
         xid = client_packet[4:8]
@@ -133,7 +159,7 @@ class DHCPServer:
         packet += struct.pack('!BBB', DHCP_MESSAGE_TYPE, 1, message_type)
         packet += struct.pack('!BB4s', DHCP_SERVER_ID, 4, socket.inet_aton(self.server_ip))
         packet += struct.pack('!BBI', DHCP_LEASE_TIME, 4, self.lease_time)
-        packet += struct.pack('!BB4s', DHCP_SUBNET_MASK, 4, socket.inet_aton(self.subnet_mask))
+        packet += struct.pack('!BB4s', DHCP_SUBNET_MASK, 4, socket.inet_aton(self.main_scope_subnet_mask))
         packet += struct.pack('!BB4s', DHCP_ROUTER, 4, socket.inet_aton(self.server_ip))
         packet += struct.pack('!BB4s', DHCP_DNS, 4, socket.inet_aton(self.server_ip))
         packet += struct.pack('!BB4s', DHCP_TFTP_SERVER_IP, 4, socket.inet_aton(self.tftp_server_ip))
@@ -147,6 +173,27 @@ class DHCPServer:
             packet += b'\x00' * (300 - len(packet))
             
         return packet
+    
+    def parse_dhcp_options(self, data):
+        options = {}
+        options_start = data.find(b'\x63\x82\x53\x63') + 4
+        i = options_start
+        
+        while i < len(data) and data[i] != DHCP_END:
+            option = data[i]
+            if option == 0:
+                i += 1
+                continue
+            
+            if i + 1 >= len(data):
+                break
+                
+            length = data[i+1]
+            value = data[i+2:i+2+length]
+            options[option] = value
+            i += 2 + length
+        
+        return options
     
     def process_dhcp_discover(self, data, addr, giaddr):
         self.logger.info('Processing DHCP DISCOVER')
@@ -169,9 +216,11 @@ class DHCPServer:
                 length = data[i+1]
                 i += 2 + length
         
-        ip_to_offer = self.get_available_ip(client_mac)
+        # If a relay agent is involved, pass its IP
+        ip_to_offer = self.get_available_ip(client_mac, relay_ip=giaddr if giaddr != '0.0.0.0' else None)
+        
         if not ip_to_offer:
-            self.logger.warning(f'No available IP addresses for client {client_mac}')
+            self.logger.warning(f'No available IP addresses for client {client_mac} (Hostname: {hostname})')
             return
         
         self.logger.info(f'Offering IP {ip_to_offer} to client {client_mac} (Hostname: {hostname})')
@@ -192,6 +241,7 @@ class DHCPServer:
         requested_ip = None
         options_start = data.find(b'\x63\x82\x53\x63') + 4
         i = options_start
+        giaddr = socket.inet_ntoa(data[24:28])
         
         while i < len(data) and data[i] != DHCP_END:
             option = data[i]
@@ -210,7 +260,11 @@ class DHCPServer:
                 length = data[i+1]
                 i += 2 + length
         
-        available_ip = self.get_available_ip(client_mac, requested_ip)
+        # If a relay agent is involved, pass its IP
+        available_ip = self.get_available_ip(
+            client_mac, 
+            relay_ip=giaddr if giaddr != '0.0.0.0' else None
+        )
         
         if available_ip and (not requested_ip or available_ip == requested_ip):
             self.create_or_update_lease(
@@ -223,12 +277,20 @@ class DHCPServer:
             self.logger.info(f'Acknowledging IP {available_ip} to client {client_mac} (Hostname: {hostname})')
             
             ack_packet = self.create_dhcp_packet(data, DHCP_ACK, available_ip)
-            self.sock.sendto(ack_packet, ('255.255.255.255', 68))
+            
+            if giaddr != '0.0.0.0':
+                self.sock.sendto(ack_packet, (giaddr, 67))
+            else:
+                self.sock.sendto(ack_packet, ('255.255.255.255', 68))
         else:
             self.logger.warning(f'Requested IP {requested_ip} not available for client {client_mac}')
             
             nak_packet = self.create_dhcp_packet(data, DHCP_NAK)
-            self.sock.sendto(nak_packet, ('255.255.255.255', 68))
+            
+            if giaddr != '0.0.0.0':
+                self.sock.sendto(nak_packet, (giaddr, 67))
+            else:
+                self.sock.sendto(nak_packet, ('255.255.255.255', 68))
     
     def process_dhcp_release(self, data, addr):
         self.logger.info('Processing DHCP RELEASE')
@@ -241,27 +303,6 @@ class DHCPServer:
             self.logger.info(f'Client {client_mac} (Hostname: {hostname}) released IP {released_ip}')
             
             self.delete_lease(client_mac)
-    
-    def parse_dhcp_options(self, data):
-        options = {}
-        options_start = data.find(b'\x63\x82\x53\x63') + 4
-        i = options_start
-        
-        while i < len(data) and data[i] != DHCP_END:
-            option = data[i]
-            if option == 0:
-                i += 1
-                continue
-            
-            if i + 1 >= len(data):
-                break
-                
-            length = data[i+1]
-            value = data[i+2:i+2+length]
-            options[option] = value
-            i += 2 + length
-        
-        return options
     
     def process_packet(self, data, addr):
         if len(data) < 240:
@@ -286,7 +327,7 @@ class DHCPServer:
     
     def server_loop(self):
         self.logger.info(f'DHCP server running on {self.server_ip}')
-        self.logger.info(f'Offering IP range: {self.int_to_ip(self.start_ip)} - {self.int_to_ip(self.end_ip)}')
+        self.logger.info(f'Main scope: {self.main_scope_address}/{self.main_scope_subnet_mask}')
         
         try:
             self.sock.settimeout(1)
@@ -307,24 +348,23 @@ class DHCPServer:
             self.running = False
             self.logger.info('DHCP server stopped')
     
-    def start(self):
+    def start(self, server_ip, main_scope_address, main_scope_subnet_mask, tftp_server_ip=None, lease_time=86400, config_filename=CONFIG_FILENAME):
         if self.running:
             self.logger.warning("DHCP server is already running")
             return False
         
         try:
-            # Get settings from the Settings model
-            settings = Settings.get_settings()
+            # Set server parameters
+            self.server_ip = server_ip
+            self.tftp_server_ip = tftp_server_ip or server_ip
+            self.main_scope_address = main_scope_address
+            self.main_scope_subnet_mask = main_scope_subnet_mask
+            self.lease_time = lease_time
+            self.config_filename = config_filename
             
-            # Set server parameters from settings
-            self.server_ip = settings.host_ip
-            self.start_ip = self.ip_to_int(settings.dhcp_ip_range_start)
-            self.end_ip = self.ip_to_int(settings.dhcp_ip_range_end)
-            self.subnet_mask = settings.host_subnet_mask
-            self.tftp_server_ip = settings.host_ip  # Using host IP as TFTP server IP
-            self.lease_time = settings.dhcp_lease_time
             self.stop_event.clear()
             
+            # Setup socket
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
@@ -372,8 +412,7 @@ class DHCPServer:
             "running": self.running,
             "config": {
                 "server_ip": self.server_ip,
-                "ip_range": f"{self.int_to_ip(self.start_ip) if self.start_ip else None} - {self.int_to_ip(self.end_ip) if self.end_ip else None}",
-                "subnet_mask": self.subnet_mask,
+                "main_scope": f"{self.main_scope_address}/{self.main_scope_subnet_mask}",
                 "lease_time": self.lease_time,
                 "tftp_server_ip": self.tftp_server_ip
             } if self.running else None

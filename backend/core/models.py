@@ -2,8 +2,7 @@ import ipaddress
 from django.db import models
 from django.utils import timezone
 from django.core.exceptions import ValidationError
-
-from core.settings import Settings
+from core.settings import get_settings
 
 class DHCPLease(models.Model):
     mac_address = models.CharField(max_length=17, primary_key=True, help_text="MAC address of the client")
@@ -30,6 +29,18 @@ class DHCPLease(models.Model):
             return 0
         delta = self.expiry_time - timezone.now()
         return delta.total_seconds()
+
+class DHCPScope(models.Model):
+    network = models.GenericIPAddressField(protocol='IPv4')
+    subnet_mask = models.GenericIPAddressField(protocol='IPv4')
+    is_active = models.BooleanField(default=True)
+    
+    class Meta:
+        verbose_name = "DHCP Scope"
+        verbose_name_plural = "DHCP Scopes"
+        
+    def __str__(self):
+        return f"{self.network}/{self.subnet_mask}"
 
 class Router(models.Model):
     ROLE_CHOICES = [
@@ -155,8 +166,8 @@ class Site(models.Model):
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='sites')
     description = models.TextField(blank=True, help_text="Site description")
     location = models.CharField(max_length=255, blank=True, help_text="Site location")
-    management_network = models.GenericIPAddressField(protocol='IPv4', help_text="Management network IP (/30 subnet derived from DHCP sites network)")
-    router = models.ForeignKey(Router, null=True, blank=True, on_delete=models.CASCADE,  related_name='sites', help_text="Customer Edge router for this site")
+    dhcp_scope = models.OneToOneField(DHCPScope, on_delete=models.CASCADE, help_text="DHCP Scope (/30 subnet)")
+    router = models.ForeignKey(Router, null=True, blank=True, on_delete=models.CASCADE, related_name='sites', help_text="Customer Edge router for this site")
     
     class Meta:
         unique_together = [['customer', 'name']]
@@ -165,57 +176,46 @@ class Site(models.Model):
         return f"{self.customer.name} - {self.name}"
     
     def save(self, *args, **kwargs):
+        # Validate DHCP scope
+        self.validate_dhcp_scope()
+
         # Validate router role is CE
         if self.router and self.router.role != 'CE':
             raise ValidationError(f"Router '{self.router.hostname}' must have a Customer Edge (CE) role for site assignment")
         
-        # Validate management network
-        self.validate_management_network()
-        
-        super().save(args, **kwargs)
+        super().save(*args, **kwargs)
 
-    def validate_management_network(self):
-        if not self.management_network:
+    def validate_dhcp_scope(self):
+        if not self.dhcp_scope:
             return
             
         try:
             # Get global settings
-            settings = Settings.get_settings()
+            settings = get_settings()
             
             # Parse the DHCP sites network from settings
-            dhcp_sites_network = ipaddress.IPv4Network(
-                f"{settings.dhcp_sites_network_ip}/{settings.dhcp_sites_network_subnet_mask}", 
-                strict=False
-            )
+            dhcp_sites_network = ipaddress.IPv4Network(f"{settings.dhcp_sites_network_address}/{settings.dhcp_sites_network_subnet_mask}", strict=False)
             
-            # Create a /30 network from the management IP
-            management_ip = ipaddress.IPv4Address(self.management_network)
-            management_network = ipaddress.IPv4Network(f"{management_ip}/30", strict=False)
+            # Create a scope
+            dhcp_scope = ipaddress.IPv4Network(f"{self.dhcp_scope.network}/{self.dhcp_scope.subnet_mask}", strict=False)
+            
+            # Validate /30 subnet
+            if dhcp_scope.prefixlen != 30:
+                raise ValidationError(f"DHCP scope must be a /30 subnet. Current is /{dhcp_scope.prefixlen}")
             
             # Check if the /30 is a valid subnet of the DHCP sites network
-            if not management_network.subnet_of(dhcp_sites_network):
-                raise ValidationError(f"Management network {management_network} must be a subnet of the DHCP sites network {dhcp_sites_network}")
+            if not dhcp_scope.subnet_of(dhcp_sites_network):
+                raise ValidationError(f"DHCP scope {dhcp_scope} must be a subnet of the DHCP sites network {dhcp_sites_network}")
             
-            # Check if this /30 is already used by another site
-            if Site.objects.exclude(pk=self.pk).exists():
-                # Get all other sites' management networks
-                other_sites = Site.objects.exclude(pk=self.pk)
-                for site in other_sites:
-                    other_management_ip = ipaddress.IPv4Address(site.management_network)
-                    other_management_network = ipaddress.IPv4Network(f"{other_management_ip}/30", strict=False)
-                    
-                    if management_network == other_management_network:
-                        raise ValidationError(f"Management network {management_network} is already used by site '{site.name}'")
-            
-            # Ensure the network is properly aligned for a /30 (must start at a multiple of 4)
-            network_int = int(management_ip)
+            # Ensure the scope is properly aligned for a /30 (must start at a multiple of 4)
+            network_int = int(ipaddress.IPv4Address(self.dhcp_scope.network))
             if network_int % 4 != 0:
                 correct_start = network_int - (network_int % 4)
                 correct_ip = str(ipaddress.IPv4Address(correct_start))
-                raise ValidationError(f"Management network must be properly aligned for a /30 subnet. Use {correct_ip} instead.")
+                raise ValidationError(f"DHCP scope must be properly aligned for a /30 subnet. Use {correct_ip} instead.")
                 
         except (ValueError, TypeError) as e:
-            raise ValidationError(f"Invalid management network: {str(e)}")
+            raise ValidationError(f"Invalid DHCP scope: {str(e)}")
 
 class Interface(models.Model):
     router = models.ForeignKey(Router, on_delete=models.CASCADE, related_name='interfaces')

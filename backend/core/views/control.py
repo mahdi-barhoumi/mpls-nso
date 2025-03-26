@@ -1,12 +1,86 @@
-import os
 import json
-from django.apps import apps
-from django.http import JsonResponse, HttpResponse
+from django.utils import timezone
+from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
-from core.modules.tftp import TFTPServer
+from core.models import DHCPLease
+from core.modules.controller import NetworkController
 
-tftp_server = TFTPServer()
+@csrf_exempt
+@require_http_methods(["POST"])
+def start_dhcp_server(request):
+    try:        
+        success = NetworkController.start_dhcp_server()
+        
+        return JsonResponse({
+            'status': 'success' if success else 'error',
+            'message': 'DHCP server started successfully' if success else 'DHCP server already started'
+        })
+    
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def stop_dhcp_server(request):
+    try:
+        success = NetworkController.stop_dhcp_server()
+        return JsonResponse({
+            'status': 'success' if success else 'error',
+            'message': 'DHCP server stopped successfully' if success else 'DHCP server was not running'
+        })
+    
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def dhcp_server_status(request):
+    try:
+        status = NetworkController.get_dhcp_server_status()
+        return JsonResponse({
+            'status': 'success',
+            'data': status
+        })
+    
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def dhcp_leases(request):
+    try:
+        leases = []
+        active_leases = DHCPLease.objects.filter(expiry_time__gt=timezone.now())
+        
+        for lease in active_leases:
+            leases.append({
+                'mac_address': lease.mac_address,
+                'ip_address': lease.ip_address,
+                'hostname': lease.hostname,
+                'expiry_time': lease.expiry_time.isoformat(),
+                'remaining_seconds': lease.remaining_time
+            })
+        
+        return JsonResponse({
+            'status': 'success',
+            'leases': leases
+        })
+    
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
 
 @csrf_exempt
 @require_http_methods(["POST"])
@@ -27,16 +101,14 @@ def start_tftp_server(request):
                 'error': 'Missing required parameters'
             }, status=400)
         
-        success = tftp_server.start(
-            root_dir=os.path.join(apps.get_app_config('core').path, 'data\\tftp-files'),
+        success = NetworkController.start_tftp_server(
             server_ip=server_ip,
-            port=69,
             max_block_size=max_block_size
         )
         
         return JsonResponse({
             'success': success,
-            'message': 'TFTP server started successfully' if success else 'TFTP server already started' if tftp_server.is_running() else 'Failed to start TFTP server'
+            'message': 'TFTP server started successfully' if success else 'TFTP server already started' if NetworkController.is_tftp_server_running() else 'Failed to start TFTP server'
         })
     
     except Exception as e:
@@ -49,7 +121,7 @@ def start_tftp_server(request):
 @require_http_methods(["POST"])
 def stop_tftp_server(request):
     try:
-        success = tftp_server.stop()
+        success = NetworkController.stop_tftp_server()
         return JsonResponse({
             'success': success,
             'message': 'TFTP server stopped successfully' if success else 'TFTP server was not running'
@@ -65,7 +137,7 @@ def stop_tftp_server(request):
 @require_http_methods(["GET"])
 def tftp_server_status(request):
     try:
-        status = tftp_server.get_status()
+        status = NetworkController.get_tftp_server_status()
         return JsonResponse(status)
     
     except Exception as e:
@@ -78,7 +150,7 @@ def tftp_server_status(request):
 @require_http_methods(["GET"])
 def tftp_files(request):
     try:
-        files = tftp_server.get_files_list()
+        files = NetworkController.get_tftp_files_list()
         return JsonResponse({
             'count': len(files),
             'files': files
@@ -93,12 +165,6 @@ def tftp_files(request):
 @csrf_exempt
 @require_http_methods(["POST"])
 def upload_file(request):
-    if not tftp_server.is_running():
-        return JsonResponse({
-            'success': False,
-            'error': 'TFTP server is not running'
-        }, status=400)
-        
     try:
         if 'file' not in request.FILES:
             return JsonResponse({
@@ -107,21 +173,7 @@ def upload_file(request):
             }, status=400)
             
         uploaded_file = request.FILES['file']
-        filename = uploaded_file.name
-        
-        # Ensure root directory exists
-        if not tftp_server.root_dir:
-            return JsonResponse({
-                'success': False,
-                'error': 'TFTP server root directory not set'
-            }, status=500)
-            
-        # Save file to TFTP root directory
-        file_path = os.path.join(tftp_server.root_dir, filename)
-        
-        with open(file_path, 'wb+') as destination:
-            for chunk in uploaded_file.chunks():
-                destination.write(chunk)
+        filename = NetworkController.upload_tftp_file(uploaded_file)
                 
         return JsonResponse({
             'success': True,
@@ -137,42 +189,8 @@ def upload_file(request):
 @csrf_exempt
 @require_http_methods(["DELETE"])
 def delete_file(request, filename):
-    if not tftp_server.is_running():
-        return JsonResponse({
-            'success': False,
-            'error': 'TFTP server is not running'
-        }, status=400)
-        
     try:
-        if not filename:
-            return JsonResponse({
-                'success': False,
-                'error': 'No filename provided'
-            }, status=400)
-            
-        # Ensure root directory exists
-        if not tftp_server.root_dir:
-            return JsonResponse({
-                'success': False,
-                'error': 'TFTP server root directory not set'
-            }, status=500)
-            
-        # Create full path and verify it's within root_dir
-        file_path = os.path.realpath(os.path.normpath(os.path.join(tftp_server.root_dir, filename)))
-        
-        if not file_path.startswith(tftp_server.root_dir):
-            return JsonResponse({
-                'success': False,
-                'error': 'Access denied'
-            }, status=403)
-            
-        if not os.path.exists(file_path):
-            return JsonResponse({
-                'success': False,
-                'error': f'File {filename} not found'
-            }, status=404)
-            
-        os.remove(file_path)
+        filename = NetworkController.delete_tftp_file(filename)
         
         return JsonResponse({
             'success': True,

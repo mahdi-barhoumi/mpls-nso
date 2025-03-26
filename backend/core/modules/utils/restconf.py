@@ -3,13 +3,13 @@ import json
 import logging
 import time
 from requests.auth import HTTPBasicAuth
-from core.settings import Settings
+from core.settings import get_settings
 
 requests.packages.urllib3.disable_warnings()
 
 class RestconfWrapper:
     def __init__(self, username=None, password=None, max_retries=3, timeout=10, verify_ssl=False):
-        settings = Settings.get_settings()
+        settings = get_settings()
         self.username = username if username else settings.restconf_username
         self.password = password if password else settings.restconf_password
         self.max_retries = max_retries

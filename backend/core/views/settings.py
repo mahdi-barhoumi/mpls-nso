@@ -3,52 +3,43 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.core.exceptions import ValidationError
-
-from core.settings import Settings
+from core.settings import Settings, get_settings
 
 @csrf_exempt
 @require_http_methods(["GET", "POST"])
 def global_settings(request):
     if request.method == "GET":
-        try:
-            # Check if settings exist first
-            try:
-                settings = Settings.get_settings()
-                
-                # Convert settings to a dictionary
-                settings_dict = {
-                    'restconf_username': settings.restconf_username,
-                    'restconf_password': settings.restconf_password,
-                    'host_interface_id': settings.host_interface_id,
-                    'host_ip': settings.host_ip,
-                    'host_subnet_mask': settings.host_subnet_mask,
-                    'dhcp_sites_network_ip': settings.dhcp_sites_network_ip,
-                    'dhcp_sites_network_subnet_mask': settings.dhcp_sites_network_subnet_mask,
-                    'bgp_as': settings.bgp_as,
-                    'dhcp_ip_range_start': settings.dhcp_ip_range_start,
-                    'dhcp_ip_range_end': settings.dhcp_ip_range_end,
-                    'dhcp_lease_time': settings.dhcp_lease_time,
-                    'management_vrf': settings.management_vrf
-                }
-                
-                return JsonResponse({
-                    'status': 'success',
-                    'settings': settings_dict,
-                    'is_configured': True
-                })
-            except ValidationError:
-                # Settings don't exist yet
-                return JsonResponse({
-                    'status': 'success',
-                    'message': 'Settings have not been configured yet',
-                    'is_configured': False
-                })
-        
-        except Exception as e:
+        # Check if settings exist first
+        settings = get_settings()
+        if settings:
+            # Convert settings to a dictionary
+            settings_dict = {
+                'restconf_username': settings.restconf_username,
+                'restconf_password': settings.restconf_password,
+                'host_interface_id': settings.host_interface_id,
+                'host_address': settings.host_address,
+                'host_subnet_mask': settings.host_subnet_mask,
+                'dhcp_provider_network_address': settings.dhcp_provider_network_address,
+                'dhcp_provider_network_subnet_mask': settings.dhcp_provider_network_subnet_mask,
+                'dhcp_sites_network_address': settings.dhcp_sites_network_address,
+                'dhcp_sites_network_subnet_mask': settings.dhcp_sites_network_subnet_mask,
+                'dhcp_lease_time': settings.dhcp_lease_time,
+                'management_vrf': settings.management_vrf,
+                'bgp_as': settings.bgp_as
+            }
+            
             return JsonResponse({
-                'status': 'error',
-                'message': str(e)
-            }, status=500)
+                'status': 'success',
+                'settings': settings_dict,
+                'is_configured': True
+            })
+        
+        else:
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Settings have not been configured yet',
+                'is_configured': False
+            })
     
     elif request.method == "POST":
         try:
@@ -56,7 +47,7 @@ def global_settings(request):
             data = json.loads(request.body)
             
             # Check if settings already exist
-            if Settings.objects.exists():
+            if get_settings():
                 return JsonResponse({
                     'status': 'error',
                     'message': 'Settings already exist and cannot be modified'
@@ -64,9 +55,8 @@ def global_settings(request):
             
             # Create new settings instance
             required_fields = [
-                'restconf_username', 'restconf_password', 'host_ip', 'host_subnet_mask',
-                'dhcp_sites_network_ip', 'dhcp_sites_network_subnet_mask', 'bgp_as',
-                'dhcp_ip_range_start', 'dhcp_ip_range_end', 'dhcp_lease_time', 'management_vrf'
+                'restconf_username', 'restconf_password', 'host_interface_id', 'host_address', 'host_subnet_mask',
+                'dhcp_sites_network_address', 'dhcp_sites_network_subnet_mask', 'dhcp_lease_time', 'management_vrf', 'bgp_as'
             ]
             
             # Check for missing required fields
@@ -82,15 +72,15 @@ def global_settings(request):
                 restconf_username=data.get('restconf_username'),
                 restconf_password=data.get('restconf_password'),
                 host_interface_id=data.get('host_interface_id'),
-                host_ip=data.get('host_ip'),
+                host_address=data.get('host_address'),
                 host_subnet_mask=data.get('host_subnet_mask'),
-                dhcp_sites_network_ip=data.get('dhcp_sites_network_ip'),
+                dhcp_provider_network_address=data.get('host_address'),
+                dhcp_provider_network_subnet_mask=data.get('host_subnet_mask'),
+                dhcp_sites_network_address=data.get('dhcp_sites_network_address'),
                 dhcp_sites_network_subnet_mask=data.get('dhcp_sites_network_subnet_mask'),
-                bgp_as=data.get('bgp_as'),
-                dhcp_ip_range_start=data.get('dhcp_ip_range_start'),
-                dhcp_ip_range_end=data.get('dhcp_ip_range_end'),
                 dhcp_lease_time=data.get('dhcp_lease_time'),
-                management_vrf=data.get('management_vrf')
+                management_vrf=data.get('management_vrf'),
+                bgp_as=data.get('bgp_as')
             )
             
             # Save with validation
@@ -100,6 +90,7 @@ def global_settings(request):
                     'status': 'success',
                     'message': 'Settings created successfully'
                 })
+
             except ValidationError as ve:
                 return JsonResponse({
                     'status': 'error',
