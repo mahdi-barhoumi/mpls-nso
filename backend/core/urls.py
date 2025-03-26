@@ -1,6 +1,6 @@
 from django.urls import path
-from core.views import control, utils, settings, discovery, customers, sites, routers,network_map 
-
+from core.views import control, utils, settings, discovery, customers, sites, routers
+from core.views.network_map import * 
 
 urlpatterns = [
     # Settings endpoint
@@ -40,5 +40,4 @@ urlpatterns = [
     # Network discovery endpoints
     path('network/discover/', discovery.discover_network, name='discover-network'),
     path('network/map/', NetworkMapView.as_view(), name='map_data'),
-    path('network/map/<str:chassis_id>/', NetworkMapDetailView.as_view(), name='router_detail_data'),
 ]
