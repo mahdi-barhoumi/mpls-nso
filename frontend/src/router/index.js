@@ -1,21 +1,55 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import HomeView from '../views/HomeView.vue'
 
+import AppLayout from '@/layout/AppLayout.vue'
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
       path: '/',
-      name: 'home',
-      component: HomeView,
+      component: AppLayout,
+      children: [
+        {
+          path: '/',
+          name: 'dashboard',
+          component: () => import('@/views/Dashboard.vue'),
+        },
+        {
+          path: '/pages/empty',
+          name: 'empty',
+          component: () => import('@/views/pages/Empty.vue'),
+        },
+      ],
     },
     {
-      path: '/about',
-      name: 'about',
-      // route level code-splitting
-      // this generates a separate chunk (About.[hash].js) for this route
-      // which is lazy-loaded when the route is visited.
-      component: () => import('../views/AboutView.vue'),
+      path: '/landing',
+      name: 'landing',
+      component: () => import('@/views/pages/Landing.vue'),
+    },
+    {
+      path: '/pages/notfound',
+      name: 'notfound',
+      component: () => import('@/views/pages/NotFound.vue'),
+    },
+
+    {
+      path: '/auth/login',
+      name: 'login',
+      component: () => import('@/views/pages/auth/Login.vue'),
+    },
+    {
+      path: '/auth/access',
+      name: 'accessDenied',
+      component: () => import('@/views/pages/auth/Access.vue'),
+    },
+    {
+      path: '/auth/error',
+      name: 'error',
+      component: () => import('@/views/pages/auth/Error.vue'),
+    },
+    {
+      path: '/register',
+      name: 'register',
+      component: () => import('@/views/pages/auth/Register.vue'),
     },
   ],
 })
