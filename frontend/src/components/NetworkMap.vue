@@ -42,7 +42,19 @@
         class="h-full w-full"
       >
         <!-- Define custom node rendering -->
-        <template #override-node="{ nodeId, scale, config, ...slotProps }">
+        <template
+          #override-node="{ nodeId, scale, config, ...slotProps }"
+          #override-node-label="{ nodeId, scale, text, x, y, config, textAnchor, dominantBaseline }"
+        >
+          <text
+            x="0"
+            y="32"
+            :font-size="9 * scale"
+            text-anchor="middle"
+            dominant-baseline="central"
+            fill="00000"
+            >{{ getNodeName(nodeId) }}</text
+          >
           <circle :r="config.radius * scale" :fill="config.color" v-bind="slotProps" />
           <image
             :xlink:href="getNodeIcon(nodeId)"
@@ -201,6 +213,10 @@ export default {
         return '/demo/images/routers/router_blue.svg' // Blue router image for PE routers
       }
       return null // Default to no image for other types
+    },
+    getNodeName(nodeId) {
+      const node = this.graphData.nodes[nodeId]
+      return node.label
     },
     onNodeClick(event) {
       const nodeId = event.node
