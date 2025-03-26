@@ -146,12 +146,12 @@ LOGGING = {
         }
     },
     'loggers': {
-        'DHCP': {
+        'dhcp': {
             'handlers': ['console'],
             'level': 'INFO',
             'propagate': True,
         },
-        'TFTP': {
+        'tftp': {
             'handlers': ['console'],
             'level': 'INFO',
             'propagate': True,

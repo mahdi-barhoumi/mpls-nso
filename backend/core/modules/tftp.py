@@ -26,7 +26,7 @@ class TFTPServer:
         self.running = False
         self.stop_event = Event()
         self.server_thread = None
-        self.logger = logging.getLogger('TFTP')
+        self.logger = logging.getLogger('tftp')
     
     def send_error_packet(self, client_socket, client_address, error_code, error_message):
         error_packet = struct.pack('!HH', TFTP_ERROR, error_code)
