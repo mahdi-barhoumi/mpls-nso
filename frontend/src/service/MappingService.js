@@ -23,6 +23,8 @@ export const MappingService = {
           label: `${link.sourceInterfaceName} ↔ ${link.targetInterfaceName}`,
           sourceInterface: link.sourceInterface,
           targetInterface: link.targetInterface,
+          sourceInterfaceName: link.sourceInterfaceName,
+          targetInterfaceName: link.targetInterfaceName,
         })),
       }
 

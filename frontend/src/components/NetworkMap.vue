@@ -42,10 +42,7 @@
         class="h-full w-full"
       >
         <!-- Define custom node rendering -->
-        <template
-          #override-node="{ nodeId, scale, config, ...slotProps }"
-          #override-node-label="{ nodeId, scale, text, x, y, config, textAnchor, dominantBaseline }"
-        >
+        <template #override-node="{ nodeId, scale, config, ...slotProps }">
           <text
             x="0"
             y="32"
@@ -62,6 +59,32 @@
             :y="-config.radius * scale"
             :width="config.radius * 2 * scale"
             :height="config.radius * 2 * scale"
+          />
+        </template>
+
+        <!-- Define custom edge labels -->
+        <template #edge-label="{ edge, ...slotProps }">
+          <v-edge-label
+            :text="edge.label"
+            align="center"
+            vertical-align="above"
+            v-bind="slotProps"
+          />
+          <v-edge-label
+            :text="edge.sourceInterfaceName"
+            align="source"
+            vertical-align="above"
+            v-bind="slotProps"
+            fill="#ff5500"
+            :font-size="12 * scale"
+          />
+          <v-edge-label
+            :text="edge.targetInterfaceName"
+            align="target"
+            vertical-align="above"
+            v-bind="slotProps"
+            fill="#ff5500"
+            :font-size="12 * scale"
           />
         </template>
       </v-network-graph>
@@ -101,7 +124,7 @@
 </template>
 
 <script>
-import { VNetworkGraph } from 'v-network-graph'
+import { VNetworkGraph, VEdgeLabel } from 'v-network-graph'
 import 'v-network-graph/lib/style.css'
 import { MappingService } from '@/service/MappingService.js'
 
@@ -109,6 +132,7 @@ export default {
   name: 'NetworkMap',
   components: {
     VNetworkGraph,
+    VEdgeLabel,
   },
   data() {
     return {
@@ -131,7 +155,7 @@ export default {
         node: {
           normal: {
             type: 'circle',
-            radius: 25,
+            radius: 30,
             color: '#ffffff', // Default background color for nodes
             label: {
               visible: true,
@@ -147,10 +171,7 @@ export default {
             color: '#777',
             dasharray: '4 2',
             label: {
-              visible: true,
-              fontSize: 8,
-              fontFamily: 'Arial',
-              color: '#555',
+              visible: false, // Disable default edge labels
             },
           },
         },
@@ -218,6 +239,10 @@ export default {
       const node = this.graphData.nodes[nodeId]
       return node.label
     },
+    getEdgeData(edgeId) {
+      const edge = this.graphData.edge[edgeId]
+      return edge
+    },
     onNodeClick(event) {
       const nodeId = event.node
       const node = this.graphData.nodes[nodeId]
@@ -238,6 +263,7 @@ export default {
         }
       }
     },
+
     closeDetails() {
       this.selectedElement = null
     },
