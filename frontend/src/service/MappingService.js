@@ -23,8 +23,14 @@ export const MappingService = {
           label: `${link.sourceInterfaceName} ↔ ${link.targetInterfaceName}`,
           sourceInterface: link.sourceInterface,
           targetInterface: link.targetInterface,
-          sourceInterfaceName: link.sourceInterfaceName,
-          targetInterfaceName: link.targetInterfaceName,
+          sourceInterfaceName: abbreviateInterfaceName(link.sourceInterfaceName),
+          targetInterfaceName: abbreviateInterfaceName(link.targetInterfaceName),
+          sourceInterfaceIp: link.sourceInterfaceDetails.ip_address,
+          sourceInterfaceMask: link.sourceInterfaceDetails.subnet_mask,
+          subnet: calculateSubnet(
+            link.sourceInterfaceDetails.ip_address,
+            link.sourceInterfaceDetails.subnet_mask,
+          ),
         })),
       }
 
@@ -34,4 +40,39 @@ export const MappingService = {
       throw error
     }
   },
+}
+// Utility function to calculate the subnet
+function calculateSubnet(ipAddress, subnetMask) {
+  if (!ipAddress || !subnetMask) return null
+
+  const ipParts = ipAddress.split('.').map(Number)
+  const maskParts = subnetMask.split('.').map(Number)
+
+  if (ipParts.length !== 4 || maskParts.length !== 4) return null
+
+  // Calculate the subnet address
+  const subnetParts = ipParts.map((part, index) => part & maskParts[index])
+  const subnetAddress = subnetParts.join('.')
+
+  // Calculate the subnet length (number of bits set to 1 in the mask)
+  const subnetLength =
+    maskParts
+      .map((part) => part.toString(2).padStart(8, '0')) // Convert each octet to binary
+      .join('') // Combine all binary strings
+      .split('1').length - 1 // Count the number of '1's
+
+  return `${subnetAddress}/${subnetLength}` // Combine subnet address and length
+}
+// Utility function to abbreviate interface names
+function abbreviateInterfaceName(interfaceName) {
+  if (!interfaceName) return null
+
+  // Extract the first two letters and append any trailing numbers or symbols
+  const match = interfaceName.match(/^([a-zA-Z]{2})[a-zA-Z]*([\d./]*)/)
+  if (match) {
+    const [, prefix, suffix] = match
+    return `${prefix}${suffix}`
+  }
+
+  return interfaceName // Return the original name if no match
 }
