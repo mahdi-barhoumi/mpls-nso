@@ -121,7 +121,7 @@ class TFTPServer:
             self.logger.error(f"Error processing request: {e}")
     
     def server_loop(self):
-        self.logger.info(f'TFTP Server running on {self.server_ip}:{self.port}')
+        self.logger.info(f'TFTP server running on {self.server_ip}:{self.port}')
         self.logger.info(f'Serving files from {self.root_dir}')
         
         try:
@@ -145,11 +145,11 @@ class TFTPServer:
                 self.sock.close()
                 self.sock = None
             self.running = False
-            self.logger.info('TFTP Server stopped')
+            self.logger.info('TFTP server stopped')
     
     def start(self, root_dir, server_ip, port=69, max_block_size=512):
         if self.running:
-            self.logger.warning("TFTP Server is already running")
+            self.logger.warning("TFTP server is already running")
             return False
             
         # Convert relative path to absolute path
@@ -183,7 +183,7 @@ class TFTPServer:
     
     def stop(self):
         if not self.running:
-            self.logger.warning("TFTP Server is not running")
+            self.logger.warning("TFTP server is not running")
             return False
             
         self.logger.info("Stopping TFTP Server...")

@@ -1,8 +1,12 @@
 import os
 import logging
+import ipaddress
 from django.apps import apps
 from core.modules.dhcp import DHCPServer
 from core.modules.tftp import TFTPServer
+from core.modules.utils.host_network_manager import HostNetworkManager
+from core.modules.utils.restconf import RestconfWrapper
+from core.models import Interface, Site, Router
 from core.settings import get_settings
 
 class _NetworkController:
@@ -11,6 +15,7 @@ class _NetworkController:
         self.dhcp_server = DHCPServer()
         self.tftp_server = TFTPServer()
         self.start_dhcp_server()
+        self.start_tftp_server()
 
     def start_dhcp_server(self):
         # Ensure settings are loaded
@@ -39,28 +44,29 @@ class _NetworkController:
             self.logger.error(f"DHCP server stop failed: {e}")
             return False
 
+    def is_dhcp_server_running(self):
+        return self.dhcp_server.is_running()
+
     def get_dhcp_server_status(self):
         return self.dhcp_server.get_status()
 
     def get_active_dhcp_leases(self):
         return self.dhcp_server.get_active_leases()
 
-    def start_tftp_server(self, server_ip=None, max_block_size=512):
+    def start_tftp_server(self):
         settings = get_settings()
-        if not server_ip and settings:
-            server_ip = settings.host_address
-
-        if not server_ip:
-            self.logger.error("Cannot start TFTP server: No server IP provided")
+        if not settings:
+            self.logger.warning("Cannot start TFTP server: No system settings found")
             return False
 
         try:
             return self.tftp_server.start(
                 root_dir=os.path.join(apps.get_app_config('core').path, 'data\\tftp-files'),
-                server_ip=server_ip,
+                server_ip=settings.host_address,
                 port=69,
-                max_block_size=max_block_size
+                max_block_size=512
             )
+
         except Exception as e:
             self.logger.error(f"TFTP server start failed: {e}")
             return False
@@ -114,5 +120,108 @@ class _NetworkController:
 
         os.remove(file_path)
         return filename
+
+    def attach_site_to_interface(self, interface: Interface, site: Site) -> bool:
+        try:
+            if interface.site == site:
+                self.logger.error("Cannot attach site: Site already attached")
+                return False
+
+            # Get system settings
+            settings = get_settings()
+            if not settings:
+                self.logger.error("Cannot attach site: No system settings found")
+                return False
+
+            # Validate inputs
+            if not interface or not site or not site.dhcp_scope:
+                self.logger.error("Invalid interface or site configuration")
+                return False
+
+            # 1. Add route to site's DHCP scope
+            dhcp_scope = ipaddress.IPv4Network(
+                f'{site.dhcp_scope.network}/{site.dhcp_scope.subnet_mask}', 
+                strict=False
+            )
+            
+            # Add route via router's management IP
+            route_added = HostNetworkManager.add_route(
+                str(dhcp_scope), 
+                interface.router.management_ip_address, 
+                settings.host_interface_id
+            )
+            
+            if not route_added:
+                self.logger.error(f"Failed to add route for DHCP scope {dhcp_scope}")
+                return False
+
+            # Activate DHCP scope (this might involve database operations)
+            site.dhcp_scope.is_active = True
+            site.dhcp_scope.save()
+
+            # Configure interface via RESTCONF
+            restconf = RestconfWrapper()
+            
+            # Determine first usable IP in the /30 scope
+            first_ip = list(dhcp_scope.hosts())[0]
+            
+            # Prepare interface configuration
+            interface_config = {
+                "Cisco-IOS-XE-native:GigabitEthernet": { 
+                    "name": interface.name.split('GigabitEthernet')[-1],
+                    "vrf": {
+                        "forwarding": settings.management_vrf
+                    },
+                    "ip": {
+                        "address": {
+                            "primary": {
+                                "address": str(first_ip),
+                                "mask": site.dhcp_scope.subnet_mask
+                            }
+                        },
+                        "helper-address": [
+                            {
+                                "address": settings.host_address
+                            }
+                        ]
+                    }
+                }
+            }
+
+            # Send RESTCONF configuration
+            result = restconf.put(
+                interface.router.management_ip_address, 
+                f"Cisco-IOS-XE-native:native/interface/GigabitEthernet={interface.name.split('GigabitEthernet')[-1]}", 
+                interface_config
+            )
+
+            if result is None:
+                HostNetworkManager.delete_route(
+                    str(dhcp_scope), 
+                    settings.host_interface_id
+                )
+                self.logger.error(f"Failed to configure interface {interface.name} via RESTCONF")
+                return False
+
+            # Update interface in database
+            interface.site = site
+            interface.ip_address = str(first_ip)
+            interface.subnet_mask = site.dhcp_scope.subnet_mask
+            interface.save()
+
+            self.logger.info(f"Successfully attached site {site.name} to interface {interface.name}")
+            return True
+
+        except Exception as e:
+            if route_added:
+                HostNetworkManager.delete_route(
+                    str(dhcp_scope), 
+                    settings.host_interface_id
+                )
+            self.logger.error(f"Error attaching site to interface: {str(e)}")
+            return False
+
+    def detach_site_to_interface(self, interface, site):
+        pass
 
 NetworkController = _NetworkController()

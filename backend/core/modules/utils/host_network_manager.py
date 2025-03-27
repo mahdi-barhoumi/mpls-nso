@@ -1,3 +1,4 @@
+import time
 import logging
 import platform
 import subprocess
@@ -63,13 +64,10 @@ class _HostNetworkManager:
         except HostNetworkManagerError:
             return False
     
-    def delete_route(self, prefix: str, interface: Optional[Union[int, str]] = None) -> bool:
+    def delete_route(self, prefix: str, interface: Union[int, str]) -> bool:
         cmd = [
-            'netsh', 'interface', 'ipv4', 'delete', 'route', f'prefix={prefix}'
+            'netsh', 'interface', 'ipv4', 'delete', 'route', f'prefix={prefix}', f'interface={interface}'
         ]
-        
-        if interface:
-            cmd.append(f'interface={interface}')
 
         try:
             self._run_command(cmd)
@@ -89,6 +87,7 @@ class _HostNetworkManager:
         
         try:
             self._run_command(cmd)
+            time.sleep(5)
             self.logger.info(f"Interface {interface} configured: address={address} mask={subnet_mask}")
             return True
 
