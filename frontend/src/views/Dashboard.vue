@@ -1,16 +1,14 @@
 <script setup>
-import NetworkMap from '@/components/NetworkMap.vue'
+import MapWidget from '@/components/dashboard/MapWidget.vue'
+import CustomerCrud from './pages/CustomerCrud.vue'
 </script>
 
 <template>
   <div class="grid grid-cols-12 gap-8">
     <!-- The next two sections are split into two equal parts for larger screens (6 columns each) -->
-    <div class="col-span-12 xl:col-span-6">
-      <NetworkMap />
+    <div class="col-span-12 xl:col-span-8">
+      <MapWidget />
     </div>
-    <div class="col-span-12 xl:col-span-6">
-      <div />
-      <div />
-    </div>
+    <div class="col-span-12 xl:col-span-4"></div>
   </div>
 </template>

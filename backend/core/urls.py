@@ -1,6 +1,6 @@
 from django.urls import path
-from core.views import control, utils, settings, discovery, customers, sites, routers,network_map 
-
+from core.views import control, utils, settings, discovery, customers, sites, routers
+from core.views.network_map import * 
 
 urlpatterns = [
     # Settings endpoint
@@ -11,12 +11,21 @@ urlpatterns = [
     path('utils/host-interfaces/', utils.list_host_interfaces, name='host-interfaces'),
 
     # Models endpoints
+
+    ## Sites endpoints
     path('sites/', sites.list_sites, name='list-sites'),
     path('sites/create/', sites.create_site, name='create-site'),
     path('sites/<int:site_id>/', sites.get_site, name='get-site'),
+
+    ## Customers endpoints
     path('customers/', customers.list_customers, name='list-customers'),
     path('customers/create/', customers.create_customer, name='create-customer'),
     path('customers/<int:customer_id>/', customers.get_customer, name='get-customer'),
+    # TODO add update and delete customer endpoints    
+    # path('customers/<int:customer_id>/update/', views.update_customer, name='update-customer'),
+    # path('customers/<int:customer_id>/delete/', views.delete_customer, name='delete-customer'),
+    
+    ## Routers endpoints
     path('routers/', routers.list_routers, name='list-routers'),
     path('routers/<str:router_id>/', routers.get_router, name='get-router'),
     path('routers/<str:router_id>/interfaces/', routers.list_router_interfaces, name='list-router-interfaces'),
@@ -40,5 +49,4 @@ urlpatterns = [
     # Network discovery endpoints
     path('network/discover/', discovery.discover_network, name='discover-network'),
     path('network/map/', NetworkMapView.as_view(), name='map_data'),
-    path('network/map/<str:chassis_id>/', NetworkMapDetailView.as_view(), name='router_detail_data'),
 ]
