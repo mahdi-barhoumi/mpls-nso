@@ -1,36 +1,16 @@
 <template>
   <div class="network-container">
     <!-- Toolbar for zoom and filtering -->
-    <div
-      class="toolbar p-4 flex items-center justify-between bg-gray-100 dark:bg-gray-800 rounded-lg shadow-md"
-    >
-      <div class="flex space-x-2">
-        <button
-          @click="zoomIn"
-          class="px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center space-x-2"
-        >
-          <i class="pi pi-search-plus"></i>
-          <span>Zoom In</span>
-        </button>
-        <button
-          @click="zoomOut"
-          class="px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center space-x-2"
-        >
-          <i class="pi pi-search-minus"></i>
-          <span>Zoom Out</span>
-        </button>
-        <button
-          @click="resetView"
-          class="px-3 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 flex items-center space-x-2"
-        >
-          <i class="pi pi-refresh"></i>
-          <span>Reset</span>
-        </button>
+    <div class="p-4 flex items-center justify-between surface-card shadow-2 border-round">
+      <div class="flex gap-1">
+        <Button icon="pi pi-search-plus" class="p-button-secondary" @click="zoomIn" />
+        <Button icon="pi pi-search-minus" class="p-button-secondary" @click="zoomOut" />
+        <Button label="Reset" icon="pi pi-refresh" class="p-button-secondary" @click="resetView" />
       </div>
     </div>
 
     <!-- Network Graph -->
-    <div class="network-graph-container">
+    <div class="network-graph-container surface-card shadow-2 border-round mt-3">
       <v-network-graph
         ref="graph"
         :nodes="graphData.nodes"
@@ -43,16 +23,17 @@
       >
         <!-- Define custom node rendering -->
         <template #override-node="{ nodeId, scale, config, ...slotProps }">
-          <circle :r="config.radius * scale" :fill="config.color" v-bind="slotProps" />
+          <!-- <circle :r="config.radius * scale" :fill="`var(--p-primary-color)`" v-bind="slotProps" /> -->
           <text
             :x="0"
             :y="(config.radius + 10) * scale"
-            :font-size="9 * scale"
+            :font-size="12 * scale"
             text-anchor="middle"
             dominant-baseline="central"
-            fill="00000"
-            >{{ getNodeName(nodeId) }}</text
+            fill="var(--p-blue-600)"
           >
+            {{ getNodeName(nodeId) }}
+          </text>
           <image
             :xlink:href="getNodeIcon(nodeId)"
             :x="-(config.radius - 8) * scale"
@@ -64,13 +45,19 @@
 
         <!-- Define custom edge labels -->
         <template #edge-label="{ edge, ...slotProps }">
-          <v-edge-label :text="edge.id" align="center" vertical-align="above" v-bind="slotProps" />
+          <v-edge-label
+            :text="edge.subnet"
+            align="center"
+            vertical-align="above"
+            v-bind="slotProps"
+            fill="var(--p-primary-500)"
+          />
           <v-edge-label
             :text="edge.sourceInterfaceName"
             align="source"
             vertical-align="above"
             v-bind="slotProps"
-            fill="#ff5500"
+            fill="var(--text-color)"
             :font-size="12 * scale"
           />
           <v-edge-label
@@ -78,43 +65,36 @@
             align="target"
             vertical-align="above"
             v-bind="slotProps"
-            fill="#ff5500"
             :font-size="12 * scale"
+            fill="var(--text-color)"
           />
         </template>
       </v-network-graph>
     </div>
 
     <!-- Details Dialog -->
-    <div
+    <Dialog
       v-if="selectedElement"
-      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      :visible="true"
+      :header="selectedElement.type === 'node' ? 'Node Details' : 'Link Details'"
+      modal
+      class="w-11 sm:w-6"
+      @hide="closeDetails"
     >
-      <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full shadow-xl">
-        <div class="flex justify-between items-center mb-4">
-          <h2 class="text-xl font-bold">
-            {{ selectedElement.type === 'node' ? 'Node Details' : 'Link Details' }}
-          </h2>
-          <button @click="closeDetails" class="text-gray-600 hover:text-gray-900">✕</button>
+      <template v-if="selectedElement.type === 'node'">
+        <div v-for="(value, key) in selectedElement.data" :key="key" class="mb-2">
+          <span class="font-bold capitalize">{{ key.replace(/_/g, ' ') }}:</span>
+          <span>{{ value }}</span>
         </div>
+      </template>
 
-        <!-- Node Details -->
-        <template v-if="selectedElement.type === 'node'">
-          <div v-for="(value, key) in selectedElement.data" :key="key" class="mb-2">
-            <span class="font-semibold capitalize">{{ key.replace(/_/g, ' ') }}:</span>
-            <span>{{ value }}</span>
-          </div>
-        </template>
-
-        <!-- Link Details -->
-        <template v-else-if="selectedElement.type === 'link'">
-          <div v-for="(value, key) in selectedElement.data" :key="key" class="mb-2">
-            <span class="font-semibold capitalize">{{ key.replace(/_/g, ' ') }}:</span>
-            <span>{{ value }}</span>
-          </div>
-        </template>
-      </div>
-    </div>
+      <template v-else-if="selectedElement.type === 'link'">
+        <div v-for="(value, key) in selectedElement.data" :key="key" class="mb-2">
+          <span class="font-bold capitalize">{{ key.replace(/_/g, ' ') }}:</span>
+          <span>{{ value }}</span>
+        </div>
+      </template>
+    </Dialog>
   </div>
 </template>
 
@@ -122,12 +102,16 @@
 import { VNetworkGraph, VEdgeLabel } from 'v-network-graph'
 import 'v-network-graph/lib/style.css'
 import { MappingService } from '@/service/MappingService.js'
+import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
 
 export default {
   name: 'NetworkMap',
   components: {
     VNetworkGraph,
     VEdgeLabel,
+    Button,
+    Dialog,
   },
   data() {
     return {
@@ -155,7 +139,7 @@ export default {
             label: {
               visible: true,
               fontSize: 10,
-              fontFamily: 'Arial',
+              fontFamily: 'var(--font-family)',
               color: '#000',
             },
           },
@@ -163,7 +147,7 @@ export default {
         edge: {
           normal: {
             width: 2,
-            color: '#777',
+            color: 'var(--p-blue-400)',
             dasharray: '4 2',
             label: {
               visible: false, // Disable default edge labels
@@ -172,7 +156,6 @@ export default {
         },
       },
       selectedElement: null,
-      selectedFilter: 'all',
     }
   },
   async created() {
@@ -239,10 +222,6 @@ export default {
       const node = this.graphData.nodes[nodeId]
       return node.label
     },
-    getEdgeData(edgeId) {
-      const edge = this.graphData.edge[edgeId]
-      return edge
-    },
     onNodeClick(event) {
       const nodeId = event.node
       const node = this.graphData.nodes[nodeId]
@@ -263,7 +242,6 @@ export default {
         }
       }
     },
-
     closeDetails() {
       this.selectedElement = null
     },
@@ -283,8 +261,6 @@ export default {
 <style scoped>
 .network-graph-container {
   height: 600px;
-  background-color: #f0f0f0;
-  border-radius: 8px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  background-color: var(--surface-card);
 }
 </style>
