@@ -1,5 +1,6 @@
 <script setup>
 import MapWidget from '@/components/dashboard/MapWidget.vue'
+import CustomerCrud from './pages/CustomerCrud.vue'
 </script>
 
 <template>
@@ -8,9 +9,6 @@ import MapWidget from '@/components/dashboard/MapWidget.vue'
     <div class="col-span-12 xl:col-span-8">
       <MapWidget />
     </div>
-    <div class="col-span-12 xl:col-span-4">
-      <div />
-      <div />
-    </div>
+    <div class="col-span-12 xl:col-span-4"></div>
   </div>
 </template>
