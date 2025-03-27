@@ -1,4 +1,4 @@
-hostname UnassignedRouter
+hostname CE
 
 username mgmt privilege 15 secret mgmtapp
 

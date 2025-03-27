@@ -4,6 +4,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.core.exceptions import ValidationError
 from core.settings import Settings, get_settings
+from core.modules.controller import NetworkController
 
 @csrf_exempt
 @require_http_methods(["GET", "POST"])
@@ -86,6 +87,8 @@ def global_settings(request):
             # Save with validation
             try:
                 settings.save()
+                NetworkController.start_dhcp_server()
+                NetworkController.start_tftp_server()
                 return JsonResponse({
                     'status': 'success',
                     'message': 'Settings created successfully'

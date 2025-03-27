@@ -225,6 +225,7 @@ class RestconfWrapper:
                         return {}
                 else:
                     self.logger.warning(f"Failed to PUT data to {url}: HTTP {response.status_code}")
+                    print(response.content)
                     if attempt == self.max_retries - 1:
                         return None
             except requests.exceptions.Timeout:

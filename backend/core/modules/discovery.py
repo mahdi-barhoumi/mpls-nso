@@ -1,5 +1,6 @@
 import time
 import logging
+import ipaddress
 from datetime import timedelta
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
@@ -7,6 +8,7 @@ from django.utils import timezone
 from django.db import transaction, OperationalError
 from core.modules.utils.restconf import RestconfWrapper
 from core.models import DHCPLease, Router, VRF, RouteTarget, Interface, VPN
+from core.settings import get_settings
 
 class NetworkDiscoverer:
     def __init__(self, max_workers=5):
@@ -19,6 +21,15 @@ class NetworkDiscoverer:
         
         # Create RESTCONF wrapper
         self.restconf = RestconfWrapper()
+        
+        # Retrieve system settings
+        self.settings = get_settings()
+        
+        # Precompute DHCP sites network
+        self.dhcp_sites_network = ipaddress.IPv4Network(
+            f"{self.settings.dhcp_sites_network_address}/{self.settings.dhcp_sites_network_subnet_mask}", 
+            strict=False
+        )
         
     def discover_network(self):
         self.logger.info("Starting network discovery process")
@@ -140,6 +151,38 @@ class NetworkDiscoverer:
         self.logger.info(f"Finished VPN discovery, created/updated {vpn_count} VPNs")
         return vpn_count
     
+    def detect_router_role(self, ip_address):
+        # Check if IP is in DHCP sites network
+        try:
+            ip = ipaddress.IPv4Address(ip_address)
+            if ip in self.dhcp_sites_network:
+                return 'CE'
+        except ValueError:
+            pass
+        
+        # Check if router has BGP config
+        try:
+            bgp_config = self.restconf.get(ip_address, "Cisco-IOS-XE-native:native/router/bgp")
+            
+            # Validate BGP configuration exists and is not empty
+            if not bgp_config or 'Cisco-IOS-XE-bgp:bgp' not in bgp_config:
+                return 'P'  # Default to Provider Core if no BGP config
+            
+            bgp_data = bgp_config.get('Cisco-IOS-XE-bgp:bgp', [{}])[0]
+            
+            # Check if BGP AS number matches system settings
+            if str(bgp_data.get('id', '')) == str(self.settings.bgp_as):
+                return 'PE'
+            
+            # If BGP is configured but doesn't match AS, it might be a P router
+            return 'P'
+        
+        except Exception as e:
+            self.logger.warning(f"Error checking BGP config for {ip_address}: {str(e)}")
+            
+            # Default to Provider Core router in case of any errors
+            return 'P'
+
     def process_device(self, lease):
         try:
             ip_address = lease.ip_address
@@ -159,20 +202,18 @@ class NetworkDiscoverer:
                 self.logger.warning(f"Incomplete LLDP data for {ip_address}, skipping")
                 return None
             
-            # Check if the router is PE by checking for BGP configuration
-            is_pe = self.check_if_pe_router(ip_address)
-            role = 'PE' if is_pe else 'P'
+            # Detect router role
+            role = self.detect_router_role(ip_address)
             
             # Get VRF data if it's a PE router
             vrf_data = None
-            if is_pe:
+            if role == 'PE':
                 vrf_data = self.get_vrf_data(ip_address)
             
             # Get interfaces data
             interfaces_data = self.get_interfaces_data(ip_address)
             
             # Create or update router within a transaction
-            # Use multiple retry attempts with small transactions
             max_retries = 3
             for attempt in range(max_retries):
                 try:
@@ -187,9 +228,9 @@ class NetworkDiscoverer:
                         )
                         
                         if created:
-                            self.logger.info(f"Created new router: {hostname}")
+                            self.logger.info(f"Created new router: {hostname} (Role: {role})")
                         else:
-                            self.logger.info(f"Updated existing router: {hostname}")
+                            self.logger.info(f"Updated existing router: {hostname} (Role: {role})")
                         
                         # Store router in cache
                         self.router_cache[hostname] = router
@@ -204,7 +245,7 @@ class NetworkDiscoverer:
                         raise
             
             # Process VRFs if PE router (in a separate transaction)
-            if is_pe and vrf_data:
+            if role == 'PE' and vrf_data:
                 for attempt in range(max_retries):
                     try:
                         with transaction.atomic():
@@ -235,8 +276,7 @@ class NetworkDiscoverer:
                 "hostname": hostname,
                 "role": role,
                 "ip_address": ip_address,
-                "chassis_id": chassis_id,
-                "is_pe": is_pe
+                "chassis_id": chassis_id
             }
             
         except Exception as e:
@@ -261,8 +301,10 @@ class NetworkDiscoverer:
         
         for vrf_def in definitions:
             vrf_name = vrf_def.get('name')
-            if not vrf_name or vrf_name == 'management':
-                continue  # Skip management VRF or invalid entries
+            
+            # Skip management VRFs
+            if vrf_name == self.settings.management_vrf:
+                continue
             
             # Extract route distinguisher
             rd = vrf_def.get('rd', '')

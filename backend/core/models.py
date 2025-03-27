@@ -38,9 +38,49 @@ class DHCPScope(models.Model):
     class Meta:
         verbose_name = "DHCP Scope"
         verbose_name_plural = "DHCP Scopes"
+        unique_together = ['network', 'subnet_mask']
         
     def __str__(self):
         return f"{self.network}/{self.subnet_mask}"
+    
+    def validate(self):
+        try:
+            # Get global settings
+            settings = get_settings()
+            
+            # Parse the DHCP sites network from settings
+            dhcp_sites_network = ipaddress.IPv4Network(
+                f"{settings.dhcp_sites_network_address}/{settings.dhcp_sites_network_subnet_mask}", 
+                strict=False
+            )
+            
+            # Create a scope
+            dhcp_scope = ipaddress.IPv4Network(
+                f"{self.network}/{self.subnet_mask}", 
+                strict=False
+            )
+            
+            # Validate /30 subnet
+            if dhcp_scope.prefixlen != 30:
+                raise ValidationError(f"DHCP scope must be a /30 subnet. Current is /{dhcp_scope.prefixlen}")
+            
+            # Check if the /30 is a valid subnet of the DHCP sites network
+            if not dhcp_scope.subnet_of(dhcp_sites_network):
+                raise ValidationError(f"DHCP scope {dhcp_scope} must be a subnet of the DHCP sites network {dhcp_sites_network}")
+            
+            # Ensure the scope is properly aligned for a /30 (must start at a multiple of 4)
+            network_int = int(ipaddress.IPv4Address(self.network))
+            if network_int % 4 != 0:
+                correct_start = network_int - (network_int % 4)
+                correct_ip = str(ipaddress.IPv4Address(correct_start))
+                raise ValidationError(f"DHCP scope must be properly aligned for a /30 subnet. Use {correct_ip} instead.")
+                
+        except (ValueError, TypeError) as e:
+            raise ValidationError(f"Invalid DHCP scope: {str(e)}")
+
+    def save(self, *args, **kwargs):
+        self.validate()
+        super().save(*args, **kwargs)
 
 class Router(models.Model):
     ROLE_CHOICES = [
@@ -175,47 +215,22 @@ class Site(models.Model):
     def __str__(self):
         return f"{self.customer.name} - {self.name}"
     
-    def save(self, *args, **kwargs):
-        # Validate DHCP scope
-        self.validate_dhcp_scope()
-
+    def validate(self):
+        # Check if DHCP scope is already used by another site
+        if self.dhcp_scope:
+            existing_sites = Site.objects.filter(dhcp_scope=self.dhcp_scope).exclude(pk=self.pk)
+            if existing_sites.exists():
+                conflicting_site = existing_sites.first()
+                raise ValidationError(f"DHCP scope is already in use by site '{conflicting_site}' for customer '{conflicting_site.customer.name}'")
+        
         # Validate router role is CE
         if self.router and self.router.role != 'CE':
             raise ValidationError(f"Router '{self.router.hostname}' must have a Customer Edge (CE) role for site assignment")
-        
+    
+    def save(self, *args, **kwargs):
+        # Validate before saving
+        self.validate()
         super().save(*args, **kwargs)
-
-    def validate_dhcp_scope(self):
-        if not self.dhcp_scope:
-            return
-            
-        try:
-            # Get global settings
-            settings = get_settings()
-            
-            # Parse the DHCP sites network from settings
-            dhcp_sites_network = ipaddress.IPv4Network(f"{settings.dhcp_sites_network_address}/{settings.dhcp_sites_network_subnet_mask}", strict=False)
-            
-            # Create a scope
-            dhcp_scope = ipaddress.IPv4Network(f"{self.dhcp_scope.network}/{self.dhcp_scope.subnet_mask}", strict=False)
-            
-            # Validate /30 subnet
-            if dhcp_scope.prefixlen != 30:
-                raise ValidationError(f"DHCP scope must be a /30 subnet. Current is /{dhcp_scope.prefixlen}")
-            
-            # Check if the /30 is a valid subnet of the DHCP sites network
-            if not dhcp_scope.subnet_of(dhcp_sites_network):
-                raise ValidationError(f"DHCP scope {dhcp_scope} must be a subnet of the DHCP sites network {dhcp_sites_network}")
-            
-            # Ensure the scope is properly aligned for a /30 (must start at a multiple of 4)
-            network_int = int(ipaddress.IPv4Address(self.dhcp_scope.network))
-            if network_int % 4 != 0:
-                correct_start = network_int - (network_int % 4)
-                correct_ip = str(ipaddress.IPv4Address(correct_start))
-                raise ValidationError(f"DHCP scope must be properly aligned for a /30 subnet. Use {correct_ip} instead.")
-                
-        except (ValueError, TypeError) as e:
-            raise ValidationError(f"Invalid DHCP scope: {str(e)}")
 
 class Interface(models.Model):
     router = models.ForeignKey(Router, on_delete=models.CASCADE, related_name='interfaces')

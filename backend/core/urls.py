@@ -1,6 +1,8 @@
 from django.urls import path
+
 from core.views import control, utils, settings, discovery, customers, sites, routers
 from core.views.network_map import * 
+
 
 urlpatterns = [
     # Settings endpoint
@@ -16,8 +18,8 @@ urlpatterns = [
     path('sites/', sites.list_sites, name='list-sites'),
     path('sites/create/', sites.create_site, name='create-site'),
     path('sites/<int:site_id>/', sites.get_site, name='get-site'),
+    path('sites/<int:site_id>/attach-interface/', sites.attach_site_to_interface, name='attach-interface'),
 
-    ## Customers endpoints
     path('customers/', customers.list_customers, name='list-customers'),
     path('customers/create/', customers.create_customer, name='create-customer'),
     path('customers/<int:customer_id>/', customers.get_customer, name='get-customer'),
