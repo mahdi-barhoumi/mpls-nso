@@ -1,13 +1,14 @@
 <template>
   <div>
     <div class="card">
+      <div class="font-semibold text-2xl mb-4">Manage Customers</div>
       <!-- Toolbar -->
       <Toolbar class="mb-6">
         <template #start>
           <Button
             label="New"
             icon="pi pi-plus"
-            severity="secondary"
+            severity="Primary"
             class="mr-2"
             @click="openNewCustomerDialog"
           />
@@ -42,7 +43,7 @@
       >
         <template #header>
           <div class="flex flex-wrap gap-2 items-center justify-between">
-            <h4 class="m-0">Manage Customers</h4>
+            <div class="font-semibold text-xl mb-4">Customers</div>
             <IconField>
               <InputIcon>
                 <i class="pi pi-search" />
@@ -69,10 +70,19 @@
         <Column :exportable="false" style="min-width: 12rem">
           <template #body="slotProps">
             <Button
+              icon="pi pi-eye"
+              outlined
+              rounded
+              class="mr-2"
+              severity="help"
+              @click="viewCustomer(slotProps.data)"
+            />
+            <Button
               icon="pi pi-pencil"
               outlined
               rounded
               class="mr-2"
+              severity="warn"
               @click="editCustomer(slotProps.data)"
             />
             <Button
@@ -86,6 +96,33 @@
         </Column>
       </DataTable>
     </div>
+
+    <!-- Customer Details Dialog -->
+    <Dialog
+      v-model:visible="customerDetailsDialogVisible"
+      :style="{ width: '450px' }"
+      header="Customer Details"
+      :modal="true"
+    >
+      <div class="flex flex-col gap-4">
+        <div><span class="font-bold">Name:</span> {{ currentCustomer.name }}</div>
+        <div><span class="font-bold">Email:</span> {{ currentCustomer.email }}</div>
+        <div><span class="font-bold">Phone Number:</span> {{ currentCustomer.phone_number }}</div>
+        <div><span class="font-bold">Description:</span> {{ currentCustomer.description }}</div>
+        <div>
+          <span class="font-bold">Created At:</span> {{ formatDate(currentCustomer.created_at) }}
+        </div>
+      </div>
+
+      <template #footer>
+        <Button
+          label="Close"
+          icon="pi pi-times"
+          text
+          @click="customerDetailsDialogVisible = false"
+        />
+      </template>
+    </Dialog>
 
     <!-- Customer Dialog -->
     <Dialog
@@ -135,43 +172,6 @@
         <Button label="Save" icon="pi pi-check" @click="saveCustomer" />
       </template>
     </Dialog>
-
-    <!-- Delete Confirmation Dialog -->
-    <Dialog
-      v-model:visible="deleteCustomerDialog"
-      :style="{ width: '450px' }"
-      header="Confirm"
-      :modal="true"
-    >
-      <div class="flex items-center gap-4">
-        <i class="pi pi-exclamation-triangle !text-3xl" />
-        <span v-if="currentCustomer"
-          >Are you sure you want to delete <b>{{ currentCustomer.name }}</b
-          >?</span
-        >
-      </div>
-      <template #footer>
-        <Button label="No" icon="pi pi-times" text @click="deleteCustomerDialog = false" />
-        <Button label="Yes" icon="pi pi-check" @click="deleteCustomer" />
-      </template>
-    </Dialog>
-
-    <!-- Delete Selected Confirmation Dialog -->
-    <Dialog
-      v-model:visible="deleteCustomersDialog"
-      :style="{ width: '450px' }"
-      header="Confirm"
-      :modal="true"
-    >
-      <div class="flex items-center gap-4">
-        <i class="pi pi-exclamation-triangle !text-3xl" />
-        <span>Are you sure you want to delete the selected customers?</span>
-      </div>
-      <template #footer>
-        <Button label="No" icon="pi pi-times" text @click="deleteCustomersDialog = false" />
-        <Button label="Yes" icon="pi pi-check" text @click="deleteSelectedCustomers" />
-      </template>
-    </Dialog>
   </div>
 </template>
 
@@ -187,11 +187,13 @@ const customers = ref([])
 const selectedCustomers = ref([])
 const currentCustomer = ref({})
 const customerDialogVisible = ref(false)
+const customerDetailsDialogVisible = ref(false) // New state for details dialog
 const deleteCustomerDialog = ref(false)
 const deleteCustomersDialog = ref(false)
 const loading = ref(false)
 const submitted = ref(false)
 const isEditing = ref(false)
+const dt = ref(null) // Reference for the DataTable
 const filters = ref({
   global: { value: null, matchMode: FilterMatchMode.CONTAINS },
 })
@@ -217,6 +219,12 @@ const fetchCustomers = async () => {
   } finally {
     loading.value = false
   }
+}
+
+// Open Customer Details Dialog
+const viewCustomer = (customer) => {
+  currentCustomer.value = { ...customer }
+  customerDetailsDialogVisible.value = true
 }
 
 // Open New Customer Dialog
@@ -310,7 +318,11 @@ const deleteSelectedCustomers = async () => {
 
 // Export CSV
 const exportCSV = () => {
-  dt.value.exportCSV()
+  if (dt.value) {
+    dt.value.exportCSV() // Call the exportCSV method on the DataTable reference
+  } else {
+    console.error('DataTable reference is not available.')
+  }
 }
 
 // Utility: Format Date

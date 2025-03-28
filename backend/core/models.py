@@ -33,7 +33,7 @@ class DHCPLease(models.Model):
 class DHCPScope(models.Model):
     network = models.GenericIPAddressField(protocol='IPv4')
     subnet_mask = models.GenericIPAddressField(protocol='IPv4')
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=False)
     
     class Meta:
         verbose_name = "DHCP Scope"
@@ -41,7 +41,7 @@ class DHCPScope(models.Model):
         unique_together = ['network', 'subnet_mask']
         
     def __str__(self):
-        return f"{self.network}/{self.subnet_mask}"
+        return str(ipaddress.IPv4Network(f"{self.network}/{self.subnet_mask}"))
     
     def validate(self):
         try:
@@ -68,12 +68,8 @@ class DHCPScope(models.Model):
             if not dhcp_scope.subnet_of(dhcp_sites_network):
                 raise ValidationError(f"DHCP scope {dhcp_scope} must be a subnet of the DHCP sites network {dhcp_sites_network}")
             
-            # Ensure the scope is properly aligned for a /30 (must start at a multiple of 4)
-            network_int = int(ipaddress.IPv4Address(self.network))
-            if network_int % 4 != 0:
-                correct_start = network_int - (network_int % 4)
-                correct_ip = str(ipaddress.IPv4Address(correct_start))
-                raise ValidationError(f"DHCP scope must be properly aligned for a /30 subnet. Use {correct_ip} instead.")
+            # Ensure the scope is properly aligned for a /30
+            self.network = str(dhcp_scope.network_address)
                 
         except (ValueError, TypeError) as e:
             raise ValidationError(f"Invalid DHCP scope: {str(e)}")
@@ -111,6 +107,11 @@ class Customer(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
+    class Meta:
+        verbose_name = "Customer"
+        verbose_name_plural = "Customers"
+        ordering = ["name"]
+
     def __str__(self):
         return self.name
 
