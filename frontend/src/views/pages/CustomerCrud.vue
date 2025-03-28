@@ -193,6 +193,7 @@ const deleteCustomersDialog = ref(false)
 const loading = ref(false)
 const submitted = ref(false)
 const isEditing = ref(false)
+const dt = ref(null) // Reference for the DataTable
 const filters = ref({
   global: { value: null, matchMode: FilterMatchMode.CONTAINS },
 })
@@ -317,7 +318,11 @@ const deleteSelectedCustomers = async () => {
 
 // Export CSV
 const exportCSV = () => {
-  dt.value.exportCSV()
+  if (dt.value) {
+    dt.value.exportCSV() // Call the exportCSV method on the DataTable reference
+  } else {
+    console.error('DataTable reference is not available.')
+  }
 }
 
 // Utility: Format Date
