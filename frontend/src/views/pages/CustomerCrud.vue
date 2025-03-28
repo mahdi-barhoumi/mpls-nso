@@ -8,7 +8,7 @@
           <Button
             label="New"
             icon="pi pi-plus"
-            severity="secondary"
+            severity="Primary"
             class="mr-2"
             @click="openNewCustomerDialog"
           />
@@ -74,6 +74,7 @@
               outlined
               rounded
               class="mr-2"
+              severity="help"
               @click="viewCustomer(slotProps.data)"
             />
             <Button
@@ -81,6 +82,7 @@
               outlined
               rounded
               class="mr-2"
+              severity="warn"
               @click="editCustomer(slotProps.data)"
             />
             <Button
