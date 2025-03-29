@@ -7,7 +7,7 @@ from core.settings import get_settings
 class DHCPLease(models.Model):
     mac_address = models.CharField(max_length=17, primary_key=True, help_text="MAC address of the client")
     ip_address = models.GenericIPAddressField(help_text="Assigned IP address")
-    hostname = models.CharField(max_length=255, blank=True, default="Unknown", help_text="Client hostname")
+    hostname = models.CharField(max_length=255, default="Unknown", help_text="Client hostname")
     expiry_time = models.DateTimeField(help_text="When this lease expires")
     last_updated = models.DateTimeField(auto_now=True, help_text="When this lease was last updated")
     
@@ -17,7 +17,7 @@ class DHCPLease(models.Model):
         ordering = ["ip_address"]
     
     def __str__(self):
-        return f"{self.mac_address} - {self.ip_address} ({self.hostname})"
+        return f"{self.ip_address} - {self.mac_address} ({self.hostname})"
     
     @property
     def is_active(self):
@@ -31,9 +31,9 @@ class DHCPLease(models.Model):
         return delta.total_seconds()
 
 class DHCPScope(models.Model):
-    network = models.GenericIPAddressField(protocol='IPv4')
-    subnet_mask = models.GenericIPAddressField(protocol='IPv4')
-    is_active = models.BooleanField(default=False)
+    network = models.GenericIPAddressField(protocol='IPv4', help_text="Network address of the scope")
+    subnet_mask = models.GenericIPAddressField(protocol='IPv4', help_text="Subnet mask of the scope")
+    is_active = models.BooleanField(default=False, help_text="Scope status")
     
     class Meta:
         verbose_name = "DHCP Scope"
@@ -41,7 +41,7 @@ class DHCPScope(models.Model):
         unique_together = ['network', 'subnet_mask']
         
     def __str__(self):
-        return str(ipaddress.IPv4Network(f"{self.network}/{self.subnet_mask}"))
+        return str(ipaddress.IPv4Network(f"{self.network}/{self.subnet_mask}", strict=False))
     
     def validate(self):
         try:
@@ -71,24 +71,24 @@ class DHCPScope(models.Model):
             # Ensure the scope is properly aligned for a /30
             self.network = str(dhcp_scope.network_address)
                 
-        except (ValueError, TypeError) as e:
-            raise ValidationError(f"Invalid DHCP scope: {str(e)}")
+        except (ValueError, TypeError) as exception:
+            raise ValidationError(f"Invalid DHCP scope: {str(exception)}")
 
     def save(self, *args, **kwargs):
         self.validate()
         super().save(*args, **kwargs)
 
 class Router(models.Model):
-    ROLE_CHOICES = [
+    roles = [
         ('CE', 'Customer Edge'),
         ('PE', 'Provider Edge'),
         ('P', 'Provider Core'),
     ]
-    
-    chassis_id = models.CharField(max_length=50, primary_key=True, help_text="Router chassis ID (MAC address)")
-    management_ip_address = models.GenericIPAddressField(help_text="Router management IP address")
+    role = models.CharField(max_length=2, choices=roles, help_text="Router role in the network")
     hostname = models.CharField(max_length=255, default="Unknown", help_text="Router hostname")
-    role = models.CharField(max_length=2, choices=ROLE_CHOICES, default='P', help_text="Router role in the network")
+    chassis_id = models.CharField(max_length=50, help_text="Router chassis ID (MAC address)")
+    management_ip_address = models.GenericIPAddressField(help_text="Router management IP address")
+    first_discovered = models.DateTimeField(auto_now_add=True, help_text="When this router was first discovered")
     last_discovered = models.DateTimeField(auto_now=True, help_text="When this router was last discovered")
 
     class Meta:
@@ -104,8 +104,8 @@ class Customer(models.Model):
     description = models.TextField(blank=True, help_text="Customer description")
     email = models.EmailField(blank=True, help_text="Customer email")
     phone_number = models.CharField(max_length=20, blank=True, help_text="Customer phone number")
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True, help_text="When this customer was created")
+    updated_at = models.DateTimeField(auto_now=True, help_text="When this customer was updated")
     
     class Meta:
         verbose_name = "Customer"
@@ -116,22 +116,24 @@ class Customer(models.Model):
         return self.name
 
 class VPN(models.Model):
-    name = models.CharField(max_length=255, unique=True, help_text="VPN name")
-    customer = models.ForeignKey('Customer', null=True, blank=True, on_delete=models.SET_NULL, related_name='vpns', help_text="Customer who owns this VPN, if applicable")
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    name = models.CharField(max_length=255, help_text="VPN name")
+    customer = models.ForeignKey('Customer', null=True, on_delete=models.CASCADE, related_name='vpns', help_text="Customer who owns this VPN, if applicable")
+    discovered = models.BooleanField(default=False, help_text="If the VPN was discovered or created")
+    created_at = models.DateTimeField(auto_now_add=True, help_text="When this VPN was created or discovered")
+    updated_at = models.DateTimeField(auto_now=True, help_text="When this VPN was last updated")
     
     class Meta:
         verbose_name = "VPN"
         verbose_name_plural = "VPNs"
         ordering = ["name"]
+        unique_together = [['name', 'customer']]
     
     def __str__(self):
         if self.customer:
-            return f"{self.name} ({self.customer.name})"
+            return f"{self.name} belonging to {self.customer.name}"
         return self.name
     
-    def validate_route_targets(self):
+    def validate(self):
         vpn_vrfs = self.vrfs.all()
         
         # If there's only one VRF, no validation needed
@@ -163,14 +165,14 @@ class VPN(models.Model):
 
     def save(self, *args, **kwargs):
         if self.pk:
-            self.validate_route_targets()
+            self.validate()
         super().save(*args, **kwargs)
 
 class VRF(models.Model):
     name = models.CharField(max_length=255, help_text="VRF name")
-    route_distinguisher = models.CharField(max_length=50, blank=True, help_text="Route distinguisher")
+    route_distinguisher = models.CharField(max_length=50, help_text="Route distinguisher")
     router = models.ForeignKey(Router, on_delete=models.CASCADE, related_name='vrfs', help_text="Router where this VRF is configured")
-    vpn = models.ForeignKey('VPN', null=True, blank=True, on_delete=models.SET_NULL, related_name='vrfs', help_text="VPN this VRF belongs to")
+    vpn = models.ForeignKey('VPN', null=True, on_delete=models.CASCADE, related_name='vrfs', help_text="VPN this VRF belongs to")
     
     class Meta:
         unique_together = [['name', 'router'], ['route_distinguisher', 'router']]
@@ -187,14 +189,13 @@ class VRF(models.Model):
         return self.route_targets.filter(target_type='export').values_list('value', flat=True)
 
 class RouteTarget(models.Model):
-    TARGET_TYPE_CHOICES = [
+    target_types = [
         ('import', 'Import'),
         ('export', 'Export')
     ]
-    
-    vrf = models.ForeignKey(VRF, on_delete=models.CASCADE, related_name='route_targets')
+    vrf = models.ForeignKey(VRF, on_delete=models.CASCADE, related_name='route_targets', help_text="VRF this route target belongs to")
     value = models.CharField(max_length=50, help_text="Route target value (ASN:nn format)")
-    target_type = models.CharField(max_length=6, choices=TARGET_TYPE_CHOICES, help_text="Import or export target")
+    target_type = models.CharField(max_length=6, choices=target_types, help_text="Import or export target")
     
     class Meta:
         unique_together = [['vrf', 'value', 'target_type']]
@@ -202,13 +203,46 @@ class RouteTarget(models.Model):
     def __str__(self):
         return f"{self.value} ({self.target_type})"
 
+class Interface(models.Model):
+    router = models.ForeignKey(Router, on_delete=models.CASCADE, related_name='interfaces')
+    name = models.CharField(max_length=100, help_text="Interface name")
+    description = models.CharField(max_length=255, null=True, help_text="Interface description")
+    mac_address = models.CharField(max_length=17, help_text="Interface MAC address")
+    admin_status = models.CharField(max_length=20, help_text="Administrative status")
+    oper_status = models.CharField(max_length=20, help_text="Operational status")
+    ip_address = models.GenericIPAddressField(null=True, help_text="IP address if configured")
+    subnet_mask = models.GenericIPAddressField(null=True, help_text="Subnet mask if configured")
+    vrf = models.ForeignKey(VRF, null=True, on_delete=models.SET_NULL, related_name='interfaces')
+    connected_interfaces = models.ManyToManyField('self', symmetrical=False, related_name='connected_from')
+    first_discovered = models.DateTimeField(auto_now_add=True, help_text="When this interface was first discovered")
+    last_discovered = models.DateTimeField(auto_now=True, help_text="When this interface was last discovered")
+    
+    class Meta:
+        unique_together = [['router', 'name']]
+    
+    def __str__(self):
+        return f"{self.router.hostname} - {self.name}"
+
+    def validate(self):
+        if self.vrf and self.vrf.router != self.router:
+            raise ValidationError(f"VRF '{self.vrf}' does not exist on router")
+
+    def save(self, *args, **kwargs):
+        self.validate()
+        super().save(*args, **kwargs)
+    
+    @property
+    def is_connected(self):
+        return self.connected_interfaces.exists() or self.connected_from.exists()
+
 class Site(models.Model):
     name = models.CharField(max_length=255, help_text="Site name")
-    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='sites')
-    description = models.TextField(blank=True, help_text="Site description")
-    location = models.CharField(max_length=255, blank=True, help_text="Site location")
-    dhcp_scope = models.OneToOneField(DHCPScope, on_delete=models.CASCADE, help_text="DHCP Scope (/30 subnet)")
-    router = models.ForeignKey(Router, null=True, blank=True, on_delete=models.CASCADE, related_name='sites', help_text="Customer Edge router for this site")
+    description = models.TextField(max_length=255, null=True, blank=True, help_text="Site description")
+    location = models.CharField(max_length=255, null=True, blank=True, help_text="Site location")
+    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='sites', help_text="Customer this site belongs to")
+    dhcp_scope = models.OneToOneField(DHCPScope, on_delete=models.PROTECT, help_text="DHCP scope for customer edge management (/30 subnet)")
+    assigned_interface = models.ForeignKey(Interface, null=True, on_delete=models.SET_NULL, related_name='site', help_text="Assigned provider interface for this site")
+    router = models.ForeignKey(Router, null=True, on_delete=models.SET_NULL, related_name='sites', help_text="Customer edge router for this site")
     
     class Meta:
         unique_together = [['customer', 'name']]
@@ -217,6 +251,10 @@ class Site(models.Model):
         return f"{self.customer.name} - {self.name}"
     
     def validate(self):
+        # Validate if the assigned interface belongs to a PE router
+        if self.assigned_interface and self.assigned_interface.router.role != 'PE':
+            raise ValidationError("Assigned interface must belong to a PE router")
+
         # Check if DHCP scope is already used by another site
         if self.dhcp_scope:
             existing_sites = Site.objects.filter(dhcp_scope=self.dhcp_scope).exclude(pk=self.pk)
@@ -226,37 +264,9 @@ class Site(models.Model):
         
         # Validate router role is CE
         if self.router and self.router.role != 'CE':
-            raise ValidationError(f"Router '{self.router.hostname}' must have a Customer Edge (CE) role for site assignment")
+            raise ValidationError(f"Router '{self.router.hostname}' must have a CE role for site assignment")
     
     def save(self, *args, **kwargs):
         # Validate before saving
         self.validate()
         super().save(*args, **kwargs)
-
-class Interface(models.Model):
-    router = models.ForeignKey(Router, on_delete=models.CASCADE, related_name='interfaces')
-    name = models.CharField(max_length=100, help_text="Interface name")
-    admin_status = models.CharField(max_length=20, default="down", help_text="Administrative status")
-    oper_status = models.CharField(max_length=20, default="down", help_text="Operational status")
-    description = models.CharField(max_length=255, blank=True, help_text="Interface description")
-    ip_address = models.GenericIPAddressField(null=True, blank=True, help_text="IP address if configured")
-    subnet_mask = models.GenericIPAddressField(null=True, blank=True, help_text="Subnet mask if configured")
-    mac_address = models.CharField(max_length=17, blank=True, help_text="Interface MAC address")
-    vrf = models.ForeignKey(VRF, null=True, blank=True, on_delete=models.SET_NULL, related_name='interfaces')
-    site = models.ForeignKey(Site, null=True, blank=True, on_delete=models.SET_NULL, related_name='interfaces')
-    connected_interfaces = models.ManyToManyField('self', symmetrical=False, blank=True, related_name='connected_from')
-    
-    class Meta:
-        unique_together = [['router', 'name']]
-    
-    def __str__(self):
-        return f"{self.router.hostname} - {self.name}"
-
-    def save(self, *args, **kwargs):
-        if self.vrf and self.vrf.router != self.router:
-            raise ValidationError(f"VRF '{self.vrf}' does not exist on router '{self.router.hostname}'")
-        super().save(*args, **kwargs)
-    
-    @property
-    def is_connected(self):
-        return self.connected_interfaces.exists() or self.connected_from.exists()

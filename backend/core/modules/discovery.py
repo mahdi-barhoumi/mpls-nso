@@ -127,12 +127,12 @@ class NetworkDiscoverer:
             try:
                 with transaction.atomic():
                     # Create a generic VPN name
-                    vpn_name = f"VPN-{i+1}"
+                    vpn_name = f"Discovered VPN {i+1}"
                     
                     # Create or get the VPN
                     vpn, created = VPN.objects.get_or_create(
                         name=vpn_name,
-                        defaults={'customer': None}  # No customer association as requested
+                        discovered=True
                     )
                     
                     if created:
@@ -168,11 +168,12 @@ class NetworkDiscoverer:
             if not bgp_config or 'Cisco-IOS-XE-bgp:bgp' not in bgp_config:
                 return 'P'  # Default to Provider Core if no BGP config
             
-            bgp_data = bgp_config.get('Cisco-IOS-XE-bgp:bgp', [{}])[0]
+            bgp_data = bgp_config.get('Cisco-IOS-XE-bgp:bgp', [{}])
             
-            # Check if BGP AS number matches system settings
-            if str(bgp_data.get('id', '')) == str(self.settings.bgp_as):
-                return 'PE'
+            for bgp in bgp_data:
+                # Check if BGP AS number matches system settings
+                if str(bgp.get('id', '')) == str(self.settings.bgp_as):
+                    return 'PE'
             
             # If BGP is configured but doesn't match AS, it might be a P router
             return 'P'
@@ -282,10 +283,6 @@ class NetworkDiscoverer:
         except Exception as e:
             self.logger.error(f"Error processing device at {lease.ip_address}: {str(e)}")
             return None
-    
-    def check_if_pe_router(self, ip_address):
-        # Use the wrapper to check if BGP configuration exists
-        return self.restconf.exists(ip_address, "Cisco-IOS-XE-native:native/router/bgp")
     
     def get_lldp_data(self, ip_address):
         return self.restconf.get(ip_address, "Cisco-IOS-XE-lldp-oper:lldp-entries")

@@ -11,7 +11,7 @@ from core.settings import get_settings
 
 class _NetworkController:
     def __init__(self):
-        self.logger = logging.getLogger('network-controller')
+        self.logger = logging.getLogger('networkcontroller')
         self.dhcp_server = DHCPServer()
         self.tftp_server = TFTPServer()
         self.start_dhcp_server()
@@ -121,29 +121,35 @@ class _NetworkController:
         os.remove(file_path)
         return filename
 
-    def attach_site_to_interface(self, interface: Interface, site: Site) -> bool:
-        try:
-            if interface.site == site:
-                self.logger.error("Cannot attach site: Site already attached")
-                return False
+    def assign_interface(self, interface: Interface, site: Site) -> bool:
+        # Validate inputs
+        if not interface or not site:
+            self.logger.error("Invalid interface or site")
+            return False
 
-            # Get system settings
-            settings = get_settings()
-            if not settings:
-                self.logger.error("Cannot attach site: No system settings found")
-                return False
+        print(site.assigned_interface)
+        if site.assigned_interface is not None:
+            self.logger.warning("Cannot assign interface: Interface already assigned to site")
+            return False
 
-            # Validate inputs
-            if not interface or not site or not site.dhcp_scope:
-                self.logger.error("Invalid interface or site configuration")
-                return False
+        # TODO: Fix this shit
+        # if interface.site is not None:
+        #     self.logger.warning("Cannot assign interface: Interface already assigned to another site")
+        #     return False
 
-            # 1. Add route to site's DHCP scope
-            dhcp_scope = ipaddress.IPv4Network(
-                f'{site.dhcp_scope.network}/{site.dhcp_scope.subnet_mask}', 
-                strict=False
-            )
+        # Get system settings
+        settings = get_settings()
+        if not settings:
+            self.logger.error("Cannot assign interface: No system settings found")
+            return False
+
+        # Add route to site's DHCP scope
+        dhcp_scope = ipaddress.IPv4Network(
+            f'{site.dhcp_scope.network}/{site.dhcp_scope.subnet_mask}', 
+            strict=False
+        )
             
+        try:
             # Add route via router's management IP
             route_added = HostNetworkManager.add_route(
                 str(dhcp_scope), 
@@ -152,7 +158,7 @@ class _NetworkController:
             )
             
             if not route_added:
-                self.logger.error(f"Failed to add route for DHCP scope {dhcp_scope}")
+                self.logger.error(f"Cannot assign interface: Failed to add route for DHCP scope {dhcp_scope}")
                 return False
 
             # Activate DHCP scope (this might involve database operations)
@@ -194,17 +200,20 @@ class _NetworkController:
                 f"Cisco-IOS-XE-native:native/interface/GigabitEthernet={interface.name.split('GigabitEthernet')[-1]}", 
                 interface_config
             )
-
+        
             if result is None:
                 HostNetworkManager.delete_route(
                     str(dhcp_scope), 
                     settings.host_interface_id
                 )
-                self.logger.error(f"Failed to configure interface {interface.name} via RESTCONF")
+                self.logger.error(f"Cannot assign interface: Failed to configure interface {interface.name} via RESTCONF")
                 return False
 
+            # Update site in database
+            site.assigned_interface = interface
+            site.save()
+
             # Update interface in database
-            interface.site = site
             interface.ip_address = str(first_ip)
             interface.subnet_mask = site.dhcp_scope.subnet_mask
             interface.save()
@@ -218,10 +227,10 @@ class _NetworkController:
                     str(dhcp_scope), 
                     settings.host_interface_id
                 )
-            self.logger.error(f"Error attaching site to interface: {str(e)}")
+            self.logger.error(f"Error assigning interface to site: {str(e)}")
             return False
 
-    def detach_site_to_interface(self, interface, site):
+    def unassign_interface(self, interface, site):
         pass
 
 NetworkController = _NetworkController()
