@@ -246,7 +246,3 @@ class RestconfWrapper:
             time.sleep(1)
         
         return None
-    
-    def exists(self, ip_address, path):
-        result = self.get(ip_address, path)
-        return result is not None and result != {}

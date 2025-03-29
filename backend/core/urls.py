@@ -1,34 +1,35 @@
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
-from core.views import control, utils, settings, discovery, customers, sites, routers, network_map
-
-router = DefaultRouter()
-router.register(r'customers', customers.CustomerViewSet)
+from django.urls import path
+from core.views import control, utils, discovery
+from core.views.customers import CustomerView
+from core.views.routers import RouterView, RouterInterfaceView  
+from core.views.sites import SiteView, SiteInterfaceView
+from core.views.settings import SettingsView
+from core.views.network_map import NetworkMapView
 
 urlpatterns = [
-    # Router URLs
-    path('', include(router.urls)),
-
     # Settings endpoint
-    path('settings/', settings.global_settings, name='settings'),
+    path('settings/', SettingsView.as_view(), name='settings'),
 
     # Utility endpoints
 
     path('utils/host-interfaces/', utils.list_host_interfaces, name='host-interfaces'),
 
     # Models endpoints
-
-    ## Sites endpoints
-    path('sites/', sites.list_sites, name='list-sites'),
-    path('sites/create/', sites.create_site, name='create-site'),
-    path('sites/<int:site_id>/', sites.get_site, name='get-site'),
-    path('sites/<int:site_id>/attach-interface/', sites.attach_site_to_interface, name='attach-interface'),
     
-    ## Routers endpoints
-    path('routers/', routers.list_routers, name='list-routers'),
-    path('routers/<str:router_id>/', routers.get_router, name='get-router'),
-    path('routers/<str:router_id>/interfaces/', routers.list_router_interfaces, name='list-router-interfaces'),
-    path('routers/<str:router_id>/interfaces/<int:interface_id>/', routers.get_router_interface, name='get-router-interface'),
+    ## Customer endpoints
+    path('customers/', CustomerView.as_view()),
+    path('customers/<int:customer_id>/', CustomerView.as_view()),
+
+    ## Router endpoints
+    path('routers/', RouterView.as_view()),
+    path('routers/<str:router_id>/', RouterView.as_view()),
+    path('routers/<str:router_id>/interfaces/', RouterInterfaceView.as_view()),
+    path('routers/<str:router_id>/interfaces/<int:interface_id>/', RouterInterfaceView.as_view()),
+
+    ## Site endpoints
+    path('sites/', SiteView.as_view()),  
+    path('sites/<int:site_id>/', SiteView.as_view()),
+    path('sites/<int:site_id>/interface/', SiteInterfaceView.as_view()),
 
     # Controller endpoints
     ## DHCP service endpoints
@@ -43,9 +44,9 @@ urlpatterns = [
     path('control/tftp/status/', control.tftp_server_status, name='tftp-server-status'),
     path('control/tftp/files/', control.tftp_files, name='tftp-files'),
     path('control/tftp/upload/', control.upload_file, name='upload-tftp-file'),
-    path('control/tftp/files/<str:filename>', control.delete_file, name='delete-tftp-file'),
+    path('control/tftp/files/<str:filename>/', control.delete_file, name='delete-tftp-file'),
 
     # Network discovery endpoints
     path('network/discover/', discovery.discover_network, name='discover-network'),
-    path('network/map/', network_map.NetworkMapView.as_view(), name='map_data'),
+    path('network/map/', NetworkMapView.as_view(), name='map_data'),
 ]
