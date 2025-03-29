@@ -21,11 +21,11 @@ class SiteView(View):
                 site_data = {
                     'id': site.id,
                     'name': site.name,
-                    'customer_id': site.customer.id,
                     'description': site.description,
                     'location': site.location,
                     'dhcp_scope': site.dhcp_scope.network,
-                    'assigned_interface_id': site.interassigned_interface.id if site.assigned_interface else None,
+                    'customer_id': site.customer.id,
+                    'assigned_interface_id': site.assigned_interface.id if site.assigned_interface else None,
                     'router_id': site.router.id if site.router else None
                 }
                 
@@ -46,11 +46,11 @@ class SiteView(View):
                     {
                         'id': site.id,
                         'name': site.name,
-                        'customer_id': site.customer.id,
                         'description': site.description,
                         'location': site.location,
                         'dhcp_scope': site.dhcp_scope.network,
-                        'assigned_interface_id': site.interassigned_interface.id if site.assigned_interface else None,
+                        'customer_id': site.customer.id,
+                        'assigned_interface_id': site.assigned_interface.id if site.assigned_interface else None,
                         'router_id': site.router.id if site.router else None
                     }
                     for site in sites
@@ -188,6 +188,36 @@ class SiteInterfaceView(View):
                 'message': 'Invalid JSON'
             }, status=400)
         
+        except Exception as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=500)
+
+    def delete(self, request, site_id):
+        try:
+            # Get site
+            site = get_object_or_404(Site, id=site_id)
+            
+            # Check if site has an assigned interface
+            if not site.assigned_interface:
+                return JsonResponse({
+                    'message': 'Site has no assigned interface'
+                }, status=400)
+            
+            interface = site.assigned_interface
+            
+            # Perform unassignment using NetworkController
+            success = NetworkController.unassign_interface(interface, site)
+            
+            if success:
+                return JsonResponse({
+                    'message': f'Interface {interface.name} successfully unassigned from site {site.name}'
+                })
+            else:
+                return JsonResponse({
+                    'message': 'Failed to unassign interface from site'
+                }, status=500)
+                
         except Exception as e:
             return JsonResponse({
                 'message': str(e)

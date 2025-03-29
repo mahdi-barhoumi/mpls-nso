@@ -230,7 +230,71 @@ class _NetworkController:
             self.logger.error(f"Error assigning interface to site: {str(e)}")
             return False
 
-    def unassign_interface(self, interface, site):
-        pass
+    def unassign_interface(self, interface: Interface, site: Site) -> bool:
+        # Validate inputs
+        if not interface or not site:
+            self.logger.error("Invalid interface or site")
+            return False
+
+        if site.assigned_interface != interface:
+            self.logger.warning("Interface is not assigned to this site")
+            return False
+
+        # Get system settings
+        settings = get_settings()
+        if not settings:
+            self.logger.error("Cannot unassign interface: No system settings found")
+            return False
+
+        dhcp_scope = ipaddress.IPv4Network(
+            f'{site.dhcp_scope.network}/{site.dhcp_scope.subnet_mask}', 
+            strict=False
+        )
+
+        try:
+            # Configure interface via RESTCONF to remove IP and helper config
+            restconf = RestconfWrapper()
+            interface_config = {
+                "Cisco-IOS-XE-native:GigabitEthernet": {
+                    "name": interface.name.split('GigabitEthernet')[-1],
+                    "vrf": {
+                        "forwarding": settings.management_vrf
+                    }
+                }
+            }
+
+            # Send RESTCONF configuration
+            result = restconf.put(
+                interface.router.management_ip_address,
+                f"Cisco-IOS-XE-native:native/interface/GigabitEthernet={interface.name.split('GigabitEthernet')[-1]}",
+                interface_config
+            )
+
+            if result is None:
+                self.logger.error(f"Failed to clear interface {interface.name} configuration via RESTCONF")
+                return False
+
+            # Remove route to site's DHCP scope
+            HostNetworkManager.delete_route(str(dhcp_scope), settings.host_interface_id)
+
+            # Deactivate DHCP scope
+            site.dhcp_scope.is_active = False
+            site.dhcp_scope.save()
+
+            # Update site in database
+            site.assigned_interface = None
+            site.save()
+
+            # Clear interface IP configuration
+            interface.ip_address = "0.0.0.0"
+            interface.subnet_mask = "0.0.0.0"
+            interface.save()
+
+            self.logger.info(f"Successfully unassigned interface {interface.name} from site {site.name}")
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Error unassigning interface from site: {str(e)}")
+            return False
 
 NetworkController = _NetworkController()

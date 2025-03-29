@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from django.utils import timezone
 from django.db import transaction, OperationalError
 from core.modules.utils.restconf import RestconfWrapper
-from core.models import DHCPLease, Router, VRF, RouteTarget, Interface, VPN
+from core.models import DHCPLease, DHCPScope, Router, VRF, RouteTarget, Interface, VPN, Site
 from core.settings import get_settings
 
 class NetworkDiscoverer:
@@ -214,64 +214,35 @@ class NetworkDiscoverer:
             # Get interfaces data
             interfaces_data = self.get_interfaces_data(ip_address)
             
-            # Create or update router within a transaction
-            max_retries = 3
-            for attempt in range(max_retries):
-                try:
-                    with transaction.atomic():
-                        router, created = Router.objects.update_or_create(
-                            chassis_id=chassis_id,
-                            defaults={
-                                'management_ip_address': ip_address,
-                                'hostname': hostname,
-                                'role': role
-                            }
-                        )
-                        
-                        if created:
-                            self.logger.info(f"Created new router: {hostname} (Role: {role})")
-                        else:
-                            self.logger.info(f"Updated existing router: {hostname} (Role: {role})")
-                        
-                        # Store router in cache
-                        self.router_cache[hostname] = router
-                    
-                    # Break the loop if successful
-                    break
-                except OperationalError as e:
-                    if "database is locked" in str(e) and attempt < max_retries - 1:
-                        self.logger.warning(f"Database locked, retrying ({attempt + 1}/{max_retries})")
-                        time.sleep(0.5 * (2 ** attempt))  # Exponential backoff
-                    else:
-                        raise
+            # Create or update router
+            router, created = Router.objects.update_or_create(
+                chassis_id=chassis_id,
+                defaults={
+                    'management_ip_address': ip_address,
+                    'hostname': hostname,
+                    'role': role
+                }
+            )
             
-            # Process VRFs if PE router (in a separate transaction)
+            if created:
+                self.logger.info(f"Created new router: {hostname} (Role: {role})")
+            else:
+                self.logger.info(f"Updated existing router: {hostname} (Role: {role})")
+            
+            # Store router in cache
+            self.router_cache[hostname] = router
+            
+            # If this is a CE router, try to assign it to its site
+            if role == 'CE':
+                self.assign_ce_to_site(router, ip_address)
+            
+            # Process VRFs if PE router
             if role == 'PE' and vrf_data:
-                for attempt in range(max_retries):
-                    try:
-                        with transaction.atomic():
-                            self.process_vrfs(router, vrf_data)
-                        break
-                    except OperationalError as e:
-                        if "database is locked" in str(e) and attempt < max_retries - 1:
-                            self.logger.warning(f"Database locked during VRF processing, retrying ({attempt + 1}/{max_retries})")
-                            time.sleep(0.5 * (2 ** attempt))  # Exponential backoff
-                        else:
-                            raise
+                self.process_vrfs(router, vrf_data)
             
-            # Process interfaces (in a separate transaction)
+            # Process interfaces
             if interfaces_data:
-                for attempt in range(max_retries):
-                    try:
-                        with transaction.atomic():
-                            self.process_interfaces(router, interfaces_data)
-                        break
-                    except OperationalError as e:
-                        if "database is locked" in str(e) and attempt < max_retries - 1:
-                            self.logger.warning(f"Database locked during interface processing, retrying ({attempt + 1}/{max_retries})")
-                            time.sleep(0.5 * (2 ** attempt))  # Exponential backoff
-                        else:
-                            raise
+                self.process_interfaces(router, interfaces_data)
             
             return {
                 "hostname": hostname,
@@ -284,6 +255,40 @@ class NetworkDiscoverer:
             self.logger.error(f"Error processing device at {lease.ip_address}: {str(e)}")
             return None
     
+    def assign_ce_to_site(self, router, ip_address):
+        try:
+            from core.models import Site
+            
+            # Convert IP address to IPv4Address object
+            ce_ip = ipaddress.IPv4Address(ip_address)
+            
+            # Get all sites with their DHCP scopes
+            sites = Site.objects.select_related('dhcp_scope').all()
+            
+            # Find the matching site
+            for site in sites:
+                if not site.dhcp_scope:
+                    continue
+                    
+                # Create network from the site's DHCP scope
+                network = ipaddress.IPv4Network(
+                    f"{site.dhcp_scope.network}/{site.dhcp_scope.subnet_mask}", 
+                    strict=False
+                )
+                
+                # Check if CE IP is in this network
+                if ce_ip in network:
+                    # Assign router to site
+                    site.router = router
+                    site.save()
+                    self.logger.info(f"Assigned CE router {router.hostname} to site {site}")
+                    return
+            
+            self.logger.warning(f"No matching site found for CE router {router.hostname} with IP {ip_address}")
+        
+        except Exception as e:
+            self.logger.error(f"Error assigning CE router {router.hostname} to site: {str(e)}")
+
     def get_lldp_data(self, ip_address):
         return self.restconf.get(ip_address, "Cisco-IOS-XE-lldp-oper:lldp-entries")
     

@@ -1,9 +1,14 @@
 from django.urls import path
-from core.views import control, utils, settings, discovery, customers, sites, routers, network_map
+from core.views import control, utils, discovery
+from core.views.customers import CustomerView
+from core.views.routers import RouterView, RouterInterfaceView  
+from core.views.sites import SiteView, SiteInterfaceView
+from core.views.settings import SettingsView
+from core.views.network_map import NetworkMapView
 
 urlpatterns = [
     # Settings endpoint
-    path('settings/', settings.global_settings, name='settings'),
+    path('settings/', SettingsView.as_view(), name='settings'),
 
     # Utility endpoints
 
@@ -12,19 +17,19 @@ urlpatterns = [
     # Models endpoints
     
     ## Customer endpoints
-    path('customers/', customers.CustomerView.as_view()),
-    path('customers/<int:customer_id>/', customers.CustomerView.as_view()),
+    path('customers/', CustomerView.as_view()),
+    path('customers/<int:customer_id>/', CustomerView.as_view()),
 
     ## Router endpoints
-    path('routers/', routers.RouterView.as_view()),
-    path('routers/<str:router_id>/', routers.RouterView.as_view()),
-    path('routers/<str:router_id>/interfaces/', routers.RouterInterfaceView.as_view()),
-    path('routers/<str:router_id>/interfaces/<int:interface_id>/', routers.RouterInterfaceView.as_view()),
+    path('routers/', RouterView.as_view()),
+    path('routers/<str:router_id>/', RouterView.as_view()),
+    path('routers/<str:router_id>/interfaces/', RouterInterfaceView.as_view()),
+    path('routers/<str:router_id>/interfaces/<int:interface_id>/', RouterInterfaceView.as_view()),
 
     ## Site endpoints
-    path('sites/', sites.SiteView.as_view()),  
-    path('sites/<int:site_id>/', sites.SiteView.as_view()),
-    path('sites/<int:site_id>/assign-interface/', sites.SiteInterfaceView.as_view()),
+    path('sites/', SiteView.as_view()),  
+    path('sites/<int:site_id>/', SiteView.as_view()),
+    path('sites/<int:site_id>/interface/', SiteInterfaceView.as_view()),
 
     # Controller endpoints
     ## DHCP service endpoints
@@ -39,9 +44,9 @@ urlpatterns = [
     path('control/tftp/status/', control.tftp_server_status, name='tftp-server-status'),
     path('control/tftp/files/', control.tftp_files, name='tftp-files'),
     path('control/tftp/upload/', control.upload_file, name='upload-tftp-file'),
-    path('control/tftp/files/<str:filename>', control.delete_file, name='delete-tftp-file'),
+    path('control/tftp/files/<str:filename>/', control.delete_file, name='delete-tftp-file'),
 
     # Network discovery endpoints
     path('network/discover/', discovery.discover_network, name='discover-network'),
-    path('network/map/', network_map.NetworkMapView.as_view(), name='map_data'),
+    path('network/map/', NetworkMapView.as_view(), name='map_data'),
 ]
