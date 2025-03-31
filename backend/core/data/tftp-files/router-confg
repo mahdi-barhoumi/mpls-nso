@@ -15,4 +15,6 @@ exit
 restconf
 lldp run
 
+write memory
+
 end

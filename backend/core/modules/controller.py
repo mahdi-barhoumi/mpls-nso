@@ -1,3 +1,4 @@
+import re
 import os
 import logging
 import ipaddress
@@ -6,7 +7,7 @@ from core.modules.dhcp import DHCPServer
 from core.modules.tftp import TFTPServer
 from core.modules.utils.host_network_manager import HostNetworkManager
 from core.modules.utils.restconf import RestconfWrapper
-from core.models import Interface, Site, Router
+from core.models import Interface, Site, Router, VPN
 from core.settings import get_settings
 
 class _NetworkController:
@@ -296,5 +297,273 @@ class _NetworkController:
         except Exception as e:
             self.logger.error(f"Error unassigning interface from site: {str(e)}")
             return False
+
+    def setup_routing(self, site):
+        self.logger.info(f"Setting up VPN routing for site {site}")
+        
+        # Get required objects
+        if not site.assigned_interface or not site.router:
+            self.logger.error(f"Site {site} is missing assigned interface or router")
+            return False
+        
+        pe_router = site.assigned_interface.router
+        ce_router = site.router
+        settings = get_settings()
+        
+        # Verify router roles
+        if pe_router.role != 'PE':
+            self.logger.error(f"Router {pe_router.hostname} is not a PE router")
+            return False
+        
+        if ce_router.role != 'CE':
+            self.logger.error(f"Router {ce_router.hostname} is not a CE router")
+            return False
+        
+        # Create VRF name and route distinguisher for PE only
+        vrf_name = f"customer-{site.customer.id}"
+        rd = f"{settings.bgp_as}:{site.customer.id}"
+        rt = rd  # Using same value for route target
+        
+        # Initialize RESTCONF wrapper
+        restconf = RestconfWrapper()
+        
+        # 1. Configure VRF on PE router only
+        pe_vrf_data = {
+            "Cisco-IOS-XE-native:definition": {
+                "name": vrf_name,
+                "rd": rd,
+                "address-family": {
+                    "ipv4": {
+                        "route-target": {
+                            "export-route-target": {
+                                "without-stitching": [
+                                    {
+                                        "asn-ip": rt
+                                    }
+                                ]
+                            },
+                            "import-route-target": {
+                                "without-stitching": [
+                                    {
+                                        "asn-ip": rt
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                "route-target": {
+                    "export": [
+                        {
+                            "asn-ip": rt
+                        }
+                    ],
+                    "import": [
+                        {
+                            "asn-ip": rt
+                        }
+                    ]
+                }
+            }
+        }
+        
+        result = restconf.put(
+            pe_router.management_ip_address, 
+            f"Cisco-IOS-XE-native:native/vrf/definition={vrf_name}", 
+            pe_vrf_data
+        )
+        
+        if result is None:
+            self.logger.error(f"Failed to configure VRF on PE router {pe_router.hostname}")
+            return False
+        
+        # 2. Configure management VRF on CE router
+        management_vrf_name = settings.management_vrf
+        
+        ce_mgmt_vrf_data = {
+            "Cisco-IOS-XE-native:definition": {
+                "name": management_vrf_name,
+                "address-family": {
+                    "ipv4": {}
+                }
+            }
+        }
+        
+        result = restconf.put(
+            ce_router.management_ip_address, 
+            f"Cisco-IOS-XE-native:native/vrf/definition={management_vrf_name}", 
+            ce_mgmt_vrf_data
+        )
+        
+        if result is None:
+            self.logger.error(f"Failed to configure management VRF on CE router {ce_router.hostname}")
+            return False
+        
+        # 3. Determine IP addressing for the VPN link
+        
+        # Get all sites in this VPN
+        vpn_sites = site.customer.sites.all()
+        
+        # Find index of current site in the VPN
+        try:
+            site_index = list(vpn_sites).index(site)
+        except ValueError:
+            site_index = 0
+        
+        # Calculate subnet based on site index (using 192.168.0.0/16 divided into /30 subnets)
+        # Each /30 subnet has 4 addresses (0: network, 1: PE, 2: CE, 3: broadcast)
+        base_network = ipaddress.IPv4Network('192.168.0.0/16')
+        subnets = list(base_network.subnets(new_prefix=30))
+        
+        if site_index >= len(subnets):
+            self.logger.error(f"Not enough subnets available for site {site}")
+            return False
+        
+        current_subnet = subnets[site_index]
+        pe_ip = str(current_subnet[1])
+        ce_ip = str(current_subnet[2])
+        subnet_mask = str(current_subnet.netmask)
+        
+        # 4. Configure PE subinterface with VRF
+        # Parse interface name to get base and create subinterface
+        pe_interface_name = site.assigned_interface.name
+        
+        # Extract interface type and number (e.g., "GigabitEthernet" and "5" from "GigabitEthernet5")
+        match = re.match(r'([a-zA-Z]+)([0-9/]+)', pe_interface_name)
+        
+        if not match:
+            self.logger.error(f"Cannot parse interface name: {pe_interface_name}")
+            return False
+        
+        interface_type = match.group(1)
+        interface_number = match.group(2)
+        
+        # Use customer ID for VLAN ID for simplicity
+        vlan_id = 10
+        subinterface_id = f"{interface_number}.{vlan_id}"
+        
+        # Configure PE subinterface with VRF
+        pe_subinterface_data = {
+            "interface": {
+                interface_type: [
+                    {
+                        "name": subinterface_id,
+                        "encapsulation": {
+                            "dot1Q": {
+                                "vlan-id": vlan_id
+                            }
+                        },
+                        "vrf": {
+                            "forwarding": vrf_name
+                        },
+                        "ip": {
+                            "address": {
+                                "primary": {
+                                    "address": pe_ip,
+                                    "mask": subnet_mask
+                                }
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+        
+        result = restconf.patch(
+            pe_router.management_ip_address, 
+            "Cisco-IOS-XE-native:native/interface/", 
+            pe_subinterface_data
+        )
+        
+        if result is None:
+            self.logger.error(f"Failed to configure subinterface on PE router {pe_router.hostname}")
+            return False
+        
+        # 5. Find appropriate CE interface for customer traffic
+        ce_interface = site.assigned_interface.connected_interfaces.first()
+        
+        if not ce_interface:
+            self.logger.error(f"No available interfaces on CE router {ce_router.hostname}")
+            return False
+        
+        # Parse CE interface name
+        match = re.match(r'([a-zA-Z]+)([0-9/]+)', ce_interface.name)
+        
+        if not match:
+            self.logger.error(f"Cannot parse interface name: {ce_interface.name}")
+            return False
+        
+        ce_interface_type = match.group(1)
+        ce_interface_number = match.group(2)
+        ce_subinterface_id = f"{ce_interface_number}.{vlan_id}"
+        
+        # 6. Configure the untagged CE interface for management VRF
+        ce_mgmt_interface_data = {
+            ce_interface_type: [
+                {
+                    "name": ce_interface_number,
+                    "vrf": {
+                        "forwarding": management_vrf_name
+                    }
+                    # Note: Keeping any existing IP configuration intact
+                }
+            ]
+        }
+        
+        result = restconf.patch(
+            ce_router.management_ip_address, 
+            f"Cisco-IOS-XE-native:native/interface/{ce_interface_type}={ce_interface_number}", 
+            ce_mgmt_interface_data
+        )
+        
+        if result is None:
+            self.logger.error(f"Failed to configure management VRF on CE interface {ce_interface.name}")
+            return False
+
+        # 7. Configure CE subinterface for customer traffic (in global routing table, not in VRF)
+        ce_subinterface_data = {
+            "interface": {
+                ce_interface_type: [
+                    {
+                        "name": ce_subinterface_id,
+                        "encapsulation": {
+                            "dot1Q": {
+                                "vlan-id": vlan_id
+                            }
+                        },
+                        "ip": {
+                            "address": {
+                                "primary": {
+                                    "address": ce_ip,
+                                    "mask": subnet_mask
+                                }
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+        
+        result = restconf.patch(
+            ce_router.management_ip_address, 
+            "Cisco-IOS-XE-native:native/interface", 
+            ce_subinterface_data
+        )
+        
+        if result is None:
+            self.logger.error(f"Failed to configure subinterface on CE router {ce_router.hostname}")
+            return False
+        
+        # 8. Update the Interface models in the database
+        # TODO
+        
+        # TODO: Configure OSPF routing between PE and CE routers
+        # This will involve:
+        # 1. Enabling OSPF process on both routers
+        # 2. Configuring OSPF areas
+        # 3. Redistributing routes between VRF and global routing table
+        
+        self.logger.info(f"Successfully configured routing for site {site}")
+        return True
 
 NetworkController = _NetworkController()

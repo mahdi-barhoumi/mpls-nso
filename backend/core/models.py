@@ -117,7 +117,7 @@ class Customer(models.Model):
 
 class VPN(models.Model):
     name = models.CharField(max_length=255, help_text="VPN name")
-    customer = models.ForeignKey('Customer', null=True, on_delete=models.CASCADE, related_name='vpns', help_text="Customer who owns this VPN, if applicable")
+    customer = models.ForeignKey(Customer, null=True, on_delete=models.CASCADE, related_name='vpns', help_text="Customer who owns this VPN, if applicable")
     discovered = models.BooleanField(default=False, help_text="If the VPN was discovered or created")
     created_at = models.DateTimeField(auto_now_add=True, help_text="When this VPN was created or discovered")
     updated_at = models.DateTimeField(auto_now=True, help_text="When this VPN was last updated")
@@ -240,7 +240,7 @@ class Site(models.Model):
     description = models.TextField(max_length=255, null=True, blank=True, help_text="Site description")
     location = models.CharField(max_length=255, null=True, blank=True, help_text="Site location")
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='sites', help_text="Customer this site belongs to")
-    dhcp_scope = models.OneToOneField(DHCPScope, on_delete=models.PROTECT, help_text="DHCP scope for customer edge management (/30 subnet)")
+    dhcp_scope = models.OneToOneField(DHCPScope, null=True, on_delete=models.SET_NULL, help_text="DHCP scope for customer edge management (/30 subnet)")
     assigned_interface = models.ForeignKey(Interface, null=True, on_delete=models.SET_NULL, related_name='site', help_text="Assigned provider interface for this site")
     router = models.ForeignKey(Router, null=True, on_delete=models.SET_NULL, related_name='sites', help_text="Customer edge router for this site")
     

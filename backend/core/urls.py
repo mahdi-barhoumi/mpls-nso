@@ -2,7 +2,7 @@ from django.urls import path
 from core.views import control, utils, discovery
 from core.views.customers import CustomerView
 from core.views.routers import RouterView, RouterInterfaceView  
-from core.views.sites import SiteView, SiteInterfaceView
+from core.views.sites import SiteView, SiteRoutingView
 from core.views.settings import SettingsView
 from core.views.network_map import NetworkMapView
 
@@ -29,7 +29,7 @@ urlpatterns = [
     ## Site endpoints
     path('sites/', SiteView.as_view()),  
     path('sites/<int:site_id>/', SiteView.as_view()),
-    path('sites/<int:site_id>/interface/', SiteInterfaceView.as_view()),
+    path('sites/<int:site_id>/setup-routing/', SiteRoutingView.as_view()),
 
     # Controller endpoints
     ## DHCP service endpoints

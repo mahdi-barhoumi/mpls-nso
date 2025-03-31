@@ -236,7 +236,7 @@ class RestconfWrapper:
                     timeout=self.timeout,
                     json=data
                 )
-                
+
                 if response.status_code in [200, 201, 204]:
                     # Success - return response content if any, otherwise empty dict
                     result = {}
