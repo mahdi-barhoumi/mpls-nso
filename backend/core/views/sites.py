@@ -23,9 +23,9 @@ class SiteView(View):
                     'name': site.name,
                     'description': site.description,
                     'location': site.location,
-                    'dhcp_scope': site.dhcp_scope.network,
+                    'dhcp_scope': str(ipaddress.IPv4Network(f"{site.dhcp_scope.network}/{site.dhcp_scope.subnet_mask}", strict=False)),
                     'customer_id': site.customer.id,
-                    'assigned_interface_id': site.assigned_interface.id if site.assigned_interface else None,
+                    'assigned_interface_id': site.assigned_interface.id,
                     'router_id': site.router.id if site.router else None
                 }
                 
@@ -48,9 +48,9 @@ class SiteView(View):
                         'name': site.name,
                         'description': site.description,
                         'location': site.location,
-                        'dhcp_scope': site.dhcp_scope.network,
+                        'dhcp_scope': str(ipaddress.IPv4Network(f"{site.dhcp_scope.network}/{site.dhcp_scope.subnet_mask}", strict=False)),
                         'customer_id': site.customer.id,
-                        'assigned_interface_id': site.assigned_interface.id if site.assigned_interface else None,
+                        'assigned_interface_id': site.assigned_interface.id,
                         'router_id': site.router.id if site.router else None
                     }
                     for site in sites
@@ -66,8 +66,8 @@ class SiteView(View):
             # Parse JSON data
             data = json.loads(request.body)
             
-            # Validate required fields
-            required_fields = ['name', 'customer_id']
+            # Validate required fields for site creation
+            required_fields = ['name', 'customer_id', 'assigned_interface_id']
             for field in required_fields:
                 if field not in data:
                     return JsonResponse({
@@ -76,6 +76,14 @@ class SiteView(View):
             
             # Get customer
             customer = get_object_or_404(Customer, id=data['customer_id'])
+            
+            # Get and validate assigned interface
+            if data['assigned_interface_id'] is None:
+                return JsonResponse({
+                    'message': 'assigned_interface_id cannot be null'
+                }, status=400)
+                
+            assigned_interface = get_object_or_404(Interface, id=data['assigned_interface_id'])
             
             # Get settings
             settings = get_settings()
@@ -116,26 +124,39 @@ class SiteView(View):
 
             # Validate the DHCP scope
             dhcp_scope.save()
-
-            # Create site
+            
+            # Create site with assigned interface
             site = Site(
                 name=data['name'],
                 customer=customer,
                 description=data.get('description', ''),
                 location=data.get('location', ''),
                 dhcp_scope=dhcp_scope,
+                assigned_interface=assigned_interface
             )
+            
+            # Assign interface using NetworkController
+            success = NetworkController.assign_interface(assigned_interface, site)
+            if not success:
+                # Clean up the created DHCP scope if interface assignment fails
+                dhcp_scope.delete()
+                return JsonResponse({
+                    'message': 'Failed to assign interface to site'
+                }, status=500)
             
             # Validate and save site
             site.save()
             
+            # Include full information in the response
             return JsonResponse({
                 'id': site.id,
                 'name': site.name,
                 'customer_id': site.customer.id,
                 'description': site.description,
                 'location': site.location,
-                'dhcp_scope': site.dhcp_scope.network,
+                'dhcp_scope': str(ipaddress.IPv4Network(f"{site.dhcp_scope.network}/{site.dhcp_scope.subnet_mask}", strict=False)),
+                'assigned_interface_id': site.assigned_interface.id,
+                'router_id': site.router.id if site.router else None
             }, status=201)
         
         except json.JSONDecodeError:
@@ -153,41 +174,43 @@ class SiteView(View):
                 'message': str(e)
             }, status=500)
 
-
-@method_decorator(csrf_exempt, name='dispatch')
-class SiteInterfaceView(View):
-    def post(self, request, site_id):
+    def patch(self, request, site_id):
         try:
+            # Get site
+            site = get_object_or_404(Site, id=site_id)
+            
             # Parse JSON data
             data = json.loads(request.body)
             
-            # Validate required fields
-            if 'interface_id' not in data:
-                return JsonResponse({
-                    'message': 'Missing required field: interface_id'
-                }, status=400)
+            # Update fields if provided
+            if 'name' in data:
+                site.name = data['name']
+                
+            if 'description' in data:
+                site.description = data['description']
+                
+            if 'location' in data:
+                site.location = data['location']
             
-            # Get site and interface
-            site = get_object_or_404(Site, id=site_id)
-            interface = get_object_or_404(Interface, id=data['interface_id'])
+            # Save changes
+            site.save()
             
-            # Perform attachment using NetworkController
-            success = NetworkController.assign_interface(interface, site)
+            return JsonResponse({
+                'id': site.id,
+                'name': site.name,
+                'customer_id': site.customer.id,
+                'description': site.description,
+                'location': site.location,
+                'dhcp_scope': str(ipaddress.IPv4Network(f"{site.dhcp_scope.network}/{site.dhcp_scope.subnet_mask}", strict=False)),
+                'assigned_interface_id': site.assigned_interface.id,
+                'router_id': site.router.id if site.router else None
+            })
             
-            if success:
-                return JsonResponse({
-                    'message': f'Interface {interface.name} successfully assigned to site {site.name}',
-                })
-            else:
-                return JsonResponse({
-                    'message': 'Failed to assign interface to site'
-                }, status=500)
-        
         except json.JSONDecodeError:
             return JsonResponse({
                 'message': 'Invalid JSON'
             }, status=400)
-        
+            
         except Exception as e:
             return JsonResponse({
                 'message': str(e)
@@ -198,24 +221,64 @@ class SiteInterfaceView(View):
             # Get site
             site = get_object_or_404(Site, id=site_id)
             
-            # Check if site has an assigned interface
+            # Check if site has an assigned interface and unassign it
+            if site.assigned_interface:
+                interface = site.assigned_interface
+                success = NetworkController.unassign_interface(interface, site)
+                
+                if not success:
+                    return JsonResponse({
+                        'message': 'Failed to unassign interface from site'
+                    }, status=500)
+            
+            # Store name for confirmation message
+            site_name = site.name
+            
+            # Delete DHCP scope if it exists
+            if site.dhcp_scope:
+                dhcp_scope = site.dhcp_scope
+                dhcp_scope.delete()
+            
+            # Delete the site
+            site.delete()
+            
+            return JsonResponse({
+                'message': f'Site {site_name} successfully deleted'
+            })
+                
+        except Exception as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=500)
+
+@method_decorator(csrf_exempt, name='dispatch')
+class SiteRoutingView(View):
+    def post(self, request, site_id):
+        try:
+            # Get site
+            site = get_object_or_404(Site, id=site_id)
+            
+            # Check if site has required components
+            if not site.router:
+                return JsonResponse({
+                    'message': 'Site has no assigned router'
+                }, status=400)
+                
             if not site.assigned_interface:
                 return JsonResponse({
                     'message': 'Site has no assigned interface'
                 }, status=400)
             
-            interface = site.assigned_interface
-            
-            # Perform unassignment using NetworkController
-            success = NetworkController.unassign_interface(interface, site)
+            # Setup routing using NetworkController
+            success = NetworkController.setup_routing(site)
             
             if success:
                 return JsonResponse({
-                    'message': f'Interface {interface.name} successfully unassigned from site {site.name}'
+                    'message': f'Successfully configured routing for site {site.name}'
                 })
             else:
                 return JsonResponse({
-                    'message': 'Failed to unassign interface from site'
+                    'message': 'Failed to configure routing'
                 }, status=500)
                 
         except Exception as e:

@@ -161,7 +161,7 @@ LOGGING = {
             'level': 'INFO',
             'propagate': True,
         },
-        'network-controller': {
+        'networkcontroller': {
             'handlers': ['console'],
             'level': 'INFO',
             'propagate': True,
