@@ -144,6 +144,40 @@
         <Button label="Save" icon="pi pi-check" @click="saveSite" />
       </template>
     </Dialog>
+    <Dialog
+      v-model:visible="deleteSiteDialog"
+      :style="{ width: '450px' }"
+      header="Confirm"
+      :modal="true"
+    >
+      <div class="flex items-center gap-4">
+        <i class="pi pi-exclamation-triangle !text-3xl" />
+        <span v-if="currentSite"
+          >Are you sure you want to delete <b>{{ currentSite.name }}</b
+          >?</span
+        >
+      </div>
+      <template #footer>
+        <Button label="No" icon="pi pi-times" text @click="deleteSiteDialog.value = false" />
+        <Button label="Yes" icon="pi pi-check" severity="danger" @click="deleteSite" />
+      </template>
+    </Dialog>
+    <!-- Confirm Delete Selected Sites Dialog -->
+    <Dialog
+      v-model:visible="deleteSitesDialog"
+      :style="{ width: '450px' }"
+      header="Confirm"
+      :modal="true"
+    >
+      <div class="flex items-center gap-4">
+        <i class="pi pi-exclamation-triangle !text-3xl" />
+        <span>Are you sure you want to delete the selected sites?</span>
+      </div>
+      <template #footer>
+        <Button label="No" icon="pi pi-times" text @click="deleteSitesDialog.value = false" />
+        <Button label="Yes" icon="pi pi-check" severity="danger" @click="deleteSelectedSites" />
+      </template>
+    </Dialog>
   </div>
 </template>
 
@@ -240,6 +274,38 @@ const fetchPERouterInterfaces = async () => {
     })
   }
 }
+const editSite = (site) => {
+  currentSite.value = { ...site }
+  selectedPERouter.value = site.pe_router || null
+  peInterfaces.value = [] // Reset interfaces
+  isEditing.value = true
+  siteDialogVisible.value = true
+}
+const confirmDeleteSite = (site) => {
+  currentSite.value = site
+  deleteSiteDialog.value = true
+}
+const deleteSite = async () => {
+  try {
+    await SiteService.deleteSite(currentSite.value.id)
+    toast.add({
+      severity: 'success',
+      summary: 'Success',
+      detail: 'Site deleted successfully',
+      life: 3000,
+    })
+    fetchSites() // Refresh the site list
+  } catch (error) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'Failed to delete site',
+      life: 3000,
+    })
+  } finally {
+    deleteSiteDialog.value = false
+  }
+}
 const confirmDeleteSelected = () => {
   if (!selectedSites.value.length) {
     toast.add({
@@ -251,6 +317,29 @@ const confirmDeleteSelected = () => {
     return
   }
   deleteSitesDialog.value = true
+}
+const deleteSelectedSites = async () => {
+  try {
+    const ids = selectedSites.value.map((site) => site.id)
+    await Promise.all(ids.map((id) => SiteService.deleteSite(id)))
+    toast.add({
+      severity: 'success',
+      summary: 'Success',
+      detail: 'Selected sites deleted successfully',
+      life: 3000,
+    })
+    fetchSites() // Refresh the site list
+    selectedSites.value = [] // Clear the selection
+  } catch (error) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'Failed to delete selected sites',
+      life: 3000,
+    })
+  } finally {
+    deleteSitesDialog.value = false
+  }
 }
 const saveSite = async () => {
   submitted.value = true
