@@ -133,7 +133,7 @@ class _NetworkController:
                     "enabled": True
                 }
             }
-            
+
             # Send PATCH request to the router
             result = self.restconf.patch(
                 ip_address=interface.router.management_ip_address,
