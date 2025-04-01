@@ -23,6 +23,11 @@ const router = createRouter({
           name: 'customer',
           component: () => import('@/views/pages/CustomerCrud.vue'),
         },
+        {
+          path: '/sites',
+          name: 'sites',
+          component: () => import('@/views/pages/SiteCrud.vue'),
+        },
       ],
     },
     {
