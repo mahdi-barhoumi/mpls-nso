@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const API_URL = '/api/sites/' // Replace with your actual API endpoint
+const API_URL = 'http://127.0.0.1:8000/api/sites/' // Replace with your actual API endpoint
 
 export default {
   /**
@@ -17,11 +17,6 @@ export default {
     }
   },
 
-  /**
-   * Create a new site
-   * @param {Object} site - Site data
-   * @returns {Promise<Object>} Created site
-   */
   async createSite(site) {
     try {
       const response = await axios.post(API_URL, site)

@@ -1,4 +1,3 @@
-<!-- filepath: c:\Users\Moutaa\Documents\mpls-nso\frontend\src\views\pages\SiteCrud.vue -->
 <template>
   <div>
     <div class="card">
@@ -49,6 +48,12 @@
         <Column field="name" header="Name" sortable style="min-width: 16rem"></Column>
         <Column field="location" header="Location" sortable style="min-width: 16rem"></Column>
         <Column field="customer.name" header="Customer" sortable style="min-width: 16rem"></Column>
+        <Column
+          field="assigned_interface.name"
+          header="PE Interface"
+          sortable
+          style="min-width: 16rem"
+        ></Column>
         <Column field="dhcp_scope" header="DHCP Scope" sortable style="min-width: 16rem"></Column>
         <Column :exportable="false" style="min-width: 12rem">
           <template #body="slotProps">
@@ -99,6 +104,29 @@
           <InputText id="location" v-model="currentSite.location" fluid />
         </div>
         <div>
+          <label for="pe_router" class="block font-bold mb-3">PE Router</label>
+          <Dropdown
+            id="pe_router"
+            v-model="selectedPERouter"
+            :options="peRouters"
+            optionLabel="hostname"
+            placeholder="Select a PE Router"
+            @change="fetchPERouterInterfaces"
+            required
+          />
+        </div>
+        <div v-if="selectedPERouter">
+          <label for="pe_interface" class="block font-bold mb-3">PE Interface</label>
+          <Dropdown
+            id="pe_interface"
+            v-model="currentSite.assigned_interface"
+            :options="peInterfaces"
+            optionLabel="name"
+            placeholder="Select a PE Interface"
+            required
+          />
+        </div>
+        <div>
           <label for="customer" class="block font-bold mb-3">Customer</label>
           <Dropdown
             id="customer"
@@ -109,58 +137,11 @@
             required
           />
         </div>
-        <div>
-          <label for="dhcp_scope" class="block font-bold mb-3">DHCP Scope</label>
-          <InputText
-            id="dhcp_scope"
-            v-model="currentSite.dhcp_scope"
-            fluid
-            readonly
-            placeholder="Managed by backend"
-          />
-        </div>
       </div>
 
       <template #footer>
         <Button label="Cancel" icon="pi pi-times" text @click="closeDialog" />
         <Button label="Save" icon="pi pi-check" @click="saveSite" />
-      </template>
-    </Dialog>
-
-    <!-- Confirm Delete Site Dialog -->
-    <Dialog
-      v-model:visible="deleteSiteDialog"
-      :style="{ width: '450px' }"
-      header="Confirm"
-      :modal="true"
-    >
-      <div class="flex items-center gap-4">
-        <i class="pi pi-exclamation-triangle !text-3xl" />
-        <span v-if="currentSite"
-          >Are you sure you want to delete <b>{{ currentSite.name }}</b
-          >?</span
-        >
-      </div>
-      <template #footer>
-        <Button label="No" icon="pi pi-times" text @click="deleteSiteDialog = false" />
-        <Button label="Yes" icon="pi pi-check" severity="danger" @click="deleteSite" />
-      </template>
-    </Dialog>
-
-    <!-- Confirm Delete Selected Sites Dialog -->
-    <Dialog
-      v-model:visible="deleteSitesDialog"
-      :style="{ width: '450px' }"
-      header="Confirm"
-      :modal="true"
-    >
-      <div class="flex items-center gap-4">
-        <i class="pi pi-exclamation-triangle !text-3xl" />
-        <span>Are you sure you want to delete the selected sites?</span>
-      </div>
-      <template #footer>
-        <Button label="No" icon="pi pi-times" text @click="deleteSitesDialog = false" />
-        <Button label="Yes" icon="pi pi-check" severity="danger" @click="deleteSelectedSites" />
       </template>
     </Dialog>
   </div>
@@ -170,12 +151,16 @@
 import { ref, onMounted } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import SiteService from '@/service/SiteService'
+import RouterService from '@/service/RouterService'
 import CustomerService from '@/service/CustomerService'
 import { FilterMatchMode } from '@primevue/core/api'
 
 // State
 const sites = ref([])
 const customers = ref([])
+const peRouters = ref([])
+const peInterfaces = ref([])
+const selectedPERouter = ref(null)
 const selectedSites = ref([])
 const currentSite = ref({})
 const siteDialogVisible = ref(false)
@@ -224,36 +209,98 @@ const fetchCustomers = async () => {
   }
 }
 
-// Open New Site Dialog
-const openNewSiteDialog = () => {
-  currentSite.value = {}
-  submitted.value = false
-  isEditing.value = false
-  siteDialogVisible.value = true
+// Fetch PE Routers
+const fetchPERouters = async () => {
+  try {
+    const response = await RouterService.getPERouters() // Fetch only PE routers
+    peRouters.value = Array.isArray(response) ? response : []
+  } catch (error) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'Failed to fetch PE routers',
+      life: 3000,
+    })
+  }
 }
 
-// Edit Site
-const editSite = (site) => {
-  currentSite.value = { ...site }
-  isEditing.value = true
-  siteDialogVisible.value = true
+// Fetch PE Router Interfaces
+const fetchPERouterInterfaces = async () => {
+  if (!selectedPERouter.value) return
+  try {
+    const response = await RouterService.getConnectedInterfaces(selectedPERouter.value.id)
+    // Filter interfaces to only show those that are not connected
+    peInterfaces.value = response.filter((iface) => !iface.connected)
+  } catch (error) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'Failed to fetch PE router interfaces',
+      life: 3000,
+    })
+  }
 }
-
-// Save Site
+const confirmDeleteSelected = () => {
+  if (!selectedSites.value.length) {
+    toast.add({
+      severity: 'warn',
+      summary: 'Warning',
+      detail: 'No sites selected for deletion',
+      life: 3000,
+    })
+    return
+  }
+  deleteSitesDialog.value = true
+}
 const saveSite = async () => {
   submitted.value = true
-  if (!currentSite.value.name || !currentSite.value.customer) return
+
+  // Validate required fields
+  if (
+    !currentSite.value.name ||
+    !currentSite.value.customer ||
+    !currentSite.value.assigned_interface
+  ) {
+    toast.add({
+      severity: 'warn',
+      summary: 'Warning',
+      detail: 'Please fill in all required fields',
+      life: 3000,
+    })
+    return
+  }
 
   try {
     if (isEditing.value) {
+      // Update existing site
       await SiteService.updateSite(currentSite.value.id, currentSite.value)
-      toast.add({ severity: 'success', summary: 'Success', detail: 'Site Updated', life: 3000 })
+      toast.add({
+        severity: 'success',
+        summary: 'Success',
+        detail: 'Site updated successfully',
+        life: 3000,
+      })
     } else {
-      await SiteService.createSite(currentSite.value)
-      toast.add({ severity: 'success', summary: 'Success', detail: 'Site Created', life: 3000 })
+      // Create new site
+      const payload = {
+        name: currentSite.value.name,
+        location: currentSite.value.location,
+        customer_id: currentSite.value.customer.id,
+        assigned_interface_id: currentSite.value.assigned_interface.id, // Pass the selected interface ID
+      }
+      await SiteService.createSite(payload)
+      toast.add({
+        severity: 'success',
+        summary: 'Success',
+        detail: 'Site created successfully',
+        life: 3000,
+      })
     }
+
+    // Refresh the site list and close the dialog
     fetchSites()
     siteDialogVisible.value = false
+    submitted.value = false
   } catch (error) {
     toast.add({
       severity: 'error',
@@ -263,60 +310,25 @@ const saveSite = async () => {
     })
   }
 }
-
-// Confirm Delete Site
-const confirmDeleteSite = (site) => {
-  currentSite.value = site
-  deleteSiteDialog.value = true
+const closeDialog = () => {
+  siteDialogVisible.value = false
+  submitted.value = false
 }
-
-// Delete Site
-const deleteSite = async () => {
-  try {
-    await SiteService.deleteSite(currentSite.value.id)
-    toast.add({ severity: 'success', summary: 'Success', detail: 'Site Deleted', life: 3000 })
-    fetchSites()
-  } catch (error) {
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: 'Failed to delete site',
-      life: 3000,
-    })
-  } finally {
-    deleteSiteDialog.value = false
-  }
-}
-
-// Confirm Delete Selected Sites
-const confirmDeleteSelected = () => {
-  deleteSitesDialog.value = true
-}
-
-// Delete Selected Sites
-const deleteSelectedSites = async () => {
-  try {
-    const ids = selectedSites.value.map((site) => site.id)
-    await Promise.all(ids.map((id) => SiteService.deleteSite(id)))
-    toast.add({ severity: 'success', summary: 'Success', detail: 'Sites Deleted', life: 3000 })
-    fetchSites()
-  } catch (error) {
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: 'Failed to delete sites',
-      life: 3000,
-    })
-  } finally {
-    deleteSitesDialog.value = false
-    selectedSites.value = []
-  }
+// Open New Site Dialog
+const openNewSiteDialog = () => {
+  currentSite.value = {}
+  selectedPERouter.value = null
+  peInterfaces.value = []
+  submitted.value = false
+  isEditing.value = false
+  siteDialogVisible.value = true
 }
 
 // Lifecycle
 onMounted(() => {
   fetchSites()
   fetchCustomers()
+  fetchPERouters()
 })
 </script>
 
