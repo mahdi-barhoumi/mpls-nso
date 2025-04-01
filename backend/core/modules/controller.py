@@ -15,6 +15,7 @@ class _NetworkController:
         self.logger = logging.getLogger('networkcontroller')
         self.dhcp_server = DHCPServer()
         self.tftp_server = TFTPServer()
+        self.restconf = RestconfWrapper()
         self.start_dhcp_server()
         self.start_tftp_server()
 
@@ -122,21 +123,69 @@ class _NetworkController:
         os.remove(file_path)
         return filename
 
+    def enable_interface(self, interface: Interface) -> bool:
+        try:
+            self.logger.debug(f"Enabling interface {interface.name} on router {interface.router.hostname}")
+            
+            # Prepare the payload with enabled=true
+            payload = {
+                "ietf-interfaces:interface": {
+                    "enabled": True
+                }
+            }
+            
+            # Send PATCH request to the router
+            result = self.restconf.patch(
+                ip_address=interface.router.management_ip_address,
+                path=f"ietf-interfaces:interfaces/interface={interface.name}",
+                data=payload
+            )
+            
+            if result is not None:
+                self.logger.info(f"Successfully enabled interface {interface.name} on {interface.router.hostname}")
+                return True
+            else:
+                self.logger.error(f"Failed to enable interface {interface.name} on {interface.router.hostname}")
+                return False
+                
+        except Exception as exception:
+            self.logger.error(f"Error enabling interface {interface.name}: {str(exception)}")
+            return False
+
+    def disable_interface(self, interface: Interface) -> bool:
+        try:
+            self.logger.info(f"Disabling interface {interface.name} on router {interface.router.hostname}")
+            
+            # Prepare the payload with enabled=false
+            payload = {
+                "ietf-interfaces:interface": {
+                    "enabled": False
+                }
+            }
+            
+            # Send PATCH request to the router
+            result = self.restconf.patch(
+                ip_address=interface.router.management_ip_address,
+                path=f"ietf-interfaces:interfaces/interface={interface.name}",
+                data=payload
+            )
+            
+            if result is not None:
+                self.logger.info(f"Successfully disabled interface {interface.name} on {interface.router.hostname}")
+                return True
+            else:
+                self.logger.error(f"Failed to disable interface {interface.name} on {interface.router.hostname}")
+                return False
+                
+        except Exception as exception:
+            self.logger.error(f"Error disabling interface {interface.name}: {str(exception)}")
+            return False
+
     def assign_interface(self, interface: Interface, site: Site) -> bool:
         # Validate inputs
         if not interface or not site:
             self.logger.error("Invalid interface or site")
             return False
-
-        print(site.assigned_interface)
-        if site.assigned_interface is not None:
-            self.logger.warning("Cannot assign interface: Interface already assigned to site")
-            return False
-
-        # TODO: Fix this shit
-        # if interface.site is not None:
-        #     self.logger.warning("Cannot assign interface: Interface already assigned to another site")
-        #     return False
 
         # Get system settings
         settings = get_settings()
@@ -194,6 +243,8 @@ class _NetworkController:
                     }
                 }
             }
+
+            self.enable_interface(interface)
 
             # Send RESTCONF configuration
             result = restconf.put(
@@ -290,6 +341,8 @@ class _NetworkController:
             interface.ip_address = "0.0.0.0"
             interface.subnet_mask = "0.0.0.0"
             interface.save()
+
+            self.disable_interface(interface)
 
             self.logger.info(f"Successfully unassigned interface {interface.name} from site {site.name}")
             return True
