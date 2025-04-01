@@ -23,6 +23,11 @@ const router = createRouter({
           name: 'customer',
           component: () => import('@/views/pages/CustomerCrud.vue'),
         },
+        {
+          path: '/sites',
+          name: 'sites',
+          component: () => import('@/views/pages/SiteCrud.vue'),
+        },
       ],
     },
     {
@@ -55,6 +60,11 @@ const router = createRouter({
       path: '/register',
       name: 'register',
       component: () => import('@/views/pages/auth/Register.vue'),
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'not-found',
+      component: () => import('@/views/pages/NotFound.vue'),
     },
   ],
 })
