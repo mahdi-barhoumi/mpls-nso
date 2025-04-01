@@ -138,12 +138,12 @@
           />
         </div>
       </div>
-
       <template #footer>
         <Button label="Cancel" icon="pi pi-times" text @click="closeDialog" />
         <Button label="Save" icon="pi pi-check" @click="saveSite" />
       </template>
     </Dialog>
+    <!-- Confirm Delete Site Dialog -->
     <Dialog
       v-model:visible="deleteSiteDialog"
       :style="{ width: '450px' }"
@@ -158,10 +158,11 @@
         >
       </div>
       <template #footer>
-        <Button label="No" icon="pi pi-times" text @click="deleteSiteDialog.value = false" />
+        <Button label="No" icon="pi pi-times" text @click="deleteSiteDialog = false" />
         <Button label="Yes" icon="pi pi-check" severity="danger" @click="deleteSite" />
       </template>
     </Dialog>
+
     <!-- Confirm Delete Selected Sites Dialog -->
     <Dialog
       v-model:visible="deleteSitesDialog"
@@ -174,7 +175,7 @@
         <span>Are you sure you want to delete the selected sites?</span>
       </div>
       <template #footer>
-        <Button label="No" icon="pi pi-times" text @click="deleteSitesDialog.value = false" />
+        <Button label="No" icon="pi pi-times" text @click="deleteSitesDialog = false" />
         <Button label="Yes" icon="pi pi-check" severity="danger" @click="deleteSelectedSites" />
       </template>
     </Dialog>
