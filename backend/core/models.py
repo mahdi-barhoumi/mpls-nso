@@ -1,7 +1,9 @@
+import re
 import ipaddress
 from django.db import models
 from django.utils import timezone
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator, MaxValueValidator
 from core.settings import get_settings
 
 class DHCPLease(models.Model):
@@ -169,9 +171,9 @@ class VPN(models.Model):
         super().save(*args, **kwargs)
 
 class VRF(models.Model):
+    router = models.ForeignKey(Router, on_delete=models.CASCADE, related_name='vrfs', help_text="Router where this VRF is configured")
     name = models.CharField(max_length=255, help_text="VRF name")
     route_distinguisher = models.CharField(max_length=50, help_text="Route distinguisher")
-    router = models.ForeignKey(Router, on_delete=models.CASCADE, related_name='vrfs', help_text="Router where this VRF is configured")
     vpn = models.ForeignKey('VPN', null=True, on_delete=models.CASCADE, related_name='vrfs', help_text="VPN this VRF belongs to")
     
     class Meta:
@@ -187,6 +189,25 @@ class VRF(models.Model):
     @property
     def export_targets(self):
         return self.route_targets.filter(target_type='export').values_list('value', flat=True)
+
+    @classmethod
+    def get_or_new(cls, router, name, route_distinguisher, vpn=None):
+        try:
+            # Try to get existing VRF
+            vrf = cls.objects.get(router=router, name=name)
+            return vrf, False
+        except cls.DoesNotExist:
+            # Create new VRF but don't save it
+            id = cls.objects.aggregate(models.Max('id'))['id__max'] or 0
+            id = id + 1
+            vrf = cls(
+                id=id,
+                router=router,
+                name=name,
+                route_distinguisher=route_distinguisher,
+                vpn=vpn
+            )
+            return vrf, True
 
 class RouteTarget(models.Model):
     target_types = [
@@ -209,7 +230,6 @@ class Interface(models.Model):
     description = models.CharField(max_length=255, null=True, help_text="Interface description")
     mac_address = models.CharField(max_length=17, help_text="Interface MAC address")
     admin_status = models.CharField(max_length=20, help_text="Administrative status")
-    oper_status = models.CharField(max_length=20, help_text="Operational status")
     ip_address = models.GenericIPAddressField(null=True, help_text="IP address if configured")
     subnet_mask = models.GenericIPAddressField(null=True, help_text="Subnet mask if configured")
     vrf = models.ForeignKey(VRF, null=True, on_delete=models.SET_NULL, related_name='interfaces')
@@ -232,6 +252,20 @@ class Interface(models.Model):
         super().save(*args, **kwargs)
     
     @property
+    def type(self):
+        match = re.match(r'([a-zA-Z-]+)', self.name)
+        if match:
+            return match.group(1)
+        return None
+
+    @property
+    def number(self):
+        match = re.match(r'[a-zA-Z-]+(.+)$', self.name)
+        if match:
+            return match.group(1)
+        return None
+
+    @property
     def is_connected(self):
         return self.connected_interfaces.exists() or self.connected_from.exists()
 
@@ -243,6 +277,8 @@ class Site(models.Model):
     dhcp_scope = models.OneToOneField(DHCPScope, null=True, on_delete=models.SET_NULL, help_text="DHCP scope for customer edge management (/30 subnet)")
     assigned_interface = models.ForeignKey(Interface, null=True, on_delete=models.SET_NULL, related_name='site', help_text="Assigned provider interface for this site")
     router = models.ForeignKey(Router, null=True, on_delete=models.SET_NULL, related_name='sites', help_text="Customer edge router for this site")
+    ospf_process_id = models.PositiveIntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(65535)], help_text="OSPF process ID used by the PE router for this site's routing")
+    link_network = models.GenericIPAddressField(protocol='IPv4', help_text="P2P link network (/30 subnet) for site connectivity")
     
     class Meta:
         unique_together = [['customer', 'name']]
@@ -265,8 +301,42 @@ class Site(models.Model):
         # Validate router role is CE
         if self.router and self.router.role != 'CE':
             raise ValidationError(f"Router '{self.router.hostname}' must have a CE role for site assignment")
+        
+        # Validate link_network is not used by another site from the same customer
+        if self.link_network:
+            existing_sites = Site.objects.filter(
+                customer=self.customer,
+                link_network=self.link_network
+            ).exclude(pk=self.pk)
+            
+            if existing_sites.exists():
+                conflicting_site = existing_sites.first()
+                raise ValidationError(f"Link network is already in use by site '{conflicting_site.name}' for the same customer")
+    
+    def find_available_link_network(self):
+        # Start with the 192.168.0.0/16 network
+        base_network = ipaddress.ip_network('192.168.0.0/16')
+        
+        # Get all /30 subnets from the base network
+        all_possible_subnets = list(base_network.subnets(new_prefix=30))
+        
+        # Get all currently used link networks for the same customer
+        used_networks = Site.objects.filter(customer=self.customer).exclude(pk=self.pk).values_list('link_network', flat=True)
+        used_networks = [ipaddress.ip_network(f"{ip}/30") for ip in used_networks if ip]
+        
+        # Find the first available subnet
+        for subnet in all_possible_subnets:
+            if subnet not in used_networks:
+                return str(subnet.network_address)
+        
+        # If no subnet is available, raise an exception
+        raise ValidationError("No available /30 subnet in 192.168.0.0/16 range for this customer")
     
     def save(self, *args, **kwargs):
+        # If this is a new Site
+        if not self.pk:
+            self.link_network = self.find_available_link_network()
+        
         # Validate before saving
         self.validate()
         super().save(*args, **kwargs)

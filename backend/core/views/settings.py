@@ -86,8 +86,7 @@ class SettingsView(View):
             # Save with validation
             try:
                 settings.save()
-                NetworkController.start_dhcp_server()
-                NetworkController.start_tftp_server()
+                NetworkController.initialize()
                 return JsonResponse({
                     'status': 'success',
                     'message': 'Settings created successfully'

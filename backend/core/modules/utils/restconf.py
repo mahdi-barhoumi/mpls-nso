@@ -129,7 +129,7 @@ class RestconfWrapper:
         for attempt in range(self.max_retries):
             try:
                 self.logger.debug(f"PATCH {url} (attempt {attempt + 1}/{self.max_retries})")
-                
+
                 response = requests.patch(
                     url,
                     headers=self.headers,

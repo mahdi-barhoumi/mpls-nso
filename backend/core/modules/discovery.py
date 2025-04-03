@@ -362,7 +362,6 @@ class NetworkDiscoverer:
             
             # Get basic info
             admin_status = intf.get('admin-status', 'if-state-down').replace('if-state-', '')
-            oper_status = intf.get('oper-status', 'if-oper-state-down').replace('if-oper-state-', '')
             description = intf.get('description', '')
             mac_address = intf.get('phys-address', '')
             
@@ -386,7 +385,6 @@ class NetworkDiscoverer:
                 name=name,
                 defaults={
                     'admin_status': admin_status,
-                    'oper_status': oper_status,
                     'description': description,
                     'ip_address': ip_address,
                     'subnet_mask': subnet_mask,
