@@ -161,7 +161,7 @@ class _NetworkController:
             )
             
             if result is not None:
-                interface.admin_status = "up"
+                interface.enabled = True
                 interface.save()
                 self.logger.info(f"Successfully enabled interface {interface.name} on {interface.router.hostname}")
                 return True
@@ -192,7 +192,7 @@ class _NetworkController:
             )
             
             if result is not None:
-                interface.admin_status = "down"
+                interface.enabled = False
                 interface.save()
                 self.logger.info(f"Successfully disabled interface {interface.name} on {interface.router.hostname}")
                 return True
@@ -203,6 +203,72 @@ class _NetworkController:
         except Exception as exception:
             self.logger.error(f"Error disabling interface {interface.name}: {str(exception)}")
             return False
+
+    def update_interface(self, interface: Interface) -> bool:
+        try:
+            self.logger.info(f"Updating interface {interface.name} on router {interface.router.hostname}")
+                
+            # Construct the basic interface configuration
+            interface_config = {
+                f"Cisco-IOS-XE-native:interface": {
+                    interface.type: [
+                        {
+                            "name": interface.index
+                        }
+                    ]
+                }
+            }
+            
+            # Add IP configuration if available
+            if interface.ip_address and interface.subnet_mask:
+                interface_config[f"Cisco-IOS-XE-native:interface"][interface.type][0]["ip"] = {
+                    "address": {
+                        "primary": {
+                            "address": interface.ip_address,
+                            "mask": interface.subnet_mask
+                        }
+                    }
+                }
+            
+            # Add VRF configuration if available
+            if interface.vrf:
+                interface_config[f"Cisco-IOS-XE-native:interface"][interface.type][0]["vrf"] = {
+                    "forwarding": interface.vrf.name
+                }
+            
+            # Add VLAN configuration for subinterfaces
+            if interface.category == 'logical' and interface.vlan:
+                interface_config[f"Cisco-IOS-XE-native:interface"][interface.type][0]["encapsulation"] = {
+                    "dot1Q": {
+                        "vlan-id": interface.vlan
+                    }
+                }
+            
+            # Add admin status (enabled/disabled)
+            if not interface.enabled:
+                interface_config[f"Cisco-IOS-XE-native:interface"][interface.type][0]["shutdown"] = [None]
+            
+            # Send PATCH request to update interface configuration
+            result = self.restconf.patch(
+                ip_address=interface.router.management_ip_address,
+                path=f"Cisco-IOS-XE-native:native/interface",
+                data=interface_config
+            )
+            
+            if result is not None:
+                # Update was successful
+                self.logger.info(f"Successfully updated interface {interface.name} on {interface.router.hostname}")
+                return True
+            else:
+                self.logger.error(f"Failed to update interface {interface.name} on {interface.router.hostname}")
+                return False
+                
+        except Exception as exception:
+            self.logger.error(f"Error updating interface {interface.name}: {str(exception)}")
+            return False
+
+    def delete_interface(self, interface: Interface) -> bool:
+        pass
 
     def merge_vrf(self, vrf: VRF) -> bool:
         try:
@@ -313,7 +379,7 @@ class _NetworkController:
             # Prepare interface configuration
             interface_config = {
                 f"Cisco-IOS-XE-native:{interface.type}": { 
-                    "name": interface.number,
+                    "name": interface.index,
                     "vrf": {
                         "forwarding": settings.management_vrf
                     },
@@ -338,7 +404,7 @@ class _NetworkController:
             # Send RESTCONF configuration
             result = restconf.put(
                 interface.router.management_ip_address, 
-                f"Cisco-IOS-XE-native:native/interface/{interface.type}={interface.number}", 
+                f"Cisco-IOS-XE-native:native/interface/{interface.type}={interface.index}", 
                 interface_config
             )
         
@@ -397,7 +463,7 @@ class _NetworkController:
             restconf = RestconfWrapper()
             interface_config = {
                 f"Cisco-IOS-XE-native:{interface.type}": {
-                    "name": interface.number,
+                    "name": interface.index,
                     "vrf": {
                         "forwarding": settings.management_vrf
                     }
@@ -407,7 +473,7 @@ class _NetworkController:
             # Send RESTCONF configuration
             result = restconf.put(
                 interface.router.management_ip_address,
-                f"Cisco-IOS-XE-native:native/interface/{interface.type}={interface.number}",
+                f"Cisco-IOS-XE-native:native/interface/{interface.type}={interface.index}",
                 interface_config
             )
 
@@ -462,7 +528,7 @@ class _NetworkController:
             return False
         
         # 1. Configure site VRF on PE router
-        site_vrf, new = VRF.get_or_new(
+        site_vrf, new = VRF.objects.get_or_new(
             name=f"site-{site.id}",
             route_distinguisher=f"{settings.bgp_as}:{site.id}",
             router=pe_router
@@ -503,15 +569,15 @@ class _NetworkController:
 
         pe_interface = site.assigned_interface
         pe_interface_type = pe_interface.type
-        pe_interface_number = pe_interface.number
-        pe_subinterface_number = f"{pe_interface_number}.{vlan_id}"
+        pe_interface_index = pe_interface.index
+        pe_subinterface_index = f"{pe_interface_index}.{vlan_id}"
         
         # Configure PE subinterface with VRF
         pe_subinterface_data = {
             "interface": {
                 pe_interface_type: [
                     {
-                        "name": pe_subinterface_number,
+                        "name": pe_subinterface_index,
                         "encapsulation": {
                             "dot1Q": {
                                 "vlan-id": vlan_id
@@ -546,14 +612,14 @@ class _NetworkController:
         # 5. Find appropriate CE interface for customer traffic
         ce_interface = site.assigned_interface.connected_interfaces.first()
         ce_interface_type = ce_interface.type
-        ce_interface_number = ce_interface.number
-        ce_subinterface_number = f"{ce_interface_number}.{vlan_id}"
+        ce_interface_index = ce_interface.index
+        ce_subinterface_index = f"{ce_interface_index}.{vlan_id}"
         
         # 6. Configure the untagged CE interface for management VRF
         ce_mgmt_interface_data = {
             ce_interface_type: [
                 {
-                    "name": ce_interface_number,
+                    "name": ce_interface_index,
                     "vrf": {
                         "forwarding": settings.management_vrf
                     },
@@ -568,7 +634,7 @@ class _NetworkController:
         
         result = self.restconf.patch(
             ce_router.management_ip_address, 
-            f"Cisco-IOS-XE-native:native/interface/{ce_interface_type}={ce_interface_number}", 
+            f"Cisco-IOS-XE-native:native/interface/{ce_interface_type}={ce_interface_index}", 
             ce_mgmt_interface_data
         )
         
@@ -581,7 +647,7 @@ class _NetworkController:
             "interface": {
                 ce_interface_type: [
                     {
-                        "name": ce_subinterface_number,
+                        "name": ce_subinterface_index,
                         "encapsulation": {
                             "dot1Q": {
                                 "vlan-id": vlan_id

@@ -55,8 +55,7 @@ class RouterInterfaceView(View):
                 interface_data = {
                     'id': interface.id,
                     'name': interface.name,
-                    'admin_status': interface.admin_status,
-                    'oper_status': interface.oper_status,
+                    'enabled': interface.enabled,
                     'description': interface.description,
                     'ip_address': str(interface.ip_address) if interface.ip_address else None,
                     'subnet_mask': str(interface.subnet_mask) if interface.subnet_mask else None,
@@ -78,8 +77,7 @@ class RouterInterfaceView(View):
                 interface_list = [{
                     'id': interface.id,
                     'name': interface.name,
-                    'admin_status': interface.admin_status,
-                    'oper_status': interface.oper_status,
+                    'enabled': interface.enabled,
                     'description': interface.description,
                     'ip_address': str(interface.ip_address) if interface.ip_address else None,
                     'subnet_mask': str(interface.subnet_mask) if interface.subnet_mask else None,

@@ -5,8 +5,12 @@ from core.views.routers import RouterView, RouterInterfaceView
 from core.views.sites import SiteView, SiteRoutingView
 from core.views.settings import SettingsView
 from core.views.network_map import NetworkMapView
+from core.views.test import test_view
 
 urlpatterns = [
+    # Test endpoint
+    path('test/', test_view, name='test'),
+
     # Settings endpoint
     path('settings/', SettingsView.as_view(), name='settings'),
 

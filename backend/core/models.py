@@ -6,6 +6,28 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator
 from core.settings import get_settings
 
+class ImmutableFieldMixin:
+    immutable_fields = []  # Define a list of immutable fields in your model
+    
+    def save(self, *args, **kwargs):
+        if self.pk:  # If the object exists in the database
+            original = self.__class__.objects.get(pk=self.pk)
+            for field in self.immutable_fields:
+                if getattr(original, field) != getattr(self, field):
+                    raise ValueError(f"{field} is immutable.")
+        super().save(*args, **kwargs)
+
+class DefaultManager(models.Manager):
+    def get_or_new(self, **kwargs):
+        try:
+            # Try to get an existing instance
+            instance = self.get(**kwargs)
+            return instance, False
+        except self.model.DoesNotExist:
+            # Create a new instance but don't save it
+            instance = self.model(**kwargs)
+            return instance, True
+
 class DHCPLease(models.Model):
     mac_address = models.CharField(max_length=17, primary_key=True, help_text="MAC address of the client")
     ip_address = models.GenericIPAddressField(help_text="Assigned IP address")
@@ -171,6 +193,8 @@ class VPN(models.Model):
         super().save(*args, **kwargs)
 
 class VRF(models.Model):
+    objects = DefaultManager()
+
     router = models.ForeignKey(Router, on_delete=models.CASCADE, related_name='vrfs', help_text="Router where this VRF is configured")
     name = models.CharField(max_length=255, help_text="VRF name")
     route_distinguisher = models.CharField(max_length=50, help_text="Route distinguisher")
@@ -190,29 +214,10 @@ class VRF(models.Model):
     def export_targets(self):
         return self.route_targets.filter(target_type='export').values_list('value', flat=True)
 
-    @classmethod
-    def get_or_new(cls, router, name, route_distinguisher, vpn=None):
-        try:
-            # Try to get existing VRF
-            vrf = cls.objects.get(router=router, name=name)
-            return vrf, False
-        except cls.DoesNotExist:
-            # Create new VRF but don't save it
-            id = cls.objects.aggregate(models.Max('id'))['id__max'] or 0
-            id = id + 1
-            vrf = cls(
-                id=id,
-                router=router,
-                name=name,
-                route_distinguisher=route_distinguisher,
-                vpn=vpn
-            )
-            return vrf, True
-
 class RouteTarget(models.Model):
     target_types = [
-        ('import', 'Import'),
-        ('export', 'Export')
+        ('import', 'Import route target'),
+        ('export', 'Export route target')
     ]
     vrf = models.ForeignKey(VRF, on_delete=models.CASCADE, related_name='route_targets', help_text="VRF this route target belongs to")
     value = models.CharField(max_length=50, help_text="Route target value (ASN:nn format)")
@@ -224,14 +229,20 @@ class RouteTarget(models.Model):
     def __str__(self):
         return f"{self.value} ({self.target_type})"
 
-class Interface(models.Model):
-    router = models.ForeignKey(Router, on_delete=models.CASCADE, related_name='interfaces')
+class Interface(ImmutableFieldMixin, models.Model):
+    objects = DefaultManager()
+    immutable_fields = ['router', 'name', 'mac_address']
+
+    router = models.ForeignKey(Router, on_delete=models.CASCADE, related_name='interfaces', help_text="Router this interface belongs to")
     name = models.CharField(max_length=100, help_text="Interface name")
-    description = models.CharField(max_length=255, null=True, help_text="Interface description")
+    description = models.CharField(null=True, max_length=255, help_text="Interface description")
+    enabled = models.BooleanField(help_text="Whether the interface is enabled or not")
+    addressing = models.CharField(max_length=10, choices=[('static', 'Static'), ('dhcp', 'DHCP')], help_text="Addressing method")
     mac_address = models.CharField(max_length=17, help_text="Interface MAC address")
-    admin_status = models.CharField(max_length=20, help_text="Administrative status")
-    ip_address = models.GenericIPAddressField(null=True, help_text="IP address if configured")
-    subnet_mask = models.GenericIPAddressField(null=True, help_text="Subnet mask if configured")
+    ip_address = models.GenericIPAddressField(null=True, protocol='ipv4', help_text="IP address if configured")
+    subnet_mask = models.GenericIPAddressField(null=True, protocol='ipv4', help_text="Subnet mask if configured")
+    dhcp_helper_address = models.GenericIPAddressField(null=True, protocol='ipv4', help_text="DHCP helper address if applicable")
+    vlan = models.PositiveIntegerField(null=True, validators=[MinValueValidator(1), MaxValueValidator(4094)], help_text="VLAN if applicable")
     vrf = models.ForeignKey(VRF, null=True, on_delete=models.SET_NULL, related_name='interfaces')
     connected_interfaces = models.ManyToManyField('self', symmetrical=False, related_name='connected_from')
     first_discovered = models.DateTimeField(auto_now_add=True, help_text="When this interface was first discovered")
@@ -244,6 +255,11 @@ class Interface(models.Model):
         return f"{self.router.hostname} - {self.name}"
 
     def validate(self):
+        if self.pk:
+            current = Interface.objects.get(pk=self.pk)
+            if self.addressing == 'dhcp' and current.addressing == 'static':
+                self.ip_address = self.subnet_mask = None
+
         if self.vrf and self.vrf.router != self.router:
             raise ValidationError(f"VRF '{self.vrf}' does not exist on router")
 
@@ -259,11 +275,19 @@ class Interface(models.Model):
         return None
 
     @property
-    def number(self):
+    def index(self):
         match = re.match(r'[a-zA-Z-]+(.+)$', self.name)
         if match:
             return match.group(1)
         return None
+
+    @property
+    def category(self):
+        if '.' in self.name:
+            return 'logical'
+        if 'loopback' in self.name.lower():
+            return 'loopback'
+        return 'physical'
 
     @property
     def is_connected(self):

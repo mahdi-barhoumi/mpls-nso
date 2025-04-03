@@ -108,8 +108,7 @@ class NetworkMapView(View):
                             link['sourceInterfaceDetails'] = {
                                 'id': interface.id,
                                 'name': interface.name,
-                                'admin_status': interface.admin_status,
-                                'oper_status': interface.oper_status,
+                                'enabled': interface.enabled,
                                 'ip_address': interface.ip_address,
                                 'subnet_mask': interface.subnet_mask,
                                 'mac_address': interface.mac_address,
@@ -119,8 +118,7 @@ class NetworkMapView(View):
                             link['targetInterfaceDetails'] = {
                                 'id': connected.id,
                                 'name': connected.name,
-                                'admin_status': connected.admin_status,
-                                'oper_status': connected.oper_status,
+                                'enabled': connected.enabled,
                                 'ip_address': connected.ip_address,
                                 'subnet_mask': connected.subnet_mask,
                                 'mac_address': connected.mac_address,
@@ -174,8 +172,7 @@ class NetworkMapView(View):
                 interfaces_data.append({
                     'id': interface.id,
                     'name': interface.name,
-                    'admin_status': interface.admin_status,
-                    'oper_status': interface.oper_status,
+                    'enabled': interface.enabled,
                     'ip_address': interface.ip_address,
                     'subnet_mask': interface.subnet_mask,
                     'mac_address': interface.mac_address,
