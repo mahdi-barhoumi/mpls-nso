@@ -288,7 +288,7 @@ class RestconfWrapper:
             )
             
             if response.status_code == 200:
-                self.logger.info("Configuration saved to startup successfully")
+                self.logger.debug("Configuration saved to startup successfully")
                 return True
             else:
                 self.logger.warning(f"Failed to save configuration to startup: HTTP {response.status_code}")

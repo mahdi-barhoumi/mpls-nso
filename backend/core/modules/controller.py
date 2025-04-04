@@ -144,20 +144,21 @@ class _NetworkController:
 
     def enable_interface(self, interface: Interface) -> bool:
         try:
-            self.logger.debug(f"Enabling interface {interface.name} on router {interface.router.hostname}")
-            
-            # Prepare the payload with enabled=true
-            payload = {
-                "ietf-interfaces:interface": {
-                    "enabled": True
-                }
-            }
+            self.logger.info(f"Enabling interface {interface.name} on router {interface.router.hostname}")
+
+            # If the interface is a subinterface, we need to enable the parent interface first
+            if interface.category == 'logical':
+                parent_interface = Interface.objects.get(
+                    router=interface.router,
+                    name=interface.name.split('.')[0]
+                )
+                self.enable_interface(parent_interface)
 
             # Send PATCH request to the router
             result = self.restconf.patch(
                 ip_address=interface.router.management_ip_address,
-                path=f"ietf-interfaces:interfaces/interface={interface.name}",
-                data=payload
+                path=f"ietf-interfaces:interfaces/interface={interface.name}/enabled",
+                data={"enabled": True}
             )
             
             if result is not None:
@@ -177,18 +178,11 @@ class _NetworkController:
         try:
             self.logger.info(f"Disabling interface {interface.name} on router {interface.router.hostname}")
             
-            # Prepare the payload with enabled=false
-            payload = {
-                "ietf-interfaces:interface": {
-                    "enabled": False
-                }
-            }
-            
             # Send PATCH request to the router
             result = self.restconf.patch(
                 ip_address=interface.router.management_ip_address,
-                path=f"ietf-interfaces:interfaces/interface={interface.name}",
-                data=payload
+                path=f"ietf-interfaces:interfaces/interface={interface.name}/enabled",
+                data={"enabled": False}
             )
             
             if result is not None:
@@ -206,22 +200,34 @@ class _NetworkController:
 
     def update_interface(self, interface: Interface) -> bool:
         try:
-            self.logger.info(f"Updating interface {interface.name} on router {interface.router.hostname}")
-                
-            # Construct the basic interface configuration
-            interface_config = {
-                f"Cisco-IOS-XE-native:interface": {
-                    interface.type: [
-                        {
-                            "name": interface.index
-                        }
-                    ]
-                }
+            self.logger.debug(f"Updating interface {interface.name} on router {interface.router.hostname}")
+            
+            # Build payload based on interface attributes
+            payload = {
+                "name": interface.index
             }
             
-            # Add IP configuration if available
-            if interface.ip_address and interface.subnet_mask:
-                interface_config[f"Cisco-IOS-XE-native:interface"][interface.type][0]["ip"] = {
+            # Add description if present
+            if interface.description:
+                payload["description"] = interface.description
+            
+            # Add VRF if assigned
+            if interface.vrf:
+                payload["vrf"] = {
+                    "forwarding": interface.vrf.name
+                }
+
+            # Add VLAN configuration for subinterfaces
+            if interface.category == 'logical' and interface.vlan:
+                payload["encapsulation"] = {
+                    "dot1Q": {
+                        "vlan-id": interface.vlan
+                    }
+                }
+
+            # Configure IP addressing based on method
+            if interface.addressing == "static" and interface.ip_address and interface.subnet_mask:
+                payload["ip"] = {
                     "address": {
                         "primary": {
                             "address": interface.ip_address,
@@ -229,34 +235,44 @@ class _NetworkController:
                         }
                     }
                 }
-            
-            # Add VRF configuration if available
-            if interface.vrf:
-                interface_config[f"Cisco-IOS-XE-native:interface"][interface.type][0]["vrf"] = {
-                    "forwarding": interface.vrf.name
-                }
-            
-            # Add VLAN configuration for subinterfaces
-            if interface.category == 'logical' and interface.vlan:
-                interface_config[f"Cisco-IOS-XE-native:interface"][interface.type][0]["encapsulation"] = {
-                    "dot1Q": {
-                        "vlan-id": interface.vlan
+            elif interface.addressing == "dhcp":
+                payload["ip"] = {
+                    "address": {
+                        "dhcp": {}
                     }
                 }
             
-            # Add admin status (enabled/disabled)
-            if not interface.enabled:
-                interface_config[f"Cisco-IOS-XE-native:interface"][interface.type][0]["shutdown"] = [None]
-            
-            # Send PATCH request to update interface configuration
+            # Add DHCP helper if configured
+            if interface.dhcp_helper_address:
+                payload["ip"]["helper-address"] = [
+                    {
+                        "address": interface.dhcp_helper_address
+                    }
+                ]
+
+            payload = {
+                "interface": {
+                    interface.type: [
+                        payload
+                    ]
+                }
+            }
+
+            # Send PATCH request to update the interface configuration
             result = self.restconf.patch(
                 ip_address=interface.router.management_ip_address,
-                path=f"Cisco-IOS-XE-native:native/interface",
-                data=interface_config
+                path=f"Cisco-IOS-XE-native:native/interface/",
+                data=payload
             )
             
             if result is not None:
-                # Update was successful
+                # Update enable/disable state if needed
+                if interface.enabled:
+                    self.enable_interface(interface)
+                else:
+                    self.disable_interface(interface)
+                # Update the database
+                interface.save()
                 self.logger.info(f"Successfully updated interface {interface.name} on {interface.router.hostname}")
                 return True
             else:
@@ -267,12 +283,61 @@ class _NetworkController:
             self.logger.error(f"Error updating interface {interface.name}: {str(exception)}")
             return False
 
-    def delete_interface(self, interface: Interface) -> bool:
-        pass
-
-    def merge_vrf(self, vrf: VRF) -> bool:
+    def create_subinterface(self, interface: Interface, vlan: int) -> Interface:
+        # Check if the interface is physical first
+        if interface.category != 'physical':
+            self.logger.error("Cannot create ubinterface on a non-physical interface")
+            return None
+        
         try:
-            self.logger.debug(f"Configuring VRF {vrf.name} on router {vrf.router.hostname}")
+            subinterface = Interface.objects.get_or_new(router=interface.router, name=f"{interface.name}.{vlan}")
+            subinterface.vlan = vlan
+            success = self.update_interface(subinterface)
+
+            if success:
+                self.logger.info(f"Successfully created subinterface {subinterface.name} on {interface.router.hostname}")
+                return subinterface
+
+            self.logger.error(f"Failed creating subinterface {subinterface.name} on {interface.router.hostname}")
+            return None
+        except Exception as exception:
+            self.logger.error(f"Error creating subinterface: {str(exception)}")
+            return None
+
+    def delete_interface(self, interface: Interface) -> bool:
+        # Check if the interface exists in the database
+        if not interface.pk:
+            self.logger.warning(f"Cannot delete a non existing interface")
+            return False
+
+        # Check if the interface is physical
+        if interface.category == 'physical':
+            self.logger.warning(f"Cannot delete physical interface {interface.name} from {interface.router.hostname}")
+            return False
+
+        try:
+            # Send DELETE request to remove the interface
+            result = self.restconf.delete(
+                ip_address=interface.router.management_ip_address,
+                path=f"Cisco-IOS-XE-native:native/interface/{interface.type}={interface.index}"
+            )
+            
+            if result is not None:
+                # Delete the interface from the database
+                interface.delete()
+                self.logger.info(f"Successfully deleted interface {interface.name} from {interface.router.hostname}")
+                return True
+            else:
+                self.logger.error(f"Failed to delete interface {interface.name} from {interface.router.hostname}")
+                return False
+                
+        except Exception as exception:
+            self.logger.error(f"Error deleting interface {interface.name}: {str(exception)}")
+            return False
+
+    def update_vrf(self, vrf: VRF) -> bool:
+        try:
+            self.logger.debug(f"Updating VRF {vrf.name} on router {vrf.router.hostname}")
             
             # Prepare the payload with VRF configuration
             payload = {
@@ -315,6 +380,11 @@ class _NetworkController:
             return False
 
     def delete_vrf(self, vrf: VRF) -> bool:
+        # Check if the VRF exists in the database
+        if not vrf.pk:
+            self.logger.warning(f"Cannot delete a non existing VRF")
+            return False
+
         try:
             self.logger.info(f"Deleting VRF {vrf.name} from router {vrf.router.hostname}")
             

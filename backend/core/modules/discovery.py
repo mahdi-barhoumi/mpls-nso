@@ -52,18 +52,17 @@ class NetworkDiscoverer:
         self.update_interface_connections()
         
         # Discover VPNs based on VRF route targets
-        vpn_count = self.discover_vpns()
+        #vpn_count = self.discover_vpns()
         
         return {
             "discovered_devices": len(discovered_devices),
             "routers": {
                 "total": Router.objects.count(),
-                "provider_edge": Router.objects.filter(role='PE').count(),
                 "provider_core": Router.objects.filter(role='P').count(),
-                "customer_edge": Router.objects.filter(role='CE').count(),
+                "provider_edge": Router.objects.filter(role='PE').count(),
+                "customer_edge": Router.objects.filter(role='CE').count()
             },
             "vrfs": VRF.objects.count(),
-            "vpns": vpn_count,
             "interfaces": Interface.objects.count(),
         }
     

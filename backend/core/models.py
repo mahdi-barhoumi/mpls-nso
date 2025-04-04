@@ -103,12 +103,7 @@ class DHCPScope(models.Model):
         super().save(*args, **kwargs)
 
 class Router(models.Model):
-    roles = [
-        ('CE', 'Customer Edge'),
-        ('PE', 'Provider Edge'),
-        ('P', 'Provider Core'),
-    ]
-    role = models.CharField(max_length=2, choices=roles, help_text="Router role in the network")
+    role = models.CharField(max_length=2, choices=[('CE', 'Customer Edge'), ('PE', 'Provider Edge'), ('P', 'Provider Core')], help_text="Router role in the network")
     hostname = models.CharField(max_length=255, default="Unknown", help_text="Router hostname")
     chassis_id = models.CharField(max_length=50, help_text="Router chassis ID (MAC address)")
     management_ip_address = models.GenericIPAddressField(help_text="Router management IP address")
@@ -139,66 +134,13 @@ class Customer(models.Model):
     def __str__(self):
         return self.name
 
-class VPN(models.Model):
-    name = models.CharField(max_length=255, help_text="VPN name")
-    customer = models.ForeignKey(Customer, null=True, on_delete=models.CASCADE, related_name='vpns', help_text="Customer who owns this VPN, if applicable")
-    discovered = models.BooleanField(default=False, help_text="If the VPN was discovered or created")
-    created_at = models.DateTimeField(auto_now_add=True, help_text="When this VPN was created or discovered")
-    updated_at = models.DateTimeField(auto_now=True, help_text="When this VPN was last updated")
-    
-    class Meta:
-        verbose_name = "VPN"
-        verbose_name_plural = "VPNs"
-        ordering = ["name"]
-        unique_together = [['name', 'customer']]
-    
-    def __str__(self):
-        if self.customer:
-            return f"{self.name} belonging to {self.customer.name}"
-        return self.name
-    
-    def validate(self):
-        vpn_vrfs = self.vrfs.all()
-        
-        # If there's only one VRF, no validation needed
-        if vpn_vrfs.count() <= 1:
-            return True
-            
-        # For VPNs with multiple VRFs, perform validation
-        for vrf in vpn_vrfs:
-            # Get all export RTs from other VRFs in this VPN
-            other_vrfs = vpn_vrfs.exclude(pk=vrf.pk)
-            required_imports = set()
-            
-            for other_vrf in other_vrfs:
-                # Add all export RTs from other VRFs to required imports
-                export_rts = set(other_vrf.export_targets)
-                required_imports.update(export_rts)
-            
-            # Get current import RTs for this VRF
-            current_imports = set(vrf.import_targets)
-            
-            # Check if any required RTs are missing
-            missing_rts = required_imports - current_imports
-            
-            if missing_rts:
-                missing_list = ", ".join(missing_rts)
-                raise ValidationError(f"VRF '{vrf.name}' is missing required import route targets: {missing_list}")
-        
-        return True
-
-    def save(self, *args, **kwargs):
-        if self.pk:
-            self.validate()
-        super().save(*args, **kwargs)
-
-class VRF(models.Model):
+class VRF(ImmutableFieldMixin, models.Model):
     objects = DefaultManager()
+    immutable_fields = ['router', 'name']
 
     router = models.ForeignKey(Router, on_delete=models.CASCADE, related_name='vrfs', help_text="Router where this VRF is configured")
     name = models.CharField(max_length=255, help_text="VRF name")
     route_distinguisher = models.CharField(max_length=50, help_text="Route distinguisher")
-    vpn = models.ForeignKey('VPN', null=True, on_delete=models.CASCADE, related_name='vrfs', help_text="VPN this VRF belongs to")
     
     class Meta:
         unique_together = [['name', 'router'], ['route_distinguisher', 'router']]
@@ -215,13 +157,9 @@ class VRF(models.Model):
         return self.route_targets.filter(target_type='export').values_list('value', flat=True)
 
 class RouteTarget(models.Model):
-    target_types = [
-        ('import', 'Import route target'),
-        ('export', 'Export route target')
-    ]
     vrf = models.ForeignKey(VRF, on_delete=models.CASCADE, related_name='route_targets', help_text="VRF this route target belongs to")
     value = models.CharField(max_length=50, help_text="Route target value (ASN:nn format)")
-    target_type = models.CharField(max_length=6, choices=target_types, help_text="Import or export target")
+    target_type = models.CharField(max_length=6, choices=[('import', 'Import route target'), ('export', 'Export route target')], help_text="Import or export target")
     
     class Meta:
         unique_together = [['vrf', 'value', 'target_type']]
@@ -299,11 +237,12 @@ class Site(models.Model):
     location = models.CharField(max_length=255, null=True, blank=True, help_text="Site location")
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='sites', help_text="Customer this site belongs to")
     dhcp_scope = models.OneToOneField(DHCPScope, null=True, on_delete=models.SET_NULL, help_text="DHCP scope for customer edge management (/30 subnet)")
-    assigned_interface = models.ForeignKey(Interface, null=True, on_delete=models.SET_NULL, related_name='site', help_text="Assigned provider interface for this site")
-    router = models.ForeignKey(Router, null=True, on_delete=models.SET_NULL, related_name='sites', help_text="Customer edge router for this site")
-    ospf_process_id = models.PositiveIntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(65535)], help_text="OSPF process ID used by the PE router for this site's routing")
     link_network = models.GenericIPAddressField(protocol='IPv4', help_text="P2P link network (/30 subnet) for site connectivity")
-    
+    assigned_interface = models.ForeignKey(Interface, null=True, on_delete=models.SET_NULL, related_name='site', help_text="Assigned provider interface for this site")
+    vrf = models.ForeignKey(VRF, null=True, on_delete=models.SET_NULL, related_name='sites', help_text="VRF for this site")
+    ospf_process_id = models.PositiveIntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(65535)], help_text="OSPF process ID used by the PE router for this site's routing")
+    router = models.ForeignKey(Router, null=True, on_delete=models.SET_NULL, related_name='sites', help_text="Customer edge router for this site")
+
     class Meta:
         unique_together = [['customer', 'name']]
     
@@ -314,6 +253,9 @@ class Site(models.Model):
         # Validate if the assigned interface belongs to a PE router
         if self.assigned_interface and self.assigned_interface.router.role != 'PE':
             raise ValidationError("Assigned interface must belong to a PE router")
+
+        if self.assigned_interface and self.assigned_interface.vrf != self.vrf:
+            raise ValidationError("Assigned interface must belong to the same VRF as the site")
 
         # Check if DHCP scope is already used by another site
         if self.dhcp_scope:
@@ -363,4 +305,70 @@ class Site(models.Model):
         
         # Validate before saving
         self.validate()
+        super().save(*args, **kwargs)
+
+class VPN(models.Model):
+    name = models.CharField(max_length=255, help_text="VPN name")
+    customer = models.ForeignKey(Customer, null=True, on_delete=models.CASCADE, related_name='vpns', help_text="Customer who owns this VPN, if applicable")
+    sites = models.ManyToManyField(Site, related_name='vpns', help_text="VPNs this VRF belongs to")
+    discovered = models.BooleanField(default=False, help_text="If the VPN was discovered or created")
+    created_at = models.DateTimeField(auto_now_add=True, help_text="When this VPN was created or discovered")
+    updated_at = models.DateTimeField(auto_now=True, help_text="When this VPN was last updated")
+    
+    class Meta:
+        verbose_name = "VPN"
+        verbose_name_plural = "VPNs"
+        ordering = ["name"]
+        unique_together = [['name', 'customer']]
+    
+    def __str__(self):
+        if self.customer:
+            return f"{self.name} belonging to {self.customer.name}"
+        return self.name
+    
+    def validate(self):
+        # Collect all sites in this VPN
+        vpn_sites = self.sites.all()
+        
+        # If there's only one site, no validation needed
+        if vpn_sites.count() <= 1:
+            return True
+        
+        # First, validate that each site's VRF exports its own route distinguisher as a route target
+        for site in vpn_sites:
+            if not site.vrf:
+                raise ValidationError(f"Site '{site.name}' has no VRF assigned and cannot participate in VPN '{self.name}'")
+            
+            # Check if the VRF exports its own route distinguisher
+            export_targets = set(site.vrf.export_targets)
+            if site.vrf.route_distinguisher not in export_targets:
+                raise ValidationError(f"VRF '{site.vrf.name}' on site '{site.name}' must export its own route distinguisher '{site.vrf.route_distinguisher}' as a route target")
+        
+        # Then, validate that each site's VRF imports other sites' route distinguishers
+        for site in vpn_sites:
+            # Get all other sites in this VPN
+            other_sites = vpn_sites.exclude(pk=site.pk)
+            
+            # Collect all route distinguishers from other sites' VRFs that this site's VRF should import
+            required_imports = set()
+            for other_site in other_sites:
+                if other_site.vrf:
+                    # Add the route distinguisher as a required import route target
+                    required_imports.add(other_site.vrf.route_distinguisher)
+            
+            # Get current import RTs for this site's VRF
+            current_imports = set(site.vrf.import_targets)
+            
+            # Check if any required RTs are missing
+            missing_rts = required_imports - current_imports
+            
+            if missing_rts:
+                missing_list = ", ".join(missing_rts)
+                raise ValidationError(f"VRF '{site.vrf.name}' on site '{site.name}' is missing required import route targets: {missing_list}")
+        
+        return True
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            self.validate()
         super().save(*args, **kwargs)
