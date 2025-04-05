@@ -11,7 +11,7 @@ def test_view(request):
     try:
 
         router = Router.objects.get(pk=1)
-        interface, created = Interface.objects.get_or_new(
+        interface, new = Interface.objects.get_or_new(
             name="GigabitEthernet6.10",
             router=router,
         )

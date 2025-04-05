@@ -45,9 +45,9 @@ class NetworkMapView(View):
             router_ids = list(customer_router_ids) + pe_router_ids
             routers = routers.filter(chassis_id__in=router_ids)
 
-        if vpn_id:
-            vpn_router_ids = VRF.objects.filter(vpn_id=vpn_id).values_list('router__chassis_id', flat=True)
-            routers = routers.filter(chassis_id__in=vpn_router_ids)
+        #if vpn_id:
+        #    vpn_router_ids = VRF.objects.filter(vpn_id=vpn_id).values_list('router__chassis_id', flat=True)
+        #    routers = routers.filter(chassis_id__in=vpn_router_ids)
 
         if site_id:
             site_routers = Interface.objects.filter(site_id=site_id).values_list('router__chassis_id', flat=True)
@@ -61,7 +61,7 @@ class NetworkMapView(View):
         # Prefetch related interfaces with their connections
         routers = routers.prefetch_related(
             'interfaces__connected_interfaces',
-            'vrfs__vpn__customer'  # Correctly traverse through vpn to customer
+            #'vrfs__vpn__customer'  # Correctly traverse through vpn to customer
         )
 
         # Create nodes and links data structures
@@ -78,7 +78,8 @@ class NetworkMapView(View):
                 'ip': router.management_ip_address,
                 'vrfs': [{'name': vrf.name,
                           'rd': vrf.route_distinguisher,
-                          'vpn': vrf.vpn.name if vrf.vpn else None}
+                          #'vpn': vrf.vpn.name if vrf.vpn else None
+                          }
                          for vrf in router.vrfs.all()]
             }
             interface_count = router.interfaces.count()
@@ -136,7 +137,7 @@ class NetworkMapView(View):
                 'link_count': len(links),
                 'filters': {
                     'customer_id': customer_id,
-                    'vpn_id': vpn_id,
+                    #'vpn_id': vpn_id,
                     'site_id': site_id,
                     'roles': roles,
                     'include_p_routers': include_p_routers,
@@ -154,7 +155,7 @@ class NetworkMapView(View):
             router = Router.objects.prefetch_related(
                 'interfaces__connected_interfaces__router',
                 'vrfs__customer',
-                'vrfs__vpn',
+                #'vrfs__vpn',
                 'vrfs__route_targets'
             ).get(chassis_id=chassis_id)
 
@@ -189,7 +190,7 @@ class NetworkMapView(View):
                     'name': vrf.name,
                     'route_distinguisher': vrf.route_distinguisher,
                     'customer': vrf.customer.name if vrf.customer else None,
-                    'vpn': vrf.vpn.name if vrf.vpn else None,
+                    #'vpn': vrf.vpn.name if vrf.vpn else None,
                     'import_targets': list(vrf.import_targets),
                     'export_targets': list(vrf.export_targets),
                     'interface_count': vrf.interfaces.count()

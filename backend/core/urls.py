@@ -33,7 +33,7 @@ urlpatterns = [
     ## Site endpoints
     path('sites/', SiteView.as_view()),  
     path('sites/<int:site_id>/', SiteView.as_view()),
-    path('sites/<int:site_id>/setup-routing/', SiteRoutingView.as_view()),
+    path('sites/<int:site_id>/enable-routing/', SiteRoutingView.as_view()),
 
     # Controller endpoints
     ## DHCP service endpoints

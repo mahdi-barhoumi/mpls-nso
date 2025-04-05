@@ -136,25 +136,29 @@ class Customer(models.Model):
 
 class VRF(ImmutableFieldMixin, models.Model):
     objects = DefaultManager()
-    immutable_fields = ['router', 'name']
+    immutable_fields = ['router', 'name', 'route_distinguisher']
 
     router = models.ForeignKey(Router, on_delete=models.CASCADE, related_name='vrfs', help_text="Router where this VRF is configured")
     name = models.CharField(max_length=255, help_text="VRF name")
-    route_distinguisher = models.CharField(max_length=50, help_text="Route distinguisher")
+    route_distinguisher = models.CharField(null=True, max_length=50, help_text="Route distinguisher")
     
     class Meta:
         unique_together = [['name', 'router'], ['route_distinguisher', 'router']]
     
     def __str__(self):
-        return f"{self.name} (RD: {self.route_distinguisher}) on {self.router.hostname}"
+        return f"{self.name} (RD: {self.route_distinguisher}) on {self.router}"
     
     @property
     def import_targets(self):
-        return self.route_targets.filter(target_type='import').values_list('value', flat=True)
+        if self.pk:
+            return self.route_targets.filter(target_type='import').values_list('value', flat=True)
+        return None
     
     @property
     def export_targets(self):
-        return self.route_targets.filter(target_type='export').values_list('value', flat=True)
+        if self.pk:
+            return self.route_targets.filter(target_type='export').values_list('value', flat=True)
+        return None
 
 class RouteTarget(models.Model):
     vrf = models.ForeignKey(VRF, on_delete=models.CASCADE, related_name='route_targets', help_text="VRF this route target belongs to")
@@ -176,7 +180,7 @@ class Interface(ImmutableFieldMixin, models.Model):
     description = models.CharField(null=True, max_length=255, help_text="Interface description")
     enabled = models.BooleanField(help_text="Whether the interface is enabled or not")
     addressing = models.CharField(max_length=10, choices=[('static', 'Static'), ('dhcp', 'DHCP')], help_text="Addressing method")
-    mac_address = models.CharField(max_length=17, help_text="Interface MAC address")
+    mac_address = models.CharField(max_length=17, default="00:00:00:00:00:00", help_text="Interface MAC address")
     ip_address = models.GenericIPAddressField(null=True, protocol='ipv4', help_text="IP address if configured")
     subnet_mask = models.GenericIPAddressField(null=True, protocol='ipv4', help_text="Subnet mask if configured")
     dhcp_helper_address = models.GenericIPAddressField(null=True, protocol='ipv4', help_text="DHCP helper address if applicable")
@@ -254,7 +258,7 @@ class Site(models.Model):
         if self.assigned_interface and self.assigned_interface.router.role != 'PE':
             raise ValidationError("Assigned interface must belong to a PE router")
 
-        if self.assigned_interface and self.assigned_interface.vrf != self.vrf:
+        if self.assigned_interface and self.vrf and self.assigned_interface.vrf != self.vrf:
             raise ValidationError("Assigned interface must belong to the same VRF as the site")
 
         # Check if DHCP scope is already used by another site
@@ -269,15 +273,14 @@ class Site(models.Model):
             raise ValidationError(f"Router '{self.router.hostname}' must have a CE role for site assignment")
         
         # Validate link_network is not used by another site from the same customer
-        if self.link_network:
-            existing_sites = Site.objects.filter(
-                customer=self.customer,
-                link_network=self.link_network
-            ).exclude(pk=self.pk)
-            
-            if existing_sites.exists():
-                conflicting_site = existing_sites.first()
-                raise ValidationError(f"Link network is already in use by site '{conflicting_site.name}' for the same customer")
+        existing_sites = Site.objects.filter(
+            customer=self.customer,
+            link_network=self.link_network
+        ).exclude(pk=self.pk)
+        
+        if existing_sites.exists():
+            conflicting_site = existing_sites.first()
+            raise ValidationError(f"Link network is already in use by site '{conflicting_site.name}' for the same customer")
     
     def find_available_link_network(self):
         # Start with the 192.168.0.0/16 network

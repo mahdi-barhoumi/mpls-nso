@@ -205,10 +205,9 @@ class NetworkDiscoverer:
             # Detect router role
             role = self.detect_router_role(ip_address)
             
-            # Get VRF data if it's a PE router
+            # Get VRF data
             vrf_data = None
-            if role == 'PE':
-                vrf_data = self.get_vrf_data(ip_address)
+            vrf_data = self.get_vrf_data(ip_address)
             
             # Get interfaces data (both native and operational)
             native_interfaces = self.get_native_interfaces_data(ip_address)
@@ -236,9 +235,8 @@ class NetworkDiscoverer:
             if role == 'CE':
                 self.assign_ce_to_site(router, ip_address)
             
-            # Process VRFs if PE router
-            if role == 'PE' and vrf_data:
-                self.process_vrfs(router, vrf_data)
+            # Process VRFs
+            self.process_vrfs(router, vrf_data)
             
             # Process interfaces
             if native_interfaces:
@@ -318,11 +316,11 @@ class NetworkDiscoverer:
             vrf_name = vrf_def.get('name')
             
             # Skip management VRFs
-            if vrf_name == self.settings.management_vrf:
-                continue
+            #if vrf_name == self.settings.management_vrf:
+            #    continue
             
             # Extract route distinguisher
-            rd = vrf_def.get('rd', '')
+            rd = vrf_def.get('rd', None)
             
             # Create or update VRF
             vrf, created = VRF.objects.update_or_create(
@@ -443,16 +441,16 @@ class NetworkDiscoverer:
                         mac_address = oper_intf.get('phys-address', '')
                     
                     # Create a temporary Interface object to check if it's new
-                    interface, created = Interface.objects.get_or_new(
+                    interface, new = Interface.objects.get_or_new(
                         router=router,
                         name=name,
                     )
                     
                     # Update interface properties
-                    if created:
+                    if new:
                         # Only set MAC address when creating a new interface
                         # since it's an immutable field
-                        interface.mac_address = mac_address or '00:00:00:00:00:00'  # Default MAC if not found
+                        interface.mac_address = mac_address
                     
                     interface.description = description
                     interface.enabled = enabled
@@ -513,13 +511,13 @@ class NetworkDiscoverer:
                             self.logger.warning(f"VRF {vrf_name} on router {router.hostname} not found")
                     
                     # Create a temporary Interface object to check if it's new
-                    interface, created = Interface.objects.get_or_new(
+                    interface, new = Interface.objects.get_or_new(
                         router=router,
                         name=intf_name,
                     )
                     
                     # Update interface properties
-                    if created:
+                    if new:
                         # Only set MAC address when creating a new interface
                         # since it's an immutable field
                         interface.mac_address = mac_address or '00:00:00:00:00:00'  # Default MAC if not found
