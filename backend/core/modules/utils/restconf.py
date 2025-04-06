@@ -139,6 +139,9 @@ class RestconfWrapper:
                     json=data
                 )
                 
+                print("Data: ", data)
+                print("Response: ", response.content)
+
                 if response.status_code in [200, 204]:
                     # Success - return response content if any, otherwise empty dict
                     result = {}

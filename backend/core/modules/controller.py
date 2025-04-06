@@ -1,7 +1,7 @@
-import re
 import os
 import logging
 import ipaddress
+from typing import List
 from django.apps import apps
 from core.modules.dhcp import DHCPServer
 from core.modules.tftp import TFTPServer
@@ -205,7 +205,6 @@ class _NetworkController:
             # Build payload based on interface attributes
             payload = {
                 "name": interface.index,
-                "description": interface.description if interface.description else None,
                 "vrf": {"forwarding": interface.vrf.name} if interface.vrf else {},
                 "ip": {
                     "helper-address": [
@@ -215,6 +214,10 @@ class _NetworkController:
                     ] if interface.dhcp_helper_address else []
                 }
             }
+
+            # Add description if available
+            if interface.description:
+                payload["description"] = interface.description
 
             # Add VLAN configuration for subinterfaces
             if interface.category == 'logical' and interface.vlan:
@@ -521,8 +524,8 @@ class _NetworkController:
 
             interface.addressing = "static"
             interface.ip_address = None
-            inferface.subnet_mask = None
-            interface.dhcp_help_address = None
+            interface.subnet_mask = None
+            interface.dhcp_helper_address = None
             interface.enabled = False
 
             if not self.create_or_update_interface(interface) or not self.delete_interface(subinterface):
@@ -545,6 +548,86 @@ class _NetworkController:
 
         except Exception as exception:
             self.logger.error(f"Error unassigning interface from site: {str(exception)}")
+            return False
+
+    def list_router_ospf_processes(self, router: Router) -> List[int]:
+        try:            
+            # Query the router for OSPF configuration
+            result = self.restconf.get(
+                ip_address=router.management_ip_address,
+                path="Cisco-IOS-XE-native:native/router/router-ospf"
+            )
+            
+            process_ids = []
+            
+            if result and 'Cisco-IOS-XE-ospf:router-ospf' in result:
+                ospf_config = result['Cisco-IOS-XE-ospf:router-ospf']['ospf']
+                
+                # Get global OSPF processes
+                if 'process-id' in ospf_config:
+                    for process in ospf_config['process-id']:
+                        process_ids.append(process['id'])
+                
+                # Get VRF-specific OSPF processes
+                if 'process-id-vrf' in ospf_config:
+                    for process in ospf_config['process-id-vrf']:
+                        process_ids.append(process['id'])
+            
+            self.logger.debug(f"Found OSPF processes on {router}: {process_ids}")
+            return process_ids
+        
+        except Exception as exception:
+            self.logger.error(f"Error listing OSPF processes on {router}: {str(exception)}")
+            return []
+
+    def create_or_update_ospf_process(self, router: Router, process_id: int, vrf_name: str = None, networks: List[dict] = None, router_id: str = None) -> bool:
+        try:
+            self.logger.debug(f"Configuring OSPF process {process_id} on router {router}")
+            
+            # Build the payload
+            process_config = {
+                "id": process_id
+            }
+            
+            # Add router ID if provided
+            if router_id:
+                process_config["router-id"] = router_id
+            
+            # Add networks if provided
+            if networks and len(networks) > 0:
+                process_config["network"] = networks
+            
+            # Determine the path and full payload based on whether this is VRF-specific
+            if vrf_name:
+                process_config["vrf"] = vrf_name
+                payload = {
+                    "ospf": {
+                        "process-id-vrf": [process_config]
+                    }
+                }
+            else:
+                payload = {
+                    "ospf": {
+                        "process-id": [process_config]
+                    }
+                }
+
+            # Send the configuration to the router
+            result = self.restconf.patch(
+                ip_address=router.management_ip_address,
+                path="Cisco-IOS-XE-native:native/router/router-ospf/ospf/",
+                data=payload
+            )
+            
+            if result is not None:
+                self.logger.info(f"Successfully configured OSPF process {process_id} on {router}")
+                return True
+            else:
+                self.logger.error(f"Failed to configure OSPF process {process_id} on {router}")
+                return False
+                
+        except Exception as exception:
+            self.logger.error(f"Error configuring OSPF process {process_id} on {router}: {str(exception)}")
             return False
 
     def enable_routing(self, site):
@@ -667,10 +750,41 @@ class _NetworkController:
             self.logger.error(f"Failed updating CE interface {ce_interface}")
             return False
 
-        # TODO: Configure OSPF routing between PE and CE routers
-        # - Enabling OSPF process on both routers
-        # - Redistributing routes between VRF and BGP
-        # - Update the models in the database
+        # Configure OSPF routing between PE and CE routers
+    
+        # For PE router: Use a unique process ID or reuse an existing one in the site VRF
+        pe_ospf_processes = self.list_router_ospf_processes(pe_router)
+        if not site.ospf_process_id:
+            site.ospf_process_id = max(pe_ospf_processes) + 1
+            site.save()
+        
+        # Create OSPF network advertisement for the link between PE and CE
+        networks = [{
+            "ip": "0.0.0.0",
+            "wildcard": "255.255.255.255",
+            "area": 0
+        }]
+        
+        # Configure OSPF on PE router in the site VRF
+        if not self.create_or_update_ospf_process(
+            router=pe_router,
+            process_id=site.ospf_process_id,
+            vrf_name=site.vrf.name,
+            networks=networks,
+            router_id="1.1.1.1"
+        ):
+            self.logger.error(f"Failed configuring OSPF on PE router {pe_router}")
+            return False
+        
+        # For CE router: Use OSPF process 1
+        if not self.create_or_update_ospf_process(
+            router=ce_router,
+            process_id=1,
+            networks=networks,
+            router_id="2.2.2.2"
+        ):
+            self.logger.error(f"Failed configuring OSPF on CE router {ce_router}")
+            return False
         
         self.logger.info(f"Successfully configured routing for site {site}")
         return True

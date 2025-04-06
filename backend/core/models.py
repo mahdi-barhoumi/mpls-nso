@@ -177,7 +177,7 @@ class Interface(ImmutableFieldMixin, models.Model):
 
     router = models.ForeignKey(Router, on_delete=models.CASCADE, related_name='interfaces', help_text="Router this interface belongs to")
     name = models.CharField(max_length=100, help_text="Interface name")
-    description = models.CharField(null=True, max_length=255, help_text="Interface description")
+    description = models.CharField(max_length=255, help_text="Interface description")
     enabled = models.BooleanField(help_text="Whether the interface is enabled or not")
     addressing = models.CharField(max_length=10, choices=[('static', 'Static'), ('dhcp', 'DHCP')], help_text="Addressing method")
     mac_address = models.CharField(max_length=17, default="00:00:00:00:00:00", help_text="Interface MAC address")
