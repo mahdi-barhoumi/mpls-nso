@@ -7,7 +7,7 @@ from core.modules.dhcp import DHCPServer
 from core.modules.tftp import TFTPServer
 from core.modules.utils.host_network_manager import HostNetworkManager
 from core.modules.utils.restconf import RestconfWrapper
-from core.models import Interface, Site, Router, VPN, VRF
+from core.models import Interface, Site, Router, VPN, VRF, RouteTarget
 from core.settings import get_settings
 
 class _NetworkController:
@@ -229,19 +229,15 @@ class _NetworkController:
 
             # Configure IP addressing based on method
             if interface.addressing == "static":
-                payload["ip"] = {
-                    "address": {
-                        "primary": {
-                            "address": interface.ip_address,
-                            "mask": interface.subnet_mask
-                        } if interface.ip_address and interface.subnet_mask else {}
-                    }
+                payload["ip"]["address"] = {
+                    "primary": {
+                        "address": interface.ip_address,
+                        "mask": interface.subnet_mask
+                    } if interface.ip_address and interface.subnet_mask else {}
                 }
             elif interface.addressing == "dhcp":
-                payload["ip"] = {
-                    "address": {
-                        "dhcp": {}
-                    }
+                payload["ip"]["address"] = {
+                    "dhcp": {}
                 }
             
             payload = {
@@ -472,7 +468,14 @@ class _NetworkController:
             # Determine first usable IP in the /30 scope
             first_ip = str(list(dhcp_scope.hosts())[0])
 
-            interface.vrf = VRF.objects.get(name=settings.management_vrf, router=interface.router)
+            # Get management VRF
+            management_vrf = VRF.objects.get(name=settings.management_vrf, router=interface.router)
+            if not management_vrf:
+                HostNetworkManager.delete_route(str(dhcp_scope), settings.host_interface_id)
+                self.logger.error(f"Cannot assign interface: No maangement VRF found")
+                return False
+
+            interface.vrf = management_vrf 
             interface.addressing = "static"
             interface.ip_address = first_ip
             interface.subnet_mask = site.dhcp_scope.subnet_mask
@@ -484,8 +487,21 @@ class _NetworkController:
                 self.logger.error(f"Cannot assign interface: Failed to configure interfaces")
                 return False
 
+            # Configure site VRF on PE router
+            site_vrf, new = VRF.objects.get_or_new(
+                router=interface.router,
+                name=f"site-{site.id}"
+            )
+            site_vrf.route_distinguisher = f"{settings.bgp_as}:{site.id}"
+
+            if not self.create_or_update_vrf(site_vrf):
+                HostNetworkManager.delete_route(str(dhcp_scope), settings.host_interface_id)
+                self.logger.error(f"Failed creating or updating VRF {site_vrf}")
+                return False
+
             # Update site in database
             site.assigned_interface = interface
+            site.vrf = site_vrf
             site.save()
 
             self.logger.info(f"Successfully assigned interface {interface.name} to site {site.name}")
@@ -661,17 +677,6 @@ class _NetworkController:
         if ce_router.role != 'CE':
             self.logger.error(f"Router {ce_router} is not a CE router")
             return False
-        
-        # Configure site VRF on PE router
-        site_vrf, new = VRF.objects.get_or_new(
-            router=pe_router,
-            name=f"site-{site.id}"
-        )
-        site_vrf.route_distinguisher = f"{settings.bgp_as}:{site.id}"
-
-        if not self.create_or_update_vrf(site_vrf):
-            self.logger.error(f"Failed creating or updating VRF {site_vrf}")
-            return False
 
         # Configure management VRF on CE router
         ce_management_vrf, new = VRF.objects.get_or_new(
@@ -709,16 +714,12 @@ class _NetworkController:
         pe_interface.ip_address = pe_ip
         pe_interface.subnet_mask = subnet_mask
         pe_interface.enabled = True
-        pe_interface.vrf = site_vrf
+        pe_interface.vrf = site.vrf
         pe_interface.dhcp_helper_address = None
         
         if not self.create_or_update_interface(pe_interface):
             self.logger.error(f"Failed updating PE interface {pe_interface} with routing configuration")
             return False
-
-        # Save the site's VRF
-        site.vrf = site_vrf
-        site.save()
 
         # Configure PE subinterface to reestablish connection with the CE router
         pe_subinterface = self.get_or_create_subinterface(pe_interface, 10)
@@ -788,6 +789,179 @@ class _NetworkController:
         
         self.logger.info(f"Successfully configured routing for site {site}")
         return True
+
+    def add_site_to_vpn(self, site, vpn) -> bool:
+        try:
+            self.logger.info(f"Adding site {site} to VPN {vpn}")
+            
+            # Get system settings
+            settings = get_settings()
+            if not settings:
+                self.logger.error("Cannot add site to VPN: No settings settings found")
+                return False
+
+            # Verify site has PE-CE routing configured
+            if not site.assigned_interface or not site.vrf or not site.ospf_process_id:
+                self.logger.error(f"Site {site} is not properly configured")
+                return False
+
+            # Get all sites in the VPN (excluding the new one)
+            existing_sites = vpn.sites.all()
+
+            # Configure route targets for the new site's VRF
+            export_rt, created = RouteTarget.objects.update_or_create(
+                vrf=site.vrf,
+                value=site.vrf.route_distinguisher,
+                target_type='export'
+            )
+            export_rt.save()
+
+            # Import route targets from existing sites
+            for other_site in existing_sites:
+                # Add import RT for the new site
+                import_rt, created = RouteTarget.objects.update_or_create(
+                    vrf=site.vrf,
+                    value=other_site.vrf.route_distinguisher,
+                    target_type='import'
+                )
+                import_rt.save()
+
+                # Add import RT for the existing site
+                import_rt, created = RouteTarget.objects.update_or_create(
+                    vrf=other_site.vrf,
+                    value=site.vrf.route_distinguisher,
+                    target_type='import'
+                )
+                import_rt.save()
+
+            # Update all VRF configurations on routers
+            if not self.create_or_update_vrf(site.vrf):
+                self.logger.error(f"Failed to update VRF configuration for site {site}")
+                return False
+
+            # Update existing sites' VRF configurations
+            for other_site in existing_sites:
+                if not self.create_or_update_vrf(other_site.vrf):
+                    self.logger.error(f"Failed to update VRF configuration for site {other_site}")
+                    return False
+
+            # Enable route redistribution
+            payload =  {
+                "bgp": {
+                    "id": settings.bgp_as,
+                    "address-family": {
+                        "with-vrf": {
+                            "ipv4": [
+                                {
+                                    "af-name": "unicast",
+                                    "vrf": [
+                                        {
+                                            "name": site.vrf.name,
+                                            "ipv4-unicast": {
+                                                "redistribute-vrf": {
+                                                    "ospf": [
+                                                        {
+                                                            "id": site.ospf_process_id
+                                                        }
+                                                    ]
+                                                }
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+
+            result = self.restconf.patch(
+                site.assigned_interface.router.management_ip_address,
+                f"Cisco-IOS-XE-native:native/router/bgp={settings.bgp_as}/",
+                payload
+            )
+
+            if result is None:
+                self.logger.error(f"Failed redistributing site's OSPF process {site.ospf_process_id} into BGP")
+                return False
+
+            payload = {
+                "process-id-vrf": {
+                    "id": site.ospf_process_id,
+                    "vrf": site.vrf.name,
+                    "redistribute": {
+                        "bgp": [
+                            {
+                                "as": settings.bgp_as,
+                                "subnets": [None]
+                            }
+                        ]
+                    }
+                }
+            }
+
+            result = self.restconf.patch(site.assigned_interface.router.management_ip_address, f"Cisco-IOS-XE-native:native/router/router-ospf/ospf/process-id-vrf/", payload)
+
+            if result is None:
+                self.logger.error(f"Failed redistributing BGP into site's OSPF process {site.ospf_process_id}")
+                return False
+
+            # Update database
+            vpn.sites.add(site)
+            vpn.save()
+
+            self.logger.info(f"Successfully added site {site} to VPN {vpn}")
+            return True
+            
+        except Exception as exception:
+            self.logger.error(f"Error adding site {site} to VPN {vpn}: {str(exception)}")
+            return False
+
+    def remove_site_from_vpn(self, site, vpn) -> bool:
+        try:
+            self.logger.info(f"Removing site {site} from VPN {vpn}")
+            
+            # Get the site's VRF
+            site_vrf = site.vrf
+            if not site_vrf:
+                self.logger.error(f"Site {site} does not have a VRF configured")
+                return False
+
+            # Update the VRF configuration on the router
+            if not self.create_or_update_vrf(site_vrf):
+                self.logger.error(f"Failed to update VRF configuration for site {site}")
+                return False
+
+            # Remove route redistribution
+            # TODO: Implement route redistribution removal
+
+            self.logger.info(f"Successfully removed site {site} from VPN {vpn}")
+            return True
+            
+        except Exception as exception:
+            self.logger.error(f"Error removing site {site} from VPN {vpn}: {str(exception)}")
+            return False
+
+    def delete_vpn(self, vpn) -> bool:
+        try:
+            self.logger.info(f"Deleting VPN {vpn}")
+            
+            # Remove all sites from the VPN first
+            for site in vpn.sites.all():
+                if not self.remove_site_from_vpn(site, vpn):
+                    self.logger.error(f"Failed to remove site {site} from VPN {vpn}")
+                    return False
+                site.vpn = None
+                site.save()
+
+            # Delete the VPN object
+            vpn.delete()
+            self.logger.info(f"Successfully deleted VPN {vpn}")
+            return True
+            
+        except Exception as exception:
+            self.logger.error(f"Error deleting VPN {vpn}: {str(exception)}")
+            return False
 
 NetworkController = _NetworkController()
 NetworkController.initialize()

@@ -10,19 +10,9 @@ from core.models import *
 def test_view(request):
     try:
 
-        router = Router.objects.get(pk=1)
-        interface, new = Interface.objects.get_or_new(
-            name="GigabitEthernet6.10",
-            router=router,
-        )
+        interface = Interface.objects.get(pk=34)
 
-        interface.vlan = 10
-        interface.addressing = "dhcp"
-        interface.dhcp_helper_address = "192.168.100.2"
-        interface.enabled = True
-        interface.vrf = VRF.objects.get(router=interface.router, name="customer-1")
-
-        data = NetworkController.delete_interface(interface)
+        data = NetworkController.create_or_update_interface(interface)
 
         return JsonResponse(data, safe=False)
 

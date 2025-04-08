@@ -6,6 +6,7 @@ from core.views.sites import SiteView, SiteRoutingView
 from core.views.settings import SettingsView
 from core.views.network_map import NetworkMapView
 from core.views.test import test_view
+from core.views.vpn import VPNView, VPNSiteView
 
 urlpatterns = [
     # Test endpoint
@@ -34,6 +35,12 @@ urlpatterns = [
     path('sites/', SiteView.as_view()),  
     path('sites/<int:site_id>/', SiteView.as_view()),
     path('sites/<int:site_id>/enable-routing/', SiteRoutingView.as_view()),
+
+    # VPN URLs
+    path('vpns/', VPNView.as_view(), name='vpn-list-create'),
+    path('vpns/<int:vpn_id>/', VPNView.as_view(), name='vpn-detail'),
+    path('vpns/<int:vpn_id>/sites/', VPNSiteView.as_view(), name='vpn-site-add'),
+    path('vpns/<int:vpn_id>/sites/<int:site_id>/', VPNSiteView.as_view(), name='vpn-site-remove'),
 
     # Controller endpoints
     ## DHCP service endpoints

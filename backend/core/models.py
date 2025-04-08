@@ -194,7 +194,7 @@ class Interface(ImmutableFieldMixin, models.Model):
         unique_together = [['router', 'name']]
     
     def __str__(self):
-        return f"{self.router.hostname} - {self.name}"
+        return f"{self.router} - {self.name}"
 
     def validate(self):
         if self.pk:
@@ -258,9 +258,6 @@ class Site(models.Model):
         if self.assigned_interface and self.assigned_interface.router.role != 'PE':
             raise ValidationError("Assigned interface must belong to a PE router")
 
-        if self.assigned_interface and self.vrf and self.assigned_interface.vrf != self.vrf:
-            raise ValidationError("Assigned interface must belong to the same VRF as the site")
-
         # Check if DHCP scope is already used by another site
         if self.dhcp_scope:
             existing_sites = Site.objects.filter(dhcp_scope=self.dhcp_scope).exclude(pk=self.pk)
@@ -312,6 +309,7 @@ class Site(models.Model):
 
 class VPN(models.Model):
     name = models.CharField(max_length=255, help_text="VPN name")
+    description = models.TextField(max_length=255, null=True, blank=True, help_text="VPN description")
     customer = models.ForeignKey(Customer, null=True, on_delete=models.CASCADE, related_name='vpns', help_text="Customer who owns this VPN, if applicable")
     sites = models.ManyToManyField(Site, related_name='vpns', help_text="VPNs this VRF belongs to")
     discovered = models.BooleanField(default=False, help_text="If the VPN was discovered or created")

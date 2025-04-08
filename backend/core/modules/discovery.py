@@ -20,7 +20,7 @@ class NetworkDiscoverer:
         self.logger = logging.getLogger('discovery')
         
         # Create RESTCONF wrapper
-        self.restconf = RestconfWrapper()
+        self.restconf = RestconfWrapper(max_retries=2, timeout=3)
         
         # Retrieve system settings
         self.settings = get_settings()
@@ -557,9 +557,9 @@ class NetworkDiscoverer:
                         
                         # Find the remote router
                         remote_router = None
-                        for r in routers:
-                            if r.hostname == remote_system_name:
-                                remote_router = r
+                        for router in routers:
+                            if router.chassis_id == remote_chassis_id:
+                                remote_router = router
                                 break
                         
                         if not remote_router:
