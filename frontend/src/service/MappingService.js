@@ -5,14 +5,12 @@ export const MappingService = {
     try {
       const response = await axios.get('http://127.0.0.1:8000/api/network/map/')
       const data = response.data
-
       const parsedData = {
         nodes: data.nodes.map((node) => ({
           id: node.id,
-          label: node.label,
+          label: node.hostname,
           type: node.type,
           role: node.role,
-          ip: node.ip,
           vrfs: node.vrfs,
           interfaceCounts: node.interface_counts,
         })),

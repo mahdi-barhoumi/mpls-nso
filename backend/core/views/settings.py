@@ -1,15 +1,15 @@
 import json
 from django.http import JsonResponse
+from django.views import View
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods
+from django.utils.decorators import method_decorator
 from django.core.exceptions import ValidationError
 from core.settings import Settings, get_settings
 from core.modules.controller import NetworkController
 
-@csrf_exempt
-@require_http_methods(["GET", "POST"])
-def global_settings(request):
-    if request.method == "GET":
+@method_decorator(csrf_exempt, name='dispatch')
+class SettingsView(View):
+    def get(self, request):
         # Check if settings exist first
         settings = get_settings()
         if settings:
@@ -35,14 +35,13 @@ def global_settings(request):
                 'is_configured': True
             })
         
-        else:
-            return JsonResponse({
-                'status': 'success',
-                'message': 'Settings have not been configured yet',
-                'is_configured': False
-            })
-    
-    elif request.method == "POST":
+        return JsonResponse({
+            'status': 'success', 
+            'message': 'Settings have not been configured yet',
+            'is_configured': False
+        })
+
+    def post(self, request):
         try:
             # Parse the request body
             data = json.loads(request.body)
@@ -87,8 +86,7 @@ def global_settings(request):
             # Save with validation
             try:
                 settings.save()
-                NetworkController.start_dhcp_server()
-                NetworkController.start_tftp_server()
+                NetworkController.initialize()
                 return JsonResponse({
                     'status': 'success',
                     'message': 'Settings created successfully'

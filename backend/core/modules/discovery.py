@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from django.utils import timezone
 from django.db import transaction, OperationalError
 from core.modules.utils.restconf import RestconfWrapper
-from core.models import DHCPLease, Router, VRF, RouteTarget, Interface, VPN
+from core.models import DHCPLease, DHCPScope, Router, VRF, RouteTarget, Interface, VPN, Site
 from core.settings import get_settings
 
 class NetworkDiscoverer:
@@ -20,7 +20,7 @@ class NetworkDiscoverer:
         self.logger = logging.getLogger('discovery')
         
         # Create RESTCONF wrapper
-        self.restconf = RestconfWrapper()
+        self.restconf = RestconfWrapper(max_retries=2, timeout=3)
         
         # Retrieve system settings
         self.settings = get_settings()
@@ -52,18 +52,17 @@ class NetworkDiscoverer:
         self.update_interface_connections()
         
         # Discover VPNs based on VRF route targets
-        vpn_count = self.discover_vpns()
+        #vpn_count = self.discover_vpns()
         
         return {
             "discovered_devices": len(discovered_devices),
             "routers": {
                 "total": Router.objects.count(),
-                "provider_edge": Router.objects.filter(role='PE').count(),
                 "provider_core": Router.objects.filter(role='P').count(),
-                "customer_edge": Router.objects.filter(role='CE').count(),
+                "provider_edge": Router.objects.filter(role='PE').count(),
+                "customer_edge": Router.objects.filter(role='CE').count()
             },
             "vrfs": VRF.objects.count(),
-            "vpns": vpn_count,
             "interfaces": Interface.objects.count(),
         }
     
@@ -127,12 +126,12 @@ class NetworkDiscoverer:
             try:
                 with transaction.atomic():
                     # Create a generic VPN name
-                    vpn_name = f"VPN-{i+1}"
+                    vpn_name = f"Discovered VPN {i+1}"
                     
                     # Create or get the VPN
                     vpn, created = VPN.objects.get_or_create(
                         name=vpn_name,
-                        defaults={'customer': None}  # No customer association as requested
+                        discovered=True
                     )
                     
                     if created:
@@ -168,11 +167,12 @@ class NetworkDiscoverer:
             if not bgp_config or 'Cisco-IOS-XE-bgp:bgp' not in bgp_config:
                 return 'P'  # Default to Provider Core if no BGP config
             
-            bgp_data = bgp_config.get('Cisco-IOS-XE-bgp:bgp', [{}])[0]
+            bgp_data = bgp_config.get('Cisco-IOS-XE-bgp:bgp', [{}])
             
-            # Check if BGP AS number matches system settings
-            if str(bgp_data.get('id', '')) == str(self.settings.bgp_as):
-                return 'PE'
+            for bgp in bgp_data:
+                # Check if BGP AS number matches system settings
+                if str(bgp.get('id', '')) == str(self.settings.bgp_as):
+                    return 'PE'
             
             # If BGP is configured but doesn't match AS, it might be a P router
             return 'P'
@@ -205,72 +205,42 @@ class NetworkDiscoverer:
             # Detect router role
             role = self.detect_router_role(ip_address)
             
-            # Get VRF data if it's a PE router
+            # Get VRF data
             vrf_data = None
-            if role == 'PE':
-                vrf_data = self.get_vrf_data(ip_address)
+            vrf_data = self.get_vrf_data(ip_address)
             
-            # Get interfaces data
-            interfaces_data = self.get_interfaces_data(ip_address)
+            # Get interfaces data (both native and operational)
+            native_interfaces = self.get_native_interfaces_data(ip_address)
+            oper_interfaces = self.get_interfaces_oper_data(ip_address)
             
-            # Create or update router within a transaction
-            max_retries = 3
-            for attempt in range(max_retries):
-                try:
-                    with transaction.atomic():
-                        router, created = Router.objects.update_or_create(
-                            chassis_id=chassis_id,
-                            defaults={
-                                'management_ip_address': ip_address,
-                                'hostname': hostname,
-                                'role': role
-                            }
-                        )
-                        
-                        if created:
-                            self.logger.info(f"Created new router: {hostname} (Role: {role})")
-                        else:
-                            self.logger.info(f"Updated existing router: {hostname} (Role: {role})")
-                        
-                        # Store router in cache
-                        self.router_cache[hostname] = router
-                    
-                    # Break the loop if successful
-                    break
-                except OperationalError as e:
-                    if "database is locked" in str(e) and attempt < max_retries - 1:
-                        self.logger.warning(f"Database locked, retrying ({attempt + 1}/{max_retries})")
-                        time.sleep(0.5 * (2 ** attempt))  # Exponential backoff
-                    else:
-                        raise
+            # Create or update router
+            router, created = Router.objects.update_or_create(
+                chassis_id=chassis_id,
+                defaults={
+                    'management_ip_address': ip_address,
+                    'hostname': hostname,
+                    'role': role
+                }
+            )
             
-            # Process VRFs if PE router (in a separate transaction)
-            if role == 'PE' and vrf_data:
-                for attempt in range(max_retries):
-                    try:
-                        with transaction.atomic():
-                            self.process_vrfs(router, vrf_data)
-                        break
-                    except OperationalError as e:
-                        if "database is locked" in str(e) and attempt < max_retries - 1:
-                            self.logger.warning(f"Database locked during VRF processing, retrying ({attempt + 1}/{max_retries})")
-                            time.sleep(0.5 * (2 ** attempt))  # Exponential backoff
-                        else:
-                            raise
+            if created:
+                self.logger.info(f"Created new router: {hostname} (Role: {role})")
+            else:
+                self.logger.info(f"Updated existing router: {hostname} (Role: {role})")
             
-            # Process interfaces (in a separate transaction)
-            if interfaces_data:
-                for attempt in range(max_retries):
-                    try:
-                        with transaction.atomic():
-                            self.process_interfaces(router, interfaces_data)
-                        break
-                    except OperationalError as e:
-                        if "database is locked" in str(e) and attempt < max_retries - 1:
-                            self.logger.warning(f"Database locked during interface processing, retrying ({attempt + 1}/{max_retries})")
-                            time.sleep(0.5 * (2 ** attempt))  # Exponential backoff
-                        else:
-                            raise
+            # Store router in cache
+            self.router_cache[hostname] = router
+            
+            # If this is a CE router, try to assign it to its site
+            if role == 'CE':
+                self.assign_ce_to_site(router, ip_address)
+            
+            # Process VRFs
+            self.process_vrfs(router, vrf_data)
+            
+            # Process interfaces
+            if native_interfaces:
+                self.process_interfaces(router, native_interfaces, oper_interfaces)
             
             return {
                 "hostname": hostname,
@@ -283,18 +253,61 @@ class NetworkDiscoverer:
             self.logger.error(f"Error processing device at {lease.ip_address}: {str(e)}")
             return None
     
-    def check_if_pe_router(self, ip_address):
-        # Use the wrapper to check if BGP configuration exists
-        return self.restconf.exists(ip_address, "Cisco-IOS-XE-native:native/router/bgp")
-    
+    def assign_ce_to_site(self, router, ip_address):
+        try:
+            # Convert IP address to IPv4Address object
+            ce_ip = ipaddress.IPv4Address(ip_address)
+            
+            # Get all sites with their DHCP scopes
+            sites = Site.objects.select_related('dhcp_scope').all()
+            
+            # Find the matching site
+            for site in sites:
+                if not site.dhcp_scope:
+                    continue
+                    
+                # Create network from the site's DHCP scope
+                network = ipaddress.IPv4Network(
+                    f"{site.dhcp_scope.network}/{site.dhcp_scope.subnet_mask}", 
+                    strict=False
+                )
+                
+                # Check if CE IP is in this network
+                if ce_ip in network:
+                    # Assign router to site
+                    site.router = router
+                    site.save()
+                    self.logger.info(f"Assigned CE router {router.hostname} to site {site}")
+                    return
+            
+            self.logger.warning(f"No matching site found for CE router {router.hostname} with IP {ip_address}")
+        
+        except Exception as e:
+            self.logger.error(f"Error assigning CE router {router.hostname} to site: {str(e)}")
+
     def get_lldp_data(self, ip_address):
         return self.restconf.get(ip_address, "Cisco-IOS-XE-lldp-oper:lldp-entries")
     
     def get_vrf_data(self, ip_address):
         return self.restconf.get(ip_address, "Cisco-IOS-XE-native:native/vrf/definition")
     
-    def get_interfaces_data(self, ip_address):
-        return self.restconf.get(ip_address, "Cisco-IOS-XE-interfaces-oper:interfaces")
+    def get_native_interfaces_data(self, ip_address):
+        return self.restconf.get(ip_address, "Cisco-IOS-XE-native:native/interface")
+    
+    def get_interfaces_oper_data(self, ip_address):
+        oper_data = self.restconf.get(ip_address, "Cisco-IOS-XE-interfaces-oper:interfaces")
+        if not oper_data:
+            return {}
+        
+        # Create a dictionary of interfaces with interface name as key for easier lookup
+        interfaces_by_name = {}
+        interfaces = oper_data.get('Cisco-IOS-XE-interfaces-oper:interfaces', {}).get('interface', [])
+        for intf in interfaces:
+            name = intf.get('name')
+            if name:
+                interfaces_by_name[name] = intf
+        
+        return interfaces_by_name
     
     def process_vrfs(self, router, vrf_data):
         definitions = vrf_data.get('Cisco-IOS-XE-native:definition', [])
@@ -303,16 +316,16 @@ class NetworkDiscoverer:
             vrf_name = vrf_def.get('name')
             
             # Skip management VRFs
-            if vrf_name == self.settings.management_vrf:
-                continue
+            #if vrf_name == self.settings.management_vrf:
+            #    continue
             
             # Extract route distinguisher
-            rd = vrf_def.get('rd', '')
+            rd = vrf_def.get('rd', None)
             
-            # Create or update VRF - now with router reference
+            # Create or update VRF
             vrf, created = VRF.objects.update_or_create(
                 name=vrf_name,
-                router=router,  # Add router as part of lookup
+                router=router,
                 defaults={
                     'route_distinguisher': rd
                 }
@@ -350,57 +363,148 @@ class NetworkDiscoverer:
             else:
                 self.logger.info(f"Updated existing VRF: {vrf_name} on router {router.hostname}")
     
-    def process_interfaces(self, router, interfaces_data):
-        interfaces = interfaces_data.get('Cisco-IOS-XE-interfaces-oper:interfaces', {}).get('interface', [])
+    def process_interfaces(self, router, native_interfaces, oper_interfaces):
+        self.logger.info(f"Processing interfaces for router {router.hostname}")
         
-        for intf in interfaces:
-            name = intf.get('name')
-            if not name:
-                continue
+        # Dictionary to collect interface data before creating/updating
+        interface_data = {}
+        
+        # First, process operational interface data
+        if oper_interfaces:
+            for intf_name, oper_intf in oper_interfaces.items():
+                # Add interface to our collection if not already there
+                if intf_name not in interface_data:
+                    interface_data[intf_name] = {
+                        'router': router,
+                        'name': intf_name,
+                        'enabled': oper_intf.get('admin-status', 'if-state-down').replace('if-state-', '') == 'up',
+                        'description': oper_intf.get('description', ''),
+                        'mac_address': oper_intf.get('phys-address', '00:00:00:00:00:00'),
+                        'addressing': 'dhcp',  # Default, will be updated from native config if available
+                        'vrf': None,
+                        'vlan': None,
+                        'dhcp_helper_address': None
+                    }
+                    
+                    # Get IP address and subnet mask
+                    temp_ip = oper_intf.get('ipv4')
+                    temp_mask = oper_intf.get('ipv4-subnet-mask')
+                    
+                    # Set to null if equal to "0.0.0.0"
+                    if temp_ip and temp_ip != "0.0.0.0":
+                        interface_data[intf_name]['ip_address'] = temp_ip
+                    else:
+                        interface_data[intf_name]['ip_address'] = None
+                    
+                    if temp_mask and temp_mask != "0.0.0.0":
+                        interface_data[intf_name]['subnet_mask'] = temp_mask
+                    else:
+                        interface_data[intf_name]['subnet_mask'] = None
+                    
+                    # Get VRF info from operational data
+                    vrf_name = oper_intf.get('vrf')
+                    if vrf_name:
+                        try:
+                            vrf = VRF.objects.get(name=vrf_name, router=router)
+                            interface_data[intf_name]['vrf'] = vrf
+                        except VRF.DoesNotExist:
+                            self.logger.warning(f"VRF {vrf_name} on router {router.hostname} not found")
+        
+        # Process native interface data to get additional configuration details
+        if native_interfaces and 'Cisco-IOS-XE-native:interface' in native_interfaces:
+            native_intf_data = native_interfaces['Cisco-IOS-XE-native:interface']
             
-            # Get basic info
-            admin_status = intf.get('admin-status', 'if-state-down').replace('if-state-', '')
-            oper_status = intf.get('oper-status', 'if-oper-state-down').replace('if-oper-state-', '')
-            description = intf.get('description', '')
-            mac_address = intf.get('phys-address', '')
+            # Process each interface type (GigabitEthernet, Loopback, etc.)
+            for intf_type, interfaces in native_intf_data.items():
+                for intf in interfaces:
+                    name_value = intf.get('name')
+                    if name_value is None:
+                        continue
+                    
+                    # Construct full interface name
+                    name = f"{intf_type}{name_value}"
+                    
+                    # Create entry if not already in our collection
+                    if name not in interface_data:
+                        interface_data[name] = {
+                            'router': router,
+                            'name': name,
+                            'enabled': 'shutdown' not in intf,
+                            'description': intf.get('description', ''),
+                            'mac_address': '00:00:00:00:00:00',  # Default, will be updated if found in oper data
+                            'addressing': 'dhcp',
+                            'ip_address': None,
+                            'subnet_mask': None,
+                            'vrf': None,
+                            'vlan': None,
+                            'dhcp_helper_address': None
+                        }
+                    else:
+                        # Update enabled status and description
+                        interface_data[name]['enabled'] = 'shutdown' not in intf
+                        interface_data[name]['description'] = intf.get('description', '')
+                    
+                    # Check for static IP configuration
+                    if 'ip' in intf and 'address' in intf['ip'] and 'primary' in intf['ip']['address']:
+                        primary = intf['ip']['address']['primary']
+                        interface_data[name]['addressing'] = 'static'
+                    
+                    # Get VRF information
+                    if 'vrf' in intf and 'forwarding' in intf['vrf']:
+                        vrf_name = intf['vrf']['forwarding']
+                        try:
+                            vrf = VRF.objects.get(name=vrf_name, router=router)
+                            interface_data[name]['vrf'] = vrf
+                        except VRF.DoesNotExist:
+                            self.logger.warning(f"VRF {vrf_name} on router {router.hostname} not found")
+                    
+                    # Get DHCP helper address if available
+                    if 'ip' in intf and 'helper-address' in intf['ip']:
+                        helpers = intf['ip']['helper-address']
+                        if helpers and len(helpers) > 0:
+                            interface_data[name]['dhcp_helper_address'] = helpers[0].get('address')
+                    
+                    # Get VLAN information for subinterfaces
+                    if 'encapsulation' in intf and 'dot1Q' in intf['encapsulation']:
+                        interface_data[name]['vlan'] = intf['encapsulation']['dot1Q'].get('vlan-id')
+        
+        # Now create or update interfaces with the collected data
+        for name, data in interface_data.items():
+            try:
+                # Get or create a new interface object
+                interface, new = Interface.objects.get_or_new(
+                    router=router,
+                    name=name,
+                )
+                
+                # Only set MAC address for new interfaces (immutable field)
+                if new:
+                    interface.mac_address = data['mac_address']
+                
+                # Update the interface with collected data
+                interface.description = data['description']
+                interface.enabled = data['enabled']
+                interface.addressing = data['addressing']
+                interface.ip_address = data['ip_address']
+                interface.subnet_mask = data['subnet_mask']
+                interface.dhcp_helper_address = data['dhcp_helper_address']
+                interface.vlan = data['vlan']
+                interface.vrf = data['vrf']
+                
+                # Save the interface with a single database operation
+                interface.save()
+                
+                # Add to interface cache for connection discovery later
+                key = f"{router.hostname}:{name}"
+                self.interface_cache[key] = interface
+                
+                if new:
+                    self.logger.debug(f"Created new interface: {router.hostname} - {name}")
+                else:
+                    self.logger.debug(f"Updated existing interface: {router.hostname} - {name}")
             
-            # Get IP info
-            ip_address = intf.get('ipv4')
-            subnet_mask = intf.get('ipv4-subnet-mask')
-            
-            # Get VRF info
-            vrf_name = intf.get('vrf')
-            vrf = None
-            if vrf_name and vrf_name != 'management':
-                try:
-                    # Look for VRF on this specific router now
-                    vrf = VRF.objects.get(name=vrf_name, router=router)
-                except VRF.DoesNotExist:
-                    self.logger.warning(f"VRF {vrf_name} on router {router.hostname} not found")
-            
-            # Create or update interface
-            interface, created = Interface.objects.update_or_create(
-                router=router,
-                name=name,
-                defaults={
-                    'admin_status': admin_status,
-                    'oper_status': oper_status,
-                    'description': description,
-                    'ip_address': ip_address,
-                    'subnet_mask': subnet_mask,
-                    'mac_address': mac_address,
-                    'vrf': vrf
-                }
-            )
-            
-            # Add to interface cache
-            key = f"{router.hostname}:{name}"
-            self.interface_cache[key] = interface
-            
-            if created:
-                self.logger.debug(f"Created new interface: {router.hostname} - {name}")
-            else:
-                self.logger.debug(f"Updated existing interface: {router.hostname} - {name}")
+            except Exception as e:
+                self.logger.error(f"Error saving interface {name} on router {router.hostname}: {str(e)}")
     
     def update_interface_connections(self):
         self.logger.info("Starting interface connection update")
@@ -445,7 +549,7 @@ class NetworkDiscoverer:
                     # Process each neighbor
                     for neighbor in neighbor_details:
                         remote_system_name = neighbor.get('system-name')
-                        remote_interface_name = neighbor.get('port-desc')
+                        remote_interface_name = neighbor.get('port-id').replace('Gi', 'GigabitEthernet') # TODO: Fix this hack
                         remote_chassis_id = neighbor.get('chassis-id')
                         
                         if not (remote_system_name and remote_interface_name and remote_chassis_id):
@@ -453,9 +557,9 @@ class NetworkDiscoverer:
                         
                         # Find the remote router
                         remote_router = None
-                        for r in routers:
-                            if r.hostname == remote_system_name:
-                                remote_router = r
+                        for router in routers:
+                            if router.chassis_id == remote_chassis_id:
+                                remote_router = router
                                 break
                         
                         if not remote_router:

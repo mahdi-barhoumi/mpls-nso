@@ -172,6 +172,42 @@
         <Button label="Save" icon="pi pi-check" @click="saveCustomer" />
       </template>
     </Dialog>
+    <!-- Confirm Delete Customer Dialog -->
+    <Dialog
+      v-model:visible="deleteCustomerDialog"
+      :style="{ width: '450px' }"
+      header="Confirm"
+      :modal="true"
+    >
+      <div class="flex items-center gap-4">
+        <i class="pi pi-exclamation-triangle !text-3xl" />
+        <span v-if="currentCustomer"
+          >Are you sure you want to delete <b>{{ currentCustomer.name }}</b
+          >?</span
+        >
+      </div>
+      <template #footer>
+        <Button label="No" icon="pi pi-times" text @click="deleteCustomerDialog = false" />
+        <Button label="Yes" icon="pi pi-check" severity="danger" @click="deleteCustomer" />
+      </template>
+    </Dialog>
+
+    <!-- Confirm Delete Selected Customers Dialog -->
+    <Dialog
+      v-model:visible="deleteCustomersDialog"
+      :style="{ width: '450px' }"
+      header="Confirm"
+      :modal="true"
+    >
+      <div class="flex items-center gap-4">
+        <i class="pi pi-exclamation-triangle !text-3xl" />
+        <span>Are you sure you want to delete the selected customers?</span>
+      </div>
+      <template #footer>
+        <Button label="No" icon="pi pi-times" text @click="deleteCustomersDialog = false" />
+        <Button label="Yes" icon="pi pi-check" severity="danger" @click="deleteSelectedCustomers" />
+      </template>
+    </Dialog>
   </div>
 </template>
 

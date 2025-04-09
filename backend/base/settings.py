@@ -38,7 +38,6 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'rest_framework',
     'corsheaders',
     'core'
 ]
@@ -135,7 +134,7 @@ LOGGING = {
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': '{levelname} {asctime}: {message}',
+            'format': '{levelname} {asctime} ({module}): {message}',
             'style': '{',
         },
     },
@@ -153,6 +152,16 @@ LOGGING = {
             'propagate': True,
         },
         'tftp': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'restconf': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'networkcontroller': {
             'handlers': ['console'],
             'level': 'INFO',
             'propagate': True,
