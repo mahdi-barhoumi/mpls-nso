@@ -76,6 +76,40 @@ class VPNView(View):
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
 
+    def patch(self, request, vpn_id):
+        try:
+            vpn = VPN.objects.get(id=vpn_id)
+            data = json.loads(request.body)
+            
+            # Update only allowed fields
+            if 'name' in data:
+                vpn.name = data['name']
+            if 'description' in data:
+                vpn.description = data['description']
+                
+            vpn.save()
+            
+            return JsonResponse({
+                'id': vpn.id,
+                'name': vpn.name,
+                'description': vpn.description,
+                'customer': {
+                    'id': vpn.customer.id,
+                    'name': vpn.customer.name
+                },
+                'sites': [{
+                    'id': site.id,
+                    'name': site.name,
+                    'location': site.location,
+                } for site in vpn.sites.all()]
+            })
+            
+        except VPN.DoesNotExist:
+            return JsonResponse({'error': 'VPN not found'}, status=404)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON'}, status=400)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
     def delete(self, request, vpn_id):
         try:
             vpn = VPN.objects.get(id=vpn_id)
@@ -147,3 +181,4 @@ class VPNSiteView(View):
             return JsonResponse({'error': 'VPN or Site not found'}, status=404)
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
+    

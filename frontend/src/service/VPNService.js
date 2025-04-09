@@ -43,11 +43,14 @@ export default {
 
   async addSiteToVPN(vpnId, siteId) {
     try {
-      const response = await axios.post(`${API_URL}${vpnId}/sites/`, { site_id: siteId })
+      const response = await axios.post(`${API_URL}${vpnId}/sites/`, {
+        site_id: siteId,
+      })
       return response.data
     } catch (error) {
+      const errorMessage = error.response?.data?.error || 'Failed to add site to VPN'
       console.error('Error adding site to VPN:', error)
-      throw error
+      throw errorMessage
     }
   },
 
@@ -57,7 +60,10 @@ export default {
       return response.data
     } catch (error) {
       console.error('Error updating VPN:', error)
-      throw error
+      if (error.response?.status === 405) {
+        throw new Error('VPN update operation not supported')
+      }
+      throw error.response?.data?.error || error.message
     }
   },
 

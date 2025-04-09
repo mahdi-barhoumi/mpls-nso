@@ -36,7 +36,7 @@ export default {
    */
   async updateSite(id, site) {
     try {
-      const response = await axios.put(`${API_URL}${id}/`, site)
+      const response = await axios.patch(`${API_URL}${id}/`, site)
       return response.data
     } catch (error) {
       console.error('Error updating site:', error)

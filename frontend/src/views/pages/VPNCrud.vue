@@ -428,7 +428,6 @@ const hideDialog = () => {
   submitted.value = false
 }
 
-// Save VPN
 const saveVPN = async () => {
   submitted.value = true
 
@@ -450,62 +449,61 @@ const saveVPN = async () => {
     }
 
     if (isEditing.value) {
-      // Handle edit case
-      const existingSites = new Set(vpn.value.sites?.map((site) => site.id) || [])
-      const selectedSiteIds = new Set(selectedSites.value.map((site) => site.id))
-
-      // Find sites to remove
-      const sitesToRemove = [...existingSites].filter((id) => !selectedSiteIds.has(id))
-
-      // Find sites to add
-      const sitesToAdd = [...selectedSiteIds].filter((id) => !existingSites.has(id))
-
       // Update VPN basic info
       await VPNService.updateVPN(vpn.value.id, vpnData)
 
-      // Remove sites that were unselected
-      for (const siteId of sitesToRemove) {
-        await VPNService.removeSiteFromVPN(vpn.value.id, siteId)
-      }
+      // Handle site changes
+      const existingSites = new Set(vpn.value.sites?.map((site) => site.id) || [])
+      const selectedSiteIds = new Set(selectedSites.value.map((site) => site.id))
 
-      // Add newly selected sites
-      for (const siteId of sitesToAdd) {
-        await VPNService.addSiteToVPN(vpn.value.id, siteId)
-      }
+      try {
+        // Remove sites that were unselected
+        const sitesToRemove = [...existingSites].filter((id) => !selectedSiteIds.has(id))
+        for (const siteId of sitesToRemove) {
+          await VPNService.removeSiteFromVPN(vpn.value.id, siteId)
+        }
 
-      toast.add({
-        severity: 'success',
-        summary: 'Success',
-        detail: 'VPN updated successfully',
-        life: 3000,
-      })
+        // Add newly selected sites
+        const sitesToAdd = [...selectedSiteIds].filter((id) => !existingSites.has(id))
+        for (const siteId of sitesToAdd) {
+          await VPNService.addSiteToVPN(vpn.value.id, siteId)
+        }
+      } catch (siteError) {
+        throw new Error(`Failed to update VPN sites: ${siteError}`)
+      }
     } else {
-      // Handle create case
+      // Create new VPN
       const savedVPN = await VPNService.createVPN(vpnData)
 
-      // Add selected sites to the VPN
-      for (const site of selectedSites.value) {
-        await VPNService.addSiteToVPN(savedVPN.id, site.id)
+      try {
+        // Add selected sites
+        for (const site of selectedSites.value) {
+          await VPNService.addSiteToVPN(savedVPN.id, site.id)
+        }
+      } catch (siteError) {
+        // If adding sites fails, delete the VPN to maintain consistency
+        await VPNService.deleteVPN(savedVPN.id)
+        throw new Error(`Failed to add sites to VPN: ${siteError}`)
       }
-
-      toast.add({
-        severity: 'success',
-        summary: 'Success',
-        detail: 'VPN created successfully',
-        life: 3000,
-      })
     }
 
     // Refresh VPN list and close dialog
-    vpns.value = await VPNService.getVPNs()
+    await fetchVPNs()
     vpnDialog.value = false
     submitted.value = false
+
+    toast.add({
+      severity: 'success',
+      summary: 'Success',
+      detail: `VPN ${isEditing.value ? 'updated' : 'created'} successfully`,
+      life: 3000,
+    })
   } catch (error) {
+    console.error('Save VPN error:', error)
     toast.add({
       severity: 'error',
       summary: 'Error',
-      detail:
-        error.response?.data?.error || `Failed to ${isEditing.value ? 'update' : 'create'} VPN`,
+      detail: error.message || `Failed to ${isEditing.value ? 'update' : 'create'} VPN`,
       life: 3000,
     })
   }
