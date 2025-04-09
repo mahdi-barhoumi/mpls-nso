@@ -14,7 +14,6 @@ class NetworkMapView(View):
             'interfaces__connected_interfaces',
             'vrfs'
         ).all()
-
         nodes = []
         links = []
         processed_links = set()

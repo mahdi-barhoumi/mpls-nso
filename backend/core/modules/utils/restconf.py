@@ -129,7 +129,7 @@ class RestconfWrapper:
         for attempt in range(self.max_retries):
             try:
                 self.logger.debug(f"PATCH {url} (attempt {attempt + 1}/{self.max_retries})")
-                
+
                 response = requests.patch(
                     url,
                     headers=self.headers,
@@ -139,6 +139,9 @@ class RestconfWrapper:
                     json=data
                 )
                 
+                print("Data: ", data)
+                print("Response: ", response.content)
+
                 if response.status_code in [200, 204]:
                     # Success - return response content if any, otherwise empty dict
                     result = {}
@@ -288,7 +291,7 @@ class RestconfWrapper:
             )
             
             if response.status_code == 200:
-                self.logger.info("Configuration saved to startup successfully")
+                self.logger.debug("Configuration saved to startup successfully")
                 return True
             else:
                 self.logger.warning(f"Failed to save configuration to startup: HTTP {response.status_code}")

@@ -5,8 +5,12 @@ from core.views.routers import RouterView, RouterInterfaceView
 from core.views.sites import SiteView, SiteRoutingView
 from core.views.settings import SettingsView
 from core.views.network_map import NetworkMapView
+from core.views.test import test_view
 
 urlpatterns = [
+    # Test endpoint
+    path('test/', test_view, name='test'),
+
     # Settings endpoint
     path('settings/', SettingsView.as_view(), name='settings'),
 
@@ -29,7 +33,7 @@ urlpatterns = [
     ## Site endpoints
     path('sites/', SiteView.as_view()),  
     path('sites/<int:site_id>/', SiteView.as_view()),
-    path('sites/<int:site_id>/setup-routing/', SiteRoutingView.as_view()),
+    path('sites/<int:site_id>/enable-routing/', SiteRoutingView.as_view()),
 
     # Controller endpoints
     ## DHCP service endpoints

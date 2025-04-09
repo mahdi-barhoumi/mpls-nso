@@ -132,20 +132,19 @@ class SiteView(View):
                 description=data.get('description', ''),
                 location=data.get('location', ''),
                 dhcp_scope=dhcp_scope,
-                assigned_interface=assigned_interface
             )
             
+            site.save()
+
             # Assign interface using NetworkController
             success = NetworkController.assign_interface(assigned_interface, site)
             if not success:
                 # Clean up the created DHCP scope if interface assignment fails
                 dhcp_scope.delete()
+                site.delete()
                 return JsonResponse({
                     'message': 'Failed to assign interface to site'
                 }, status=500)
-            
-            # Validate and save site
-            site.save()
             
             # Include full information in the response
             return JsonResponse({
@@ -270,7 +269,7 @@ class SiteRoutingView(View):
                 }, status=400)
             
             # Setup routing using NetworkController
-            success = NetworkController.setup_routing(site)
+            success = NetworkController.enable_routing(site)
             
             if success:
                 return JsonResponse({
