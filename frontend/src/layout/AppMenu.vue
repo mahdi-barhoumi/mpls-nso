@@ -29,6 +29,11 @@ const model = ref([
         to: '/sites',
       },
       {
+        label: 'VPN',
+        icon: 'pi pi-fw pi-sitemap',
+        to: '/vpn',
+      },
+      {
         label: 'Auth',
         icon: 'pi pi-fw pi-user',
         items: [

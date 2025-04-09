@@ -22,7 +22,8 @@ class VPNView(View):
                     },
                     'sites': [{
                         'id': site.id,
-                        'name': site.name
+                        'name': site.name,
+                        'location': site.location,
                     } for site in vpn.sites.all()]
                 })
             except VPN.DoesNotExist:
@@ -34,6 +35,7 @@ class VPNView(View):
                 'id': vpn.id,
                 'name': vpn.name,
                 'customer': vpn.customer.name,
+                'customer_id': vpn.customer.id,
                 'description': vpn.description,
                 'site_count': vpn.sites.count()
             } for vpn in vpns],
