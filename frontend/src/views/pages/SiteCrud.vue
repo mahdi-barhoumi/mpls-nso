@@ -47,13 +47,25 @@
         <Column selectionMode="multiple" style="width: 3rem" :exportable="false"></Column>
         <Column field="name" header="Name" sortable style="min-width: 16rem"></Column>
         <Column field="location" header="Location" sortable style="min-width: 16rem"></Column>
-        <Column field="customer.name" header="Customer" sortable style="min-width: 16rem"></Column>
+        <Column field="customer.name" header="Customer" sortable style="min-width: 16rem">
+          <template #body="slotProps">
+            {{ slotProps.data.customer?.name || 'N/A' }}
+          </template>
+        </Column>
         <Column
           field="assigned_interface.name"
           header="PE Interface"
           sortable
           style="min-width: 16rem"
-        ></Column>
+        >
+          <template #body="slotProps">
+            {{
+              `${slotProps.data.assigned_interface?.router?.hostname || 'N/A'} - ${
+                slotProps.data.assigned_interface?.name || 'N/A'
+              }`
+            }}
+          </template>
+        </Column>
         <Column field="dhcp_scope" header="DHCP Scope" sortable style="min-width: 16rem"></Column>
         <Column :exportable="false" style="min-width: 12rem">
           <template #body="slotProps">
@@ -113,6 +125,7 @@
             placeholder="Select a PE Router"
             @change="fetchPERouterInterfaces"
             required
+            :disabled="isEditing"
           />
         </div>
         <div v-if="selectedPERouter">
@@ -124,6 +137,7 @@
             optionLabel="name"
             placeholder="Select a PE Interface"
             required
+            :disabled="isEditing"
           />
         </div>
         <div>
@@ -135,6 +149,7 @@
             optionLabel="name"
             placeholder="Select a Customer"
             required
+            :disabled="isEditing"
           />
         </div>
       </div>
@@ -362,8 +377,13 @@ const saveSite = async () => {
 
   try {
     if (isEditing.value) {
-      // Update existing site
-      await SiteService.updateSite(currentSite.value.id, currentSite.value)
+      // Update existing site with only editable fields
+      const updatePayload = {
+        id: currentSite.value.id,
+        name: currentSite.value.name,
+        location: currentSite.value.location,
+      }
+      await SiteService.updateSite(currentSite.value.id, updatePayload)
       toast.add({
         severity: 'success',
         summary: 'Success',
@@ -371,14 +391,14 @@ const saveSite = async () => {
         life: 3000,
       })
     } else {
-      // Create new site
-      const payload = {
+      // Create new site with all fields
+      const createPayload = {
         name: currentSite.value.name,
         location: currentSite.value.location,
         customer_id: currentSite.value.customer.id,
-        assigned_interface_id: currentSite.value.assigned_interface.id, // Pass the selected interface ID
+        assigned_interface_id: currentSite.value.assigned_interface.id,
       }
-      await SiteService.createSite(payload)
+      await SiteService.createSite(createPayload)
       toast.add({
         severity: 'success',
         summary: 'Success',

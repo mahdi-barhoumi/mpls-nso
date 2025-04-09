@@ -24,8 +24,18 @@ class SiteView(View):
                     'description': site.description,
                     'location': site.location,
                     'dhcp_scope': str(ipaddress.IPv4Network(f"{site.dhcp_scope.network}/{site.dhcp_scope.subnet_mask}", strict=False)),
-                    'customer_id': site.customer.id,
-                    'assigned_interface_id': site.assigned_interface.id,
+                    'customer': {
+                        'id': site.customer.id,
+                        'name': site.customer.name
+                    },
+                    'assigned_interface': {
+                        'id': site.assigned_interface.id,
+                        'name': site.assigned_interface.name,
+                        'router': {
+                            'id': site.assigned_interface.router.id,
+                            'hostname': site.assigned_interface.router.hostname
+                        }
+                    } if site.assigned_interface else None,
                     'router_id': site.router.id if site.router else None
                 }
                 
@@ -41,7 +51,7 @@ class SiteView(View):
                 else:
                     sites = Site.objects.all()
                 
-                # Serialize sites data
+                # Serialize sites data with expanded relationships
                 site_list = [
                     {
                         'id': site.id,
@@ -49,8 +59,18 @@ class SiteView(View):
                         'description': site.description,
                         'location': site.location,
                         'dhcp_scope': str(ipaddress.IPv4Network(f"{site.dhcp_scope.network}/{site.dhcp_scope.subnet_mask}", strict=False)),
-                        'customer_id': site.customer.id,
-                        'assigned_interface_id': site.assigned_interface.id,
+                        'customer': {
+                            'id': site.customer.id,
+                            'name': site.customer.name
+                        },
+                        'assigned_interface': {
+                            'id': site.assigned_interface.id,
+                            'name': site.assigned_interface.name,
+                            'router': {
+                                'id': site.assigned_interface.router.id,
+                                'hostname': site.assigned_interface.router.hostname
+                            }
+                        } if site.assigned_interface else None,
                         'router_id': site.router.id if site.router else None
                     }
                     for site in sites

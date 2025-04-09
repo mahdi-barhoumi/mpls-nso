@@ -21,7 +21,12 @@ const model = ref([
       {
         label: 'Customers',
         icon: 'pi pi-fw pi-users',
-        to: '/Customers',
+        to: '/customers',
+      },
+      {
+        label: 'Sites',
+        icon: 'pi pi-fw pi-building',
+        to: '/sites',
       },
       {
         label: 'Auth',

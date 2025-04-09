@@ -25,6 +25,8 @@ export const MappingService = {
           targetInterfaceName: abbreviateInterfaceName(link.targetInterfaceName),
           sourceInterfaceIp: link.sourceInterfaceDetails.ip_address,
           sourceInterfaceMask: link.sourceInterfaceDetails.subnet_mask,
+          sourceInterfaceType: link.sourceInterfaceDetails.category,
+          targetInterfaceType: link.targetInterfaceDetails.category,
           subnet: calculateSubnet(
             link.sourceInterfaceDetails.ip_address,
             link.sourceInterfaceDetails.subnet_mask,
