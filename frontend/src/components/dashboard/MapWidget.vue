@@ -22,7 +22,7 @@
         class="h-full w-full"
       >
         <!-- Define custom node rendering -->
-        <template #override-node="{ nodeId, scale, config, ...slotProps }">
+        <template #override-node="{ nodeId, scale = 1, config, ...slotProps }">
           <!-- <circle :r="config.radius * scale" :fill="`var(--p-primary-color)`" v-bind="slotProps" /> -->
           <text
             :x="0"
@@ -44,13 +44,14 @@
         </template>
 
         <!-- Define custom edge labels -->
-        <template #edge-label="{ edge, ...slotProps }">
+        <template #edge-label="{ edge, scale = 1, ...slotProps }">
           <v-edge-label
             :text="edge.subnet"
             align="center"
             vertical-align="above"
             v-bind="slotProps"
             fill="var(--p-primary-500)"
+            :font-size="10 * (scale || 1)"
           />
           <v-edge-label
             :text="edge.sourceInterfaceName"
@@ -58,14 +59,14 @@
             vertical-align="above"
             v-bind="slotProps"
             fill="var(--text-color)"
-            :font-size="12 * scale"
+            :font-size="10 * (scale || 1)"
           />
           <v-edge-label
             :text="edge.targetInterfaceName"
             align="target"
             vertical-align="above"
             v-bind="slotProps"
-            :font-size="12 * scale"
+            :font-size="10 * (scale || 1)"
             fill="var(--text-color)"
           />
         </template>
@@ -216,7 +217,7 @@ export default {
       } else if (node.role === 'PE') {
         return '/demo/images/routers/router_blue.svg' // Blue router image for PE routers
       }
-      return null // Default to no image for other types
+      return '/demo/images/routers/router-in-building.svg'
     },
     getNodeName(nodeId) {
       const node = this.graphData.nodes[nodeId]
