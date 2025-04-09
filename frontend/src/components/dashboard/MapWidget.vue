@@ -46,6 +46,9 @@
         <!-- Define custom edge labels -->
         <template #edge-label="{ edge, scale = 1, ...slotProps }">
           <v-edge-label
+            v-if="
+              edge.sourceInterfaceType === 'physical' && edge.targetInterfaceType === 'physical'
+            "
             :text="edge.subnet"
             align="center"
             vertical-align="above"
@@ -54,6 +57,9 @@
             :font-size="10 * (scale || 1)"
           />
           <v-edge-label
+            v-if="
+              edge.sourceInterfaceType === 'physical' && edge.targetInterfaceType === 'physical'
+            "
             :text="edge.sourceInterfaceName"
             align="source"
             vertical-align="above"
@@ -62,6 +68,9 @@
             :font-size="10 * (scale || 1)"
           />
           <v-edge-label
+            v-if="
+              edge.sourceInterfaceType === 'physical' && edge.targetInterfaceType === 'physical'
+            "
             :text="edge.targetInterfaceName"
             align="target"
             vertical-align="above"

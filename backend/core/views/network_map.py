@@ -50,11 +50,13 @@ class NetworkMapView(View):
                         'targetInterfaceName': connected.name,
                         'sourceInterfaceDetails': {
                             'ip_address': interface.ip_address,
-                            'subnet_mask': interface.subnet_mask
+                            'subnet_mask': interface.subnet_mask,
+                            'category': interface.category
                         },
                         'targetInterfaceDetails': {
                             'ip_address': connected.ip_address,
-                            'subnet_mask': connected.subnet_mask
+                            'subnet_mask': connected.subnet_mask,
+                            'category': connected.category
                         }
                     })
                     processed_links.add(link_id)
