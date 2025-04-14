@@ -3,20 +3,21 @@ from core.views import utils, discovery, dhcp, tftp
 from core.views.customers import CustomerView
 from core.views.routers import RouterView, RouterInterfaceView  
 from core.views.sites import SiteView, SiteRoutingView
-from core.views.settings import SettingsView
 from core.views.network_map import NetworkMapView
 from core.views.vpns import VPNView, VPNSiteView
+from core.views.setup import SetupStatusView, AdminSetupView, SettingsSetupView
 from core.views.test import test_view
 
 urlpatterns = [
     # Test endpoint
     path('test/', test_view, name='test'),
 
-    # Settings endpoint
-    path('settings/', SettingsView.as_view(), name='settings'),
+    # Setup endpoints
+    path('setup/status/', SetupStatusView.as_view()),
+    path('setup/admin/', AdminSetupView.as_view()),
+    path('setup/settings/', SettingsSetupView.as_view()),
 
     # Utility endpoints
-
     path('utils/host-interfaces/', utils.list_host_interfaces, name='host-interfaces'),
 
     # Models endpoints

@@ -24,6 +24,29 @@ class _NetworkController:
         self.restconf = RestconfWrapper()
         self.initialized = True
 
+    def set_router_hostname(self, router: Router, hostname: str) -> bool:
+
+        self.logger.debug(f"Attempting hostname change to {hostname} on {router.management_ip_address}")
+
+        payload = {
+            'hostname': hostname
+        }
+
+        result = self.restconf.patch(
+            ip_address=router.management_ip_address,
+            path="Cisco-IOS-XE-native:native/hostname/",
+            data=payload
+        )
+
+        if result is not None:
+            router.hostname = hostname
+            router.save()
+            self.logger.info(f"Successfully changed hostname to {hostname} on {router.management_ip_address}")
+            return True
+
+        self.logger.error(f"Failed changing hostname on {router.management_ip_address}")
+        return False
+
     def enable_interface(self, interface: Interface) -> bool:
         try:
             self.logger.info(f"Enabling interface {interface.name} on router {interface.router}")
