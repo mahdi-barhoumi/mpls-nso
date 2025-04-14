@@ -1,38 +1,99 @@
-import time
 import logging
 import ipaddress
-from datetime import timedelta
-from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from django.utils import timezone
 from django.db import transaction
 from core.modules.utils.restconf import RestconfWrapper
-from core.models import DHCPLease, DHCPScope, Router, VRF, RouteTarget, Interface, VPN, Site
+from core.models import DHCPLease, Router, VRF, RouteTarget, Interface, Site
 from core.settings import get_settings
 
-class NetworkDiscoverer:
+class _NetworkDiscoverer:
     def __init__(self, max_workers=5):
+        self.logger = logging.getLogger('network-discoverer')
         self.max_workers = max_workers
         self.router_cache = {}  # Cache router objects to avoid duplicate DB queries
         self.interface_cache = {}  # Cache interface objects
-        
-        # Setup logger
-        self.logger = logging.getLogger('discovery')
-        
+        self.initialized = False
+        # Track discovery statistics
+        self.stats = {
+            "discovered_devices": 0,
+            "routers": {
+                "created": 0,
+                "updated": 0,
+                "total": 0,
+                "provider_core": 0,
+                "provider_edge": 0,
+                "customer_edge": 0
+            },
+            "vrfs": {
+                "created": 0,
+                "updated": 0,
+                "removed": 0
+            },
+            "interfaces": {
+                "created": 0,
+                "updated": 0,
+                "removed": 0
+            },
+            "connections": {
+                "created": 0
+            }
+        }
+        # Keep track of reachable routers
+        self.reachable_routers = set()
+    
+    def initialize(self):
+        if self.initialized:
+            return
+            
+        settings = get_settings()
+        if not settings:
+            self.logger.warning("Cannot initialize discoverer: No system settings found")
+            return
+
         # Create RESTCONF wrapper
         self.restconf = RestconfWrapper(max_retries=2, timeout=3)
         
         # Retrieve system settings
-        self.settings = get_settings()
+        self.settings = settings
         
         # Precompute DHCP sites network
         self.dhcp_sites_network = ipaddress.IPv4Network(
             f"{self.settings.dhcp_sites_network_address}/{self.settings.dhcp_sites_network_subnet_mask}", 
             strict=False
         )
-        
+
+        self.initialized = True
+
     def discover_network(self):
         self.logger.info("Starting network discovery process")
+        
+        # Reset statistics
+        self.stats = {
+            "discovered_devices": 0,
+            "routers": {
+                "created": 0,
+                "updated": 0,
+                "total": 0,
+                "provider_core": 0,
+                "provider_edge": 0,
+                "customer_edge": 0
+            },
+            "vrfs": {
+                "created": 0,
+                "updated": 0,
+                "removed": 0
+            },
+            "interfaces": {
+                "created": 0,
+                "updated": 0,
+                "removed": 0
+            },
+            "connections": {
+                "created": 0
+            }
+        }
+        self.reachable_routers = set()
         
         # Get all active DHCP leases
         active_leases = DHCPLease.objects.filter(expiry_time__gt=timezone.now())
@@ -48,23 +109,24 @@ class NetworkDiscoverer:
                     device_data = future.result()
                     if device_data:
                         discovered_devices.append(device_data)
+                        self.stats["discovered_devices"] += 1
                 except Exception as e:
                     self.logger.error(f"Error processing device at {ip_address}: {str(e)}")
         
         # Update connections between interfaces after discovery
         self.update_interface_connections()
         
-        return {
-            "discovered_devices": len(discovered_devices),
-            "routers": {
-                "total": Router.objects.count(),
-                "provider_core": Router.objects.filter(role='P').count(),
-                "provider_edge": Router.objects.filter(role='PE').count(),
-                "customer_edge": Router.objects.filter(role='CE').count()
-            },
-            "vrfs": VRF.objects.count(),
-            "interfaces": Interface.objects.count(),
-        }
+        # Update router role counts
+        self.stats["routers"]["total"] = len(self.reachable_routers)
+        for router in self.reachable_routers:
+            if router.role == 'P':
+                self.stats["routers"]["provider_core"] += 1
+            elif router.role == 'PE':
+                self.stats["routers"]["provider_edge"] += 1
+            elif router.role == 'CE':
+                self.stats["routers"]["customer_edge"] += 1
+        
+        return self.stats
     
     def discover_ip(self, ip_address):
         try:
@@ -89,6 +151,9 @@ class NetworkDiscoverer:
             
             # Create or update router
             router = self.create_or_update_router(chassis_id, ip_address, hostname, role)
+            
+            # Add to reachable routers set
+            self.reachable_routers.add(router)
             
             # Store router in cache
             self.router_cache[hostname] = router
@@ -202,8 +267,10 @@ class NetworkDiscoverer:
         
         if created:
             self.logger.info(f"Created new router: {hostname} (Role: {role})")
+            self.stats["routers"]["created"] += 1
         else:
             self.logger.info(f"Updated existing router: {hostname} (Role: {role})")
+            self.stats["routers"]["updated"] += 1
             
         return router
     
@@ -303,13 +370,16 @@ class NetworkDiscoverer:
             
             if created:
                 self.logger.info(f"Created new VRF: {vrf_name} with RD: {rd} on router {router.hostname}")
+                self.stats["vrfs"]["created"] += 1
             else:
                 self.logger.info(f"Updated existing VRF: {vrf_name} on router {router.hostname}")
+                self.stats["vrfs"]["updated"] += 1
         
         # Clean up VRFs that no longer exist on the router
         removed_count = VRF.objects.filter(router=router).exclude(name__in=discovered_vrf_names).delete()[0]
         if removed_count > 0:
             self.logger.info(f"Removed {removed_count} VRFs that no longer exist on router {router.hostname}")
+            self.stats["vrfs"]["removed"] += removed_count
     
     def process_interfaces(self, router, native_interfaces, oper_interfaces):
         self.logger.info(f"Processing interfaces for router {router.hostname}")
@@ -437,6 +507,9 @@ class NetworkDiscoverer:
                     # Only set MAC address for new interfaces (immutable field)
                     if new:
                         interface.mac_address = data['mac_address']
+                        self.stats["interfaces"]["created"] += 1
+                    else:
+                        self.stats["interfaces"]["updated"] += 1
                     
                     # Update the interface with collected data
                     interface.description = data['description']
@@ -468,12 +541,13 @@ class NetworkDiscoverer:
                 removed_count = Interface.objects.filter(router=router).exclude(name__in=discovered_interfaces).delete()[0]
                 if removed_count > 0:
                     self.logger.info(f"Removed {removed_count} interfaces that no longer exist on router {router.hostname}")
+                    self.stats["interfaces"]["removed"] += removed_count
     
     def update_interface_connections(self):
         self.logger.info("Starting interface connection update")
         
-        # Get all routers
-        routers = list(Router.objects.all())
+        # Only process connections for routers that were reachable
+        routers = list(self.reachable_routers)
         
         # Process connections in parallel
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
@@ -502,8 +576,8 @@ class NetworkDiscoverer:
             # Get all interfaces for this router
             router_interfaces = {interface.name: interface for interface in Interface.objects.filter(router=router)}
             
-            # Get routers by chassis ID for faster lookup
-            routers_by_chassis = {r.chassis_id: r for r in Router.objects.all()}
+            # Get routers by chassis ID for faster lookup (only use reachable routers)
+            routers_by_chassis = {r.chassis_id: r for r in self.reachable_routers}
             
             # Process LLDP interface details
             for intf_detail in lldp_intf_details:
@@ -541,10 +615,10 @@ class NetworkDiscoverer:
         # Normalize interface name (handle various formats)
         remote_interface_name = self.normalize_interface_name(port_id)
         
-        # Find the remote router
+        # Find the remote router - only if it's reachable
         remote_router = routers_by_chassis.get(remote_chassis_id)
         if not remote_router:
-            self.logger.warning(f"Remote router {remote_system_name} not found")
+            self.logger.warning(f"Remote router {remote_system_name} not found or not reachable")
             return
         
         # Find the remote interface
@@ -558,6 +632,7 @@ class NetworkDiscoverer:
         with transaction.atomic():
             local_interface.connected_interfaces.add(remote_interface)
             self.logger.debug(f"Connected {local_interface} to {remote_interface}")
+            self.stats["connections"]["created"] += 1
     
     def normalize_interface_name(self, port_id):
         # Common interface abbreviation mappings
@@ -577,3 +652,6 @@ class NetworkDiscoverer:
                 return port_id.replace(abbr, full, 1)
         
         return port_id
+
+NetworkDiscoverer = _NetworkDiscoverer()
+NetworkDiscoverer.initialize()

@@ -1,15 +1,11 @@
-import time
 import logging
 import threading
 from typing import Dict
-from datetime import datetime, timedelta
-from django.utils import timezone
 from core.modules.discovery import NetworkDiscoverer
 
 class _DiscoveryScheduler:
     def __init__(self):
         self.logger = logging.getLogger('scheduler')
-        self.discoverer = NetworkDiscoverer()
         self.scheduled_tasks: Dict[str, threading.Timer] = {}
         self.lock = threading.Lock()
         
@@ -36,7 +32,7 @@ class _DiscoveryScheduler:
     def _execute_discovery(self, ip_address: str):
         try:
             self.logger.info(f"Executing discovery for {ip_address}")
-            device_data = self.discoverer.discover_ip(ip_address)
+            device_data = NetworkDiscoverer.discover_ip(ip_address)
             
             if not device_data:
                 # If discovery failed, reschedule

@@ -6,7 +6,7 @@ from django.utils.decorators import method_decorator
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from django.db import IntegrityError
-from core.models import Customer, Site
+from core.models import Customer
 
 @method_decorator(csrf_exempt, name='dispatch')
 class CustomerView(View):

@@ -4,8 +4,11 @@ from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.core.exceptions import ValidationError
-from core.settings import Settings, get_settings
 from core.modules.controller import NetworkController
+from core.modules.discovery import NetworkDiscoverer
+from core.modules.dhcp import DHCPServer
+from core.modules.tftp import TFTPServer
+from core.settings import Settings, get_settings
 
 @method_decorator(csrf_exempt, name='dispatch')
 class SettingsView(View):
@@ -87,6 +90,9 @@ class SettingsView(View):
             try:
                 settings.save()
                 NetworkController.initialize()
+                NetworkDiscoverer.initialize()
+                DHCPServer.start()
+                TFTPServer.start()
                 return JsonResponse({
                     'status': 'success',
                     'message': 'Settings created successfully'
