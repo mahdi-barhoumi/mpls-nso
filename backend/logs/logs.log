@@ -1,0 +1,51 @@
+INFO 2025-04-14 17:47:16,721 (autoreload): Watching for file changes with StatReloader
+INFO 2025-04-14 17:47:17,066 (dhcp): DHCP server running on 192.168.100.1
+INFO 2025-04-14 17:47:17,066 (dhcp): Main scope: 192.168.100.1/255.255.255.0
+INFO 2025-04-14 17:47:17,068 (tftp): TFTP server running on 192.168.100.1:69
+INFO 2025-04-14 17:47:17,068 (tftp): Serving files from C:\Users\Badjo\Desktop\Files\Projects\MPLS\backend\core\data\tftp-files
+INFO 2025-04-14 17:47:53,364 (basehttp): "GET /api/logs HTTP/1.1" 301 0
+INFO 2025-04-14 17:47:53,366 (basehttp): "GET /api/logs/ HTTP/1.1" 200 24
+INFO 2025-04-14 17:51:51,084 (autoreload): C:\Users\Badjo\Desktop\Files\Projects\MPLS\backend\core\views\logs.py changed, reloading.
+INFO 2025-04-14 17:51:51,624 (autoreload): Watching for file changes with StatReloader
+INFO 2025-04-14 17:51:51,979 (dhcp): DHCP server running on 192.168.100.1
+INFO 2025-04-14 17:51:51,980 (dhcp): Main scope: 192.168.100.1/255.255.255.0
+INFO 2025-04-14 17:51:51,981 (tftp): TFTP server running on 192.168.100.1:69
+INFO 2025-04-14 17:51:51,981 (tftp): Serving files from C:\Users\Badjo\Desktop\Files\Projects\MPLS\backend\core\data\tftp-files
+INFO 2025-04-14 17:51:53,455 (autoreload): C:\Users\Badjo\Desktop\Files\Projects\MPLS\backend\core\views\logs.py changed, reloading.
+INFO 2025-04-14 17:51:53,972 (autoreload): Watching for file changes with StatReloader
+INFO 2025-04-14 17:51:54,300 (dhcp): DHCP server running on 192.168.100.1
+INFO 2025-04-14 17:51:54,300 (dhcp): Main scope: 192.168.100.1/255.255.255.0
+INFO 2025-04-14 17:51:54,302 (tftp): TFTP server running on 192.168.100.1:69
+INFO 2025-04-14 17:51:54,302 (tftp): Serving files from C:\Users\Badjo\Desktop\Files\Projects\MPLS\backend\core\data\tftp-files
+INFO 2025-04-14 17:51:59,987 (basehttp): "GET /api/logs HTTP/1.1" 301 0
+INFO 2025-04-14 17:51:59,998 (basehttp): "GET /api/logs/ HTTP/1.1" 200 2972
+INFO 2025-04-14 17:53:11,703 (autoreload): C:\Users\Badjo\Desktop\Files\Projects\MPLS\backend\core\views\logs.py changed, reloading.
+INFO 2025-04-14 17:53:12,264 (autoreload): Watching for file changes with StatReloader
+INFO 2025-04-14 17:53:12,636 (dhcp): DHCP server running on 192.168.100.1
+INFO 2025-04-14 17:53:12,636 (dhcp): Main scope: 192.168.100.1/255.255.255.0
+INFO 2025-04-14 17:53:12,638 (tftp): TFTP server running on 192.168.100.1:69
+INFO 2025-04-14 17:53:12,638 (tftp): Serving files from C:\Users\Badjo\Desktop\Files\Projects\MPLS\backend\core\data\tftp-files
+INFO 2025-04-14 17:53:15,209 (autoreload): C:\Users\Badjo\Desktop\Files\Projects\MPLS\backend\core\views\logs.py changed, reloading.
+INFO 2025-04-14 17:53:15,744 (autoreload): Watching for file changes with StatReloader
+INFO 2025-04-14 17:53:16,081 (dhcp): DHCP server running on 192.168.100.1
+INFO 2025-04-14 17:53:16,081 (dhcp): Main scope: 192.168.100.1/255.255.255.0
+INFO 2025-04-14 17:53:16,083 (tftp): TFTP server running on 192.168.100.1:69
+INFO 2025-04-14 17:53:16,083 (tftp): Serving files from C:\Users\Badjo\Desktop\Files\Projects\MPLS\backend\core\data\tftp-files
+INFO 2025-04-14 17:53:18,639 (autoreload): C:\Users\Badjo\Desktop\Files\Projects\MPLS\backend\core\views\logs.py changed, reloading.
+INFO 2025-04-14 17:53:19,192 (autoreload): Watching for file changes with StatReloader
+INFO 2025-04-14 17:53:19,523 (dhcp): DHCP server running on 192.168.100.1
+INFO 2025-04-14 17:53:19,523 (dhcp): Main scope: 192.168.100.1/255.255.255.0
+INFO 2025-04-14 17:53:19,524 (tftp): TFTP server running on 192.168.100.1:69
+INFO 2025-04-14 17:53:19,525 (tftp): Serving files from C:\Users\Badjo\Desktop\Files\Projects\MPLS\backend\core\data\tftp-files
+INFO 2025-04-14 17:53:26,196 (autoreload): C:\Users\Badjo\Desktop\Files\Projects\MPLS\backend\core\views\logs.py changed, reloading.
+INFO 2025-04-14 17:53:26,721 (autoreload): Watching for file changes with StatReloader
+INFO 2025-04-14 17:53:27,046 (dhcp): DHCP server running on 192.168.100.1
+INFO 2025-04-14 17:53:27,047 (dhcp): Main scope: 192.168.100.1/255.255.255.0
+INFO 2025-04-14 17:53:27,048 (tftp): TFTP server running on 192.168.100.1:69
+INFO 2025-04-14 17:53:27,048 (tftp): Serving files from C:\Users\Badjo\Desktop\Files\Projects\MPLS\backend\core\data\tftp-files
+INFO 2025-04-14 17:53:28,552 (autoreload): C:\Users\Badjo\Desktop\Files\Projects\MPLS\backend\core\views\logs.py changed, reloading.
+INFO 2025-04-14 17:53:29,098 (autoreload): Watching for file changes with StatReloader
+INFO 2025-04-14 17:53:29,468 (dhcp): DHCP server running on 192.168.100.1
+INFO 2025-04-14 17:53:29,468 (dhcp): Main scope: 192.168.100.1/255.255.255.0
+INFO 2025-04-14 17:53:29,470 (tftp): TFTP server running on 192.168.100.1:69
+INFO 2025-04-14 17:53:29,470 (tftp): Serving files from C:\Users\Badjo\Desktop\Files\Projects\MPLS\backend\core\data\tftp-files

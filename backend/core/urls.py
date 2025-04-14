@@ -7,6 +7,7 @@ from core.views.network_map import NetworkMapView
 from core.views.vpns import VPNView, VPNSiteView
 from core.views.setup import SetupStatusView, AdminSetupView, SettingsSetupView
 from core.views.test import test_view
+from core.views.logs import LogsView
 
 urlpatterns = [
     # Test endpoint
@@ -60,4 +61,7 @@ urlpatterns = [
     # Network discovery endpoints
     path('network/discover/', discovery.discover_network, name='discover-network'),
     path('network/map/', NetworkMapView.as_view(), name='map_data'),
+
+    # Logs endpoint
+    path('logs/', LogsView.as_view(), name='logs'),
 ]
