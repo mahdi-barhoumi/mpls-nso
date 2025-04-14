@@ -12,7 +12,7 @@ from core.settings import get_settings
 
 class _NetworkController:
     def __init__(self):
-        self.logger = logging.getLogger('networkcontroller')
+        self.logger = logging.getLogger('controller')
         self.initialized = False
         self.dhcp_server = None
         self.tftp_server = None

@@ -6,6 +6,7 @@ from threading import Thread, Event
 from datetime import timedelta
 from django.utils import timezone
 from core.models import DHCPLease, DHCPScope
+from core.modules.discovery_scheduler import DiscoveryScheduler
 
 # DHCP Message Type Options
 DHCP_DISCOVER = 1
@@ -275,6 +276,9 @@ class DHCPServer:
             )
             
             self.logger.info(f'Acknowledging IP {available_ip} to client {client_mac} (Hostname: {hostname})')
+            
+            # Schedule discovery for the newly acknowledged IP
+            DiscoveryScheduler.schedule_discovery(available_ip)
             
             ack_packet = self.create_dhcp_packet(data, DHCP_ACK, available_ip)
             
