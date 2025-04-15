@@ -240,35 +240,26 @@ class SiteView(View):
             # Get site
             site = get_object_or_404(Site, id=site_id)
             
-            # Check if site has an assigned interface and unassign it
-            if site.assigned_interface:
-                interface = site.assigned_interface
-                success = NetworkController.unassign_interface(interface, site)
-                
-                if not success:
-                    return JsonResponse({
-                        'message': 'Failed to unassign interface from site'
-                    }, status=500)
-            
             # Store name for confirmation message
             site_name = site.name
-            
-            # Delete DHCP scope if it exists
-            if site.dhcp_scope:
-                dhcp_scope = site.dhcp_scope
-                dhcp_scope.delete()
-            
+
             # Delete the site
-            site.delete()
+            success = NetworkController.delete_site(site)
             
-            return JsonResponse({
-                'message': f'Site {site_name} successfully deleted'
-            })
+            if success:
+                return JsonResponse({
+                    'message': f'Site {site_name} successfully deleted'
+                })
+            else:
+                if not success:
+                    return JsonResponse({
+                        'message': f'Failed to delete site'
+                    }, status=400)
                 
-        except Exception as e:
+        except Exception as exception:
             return JsonResponse({
-                'message': str(e)
-            }, status=500)
+                    'message': f'Failed to delete site'
+                }, status=400)
 
 @method_decorator(csrf_exempt, name='dispatch')
 class SiteRoutingView(View):

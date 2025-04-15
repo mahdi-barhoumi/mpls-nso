@@ -11,7 +11,7 @@ def test_view(request):
 
         router = Router.objects.get(pk=1)
 
-        data = NetworkController.set_router_hostname(router, "PE1")
+        data = router.delete()
 
         return JsonResponse(data, safe=False)
 
