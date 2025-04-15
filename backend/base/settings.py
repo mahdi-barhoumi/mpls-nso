@@ -193,7 +193,7 @@ LOGGING = {
             'level': 'INFO',
             'propagate': True,
         },
-        'scheduler': {
+        'discovery-scheduler': {
             'handlers': ['console', 'file'],
             'level': 'INFO',
             'propagate': True,

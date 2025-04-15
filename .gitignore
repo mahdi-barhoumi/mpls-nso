@@ -4,3 +4,4 @@ images/*
 **/__pycache__/
 **/db.sqlite3
 backend/core/migrations/*
+backend/logs/*
