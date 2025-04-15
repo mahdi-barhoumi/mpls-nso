@@ -94,7 +94,7 @@ class Settings(models.Model):
         interfaces = HostNetworkManager.list_interfaces()
         
         # Check if interface index exists
-        valid_indices = [interface['index'] for interface in interfaces]
+        valid_indices = [interface['id'] for interface in interfaces]
         
         if self.host_interface_id not in valid_indices:
             raise ValidationError(f'Interface index {self.host_interface_id} does not exist. Valid indices: {sorted(valid_indices)}')
