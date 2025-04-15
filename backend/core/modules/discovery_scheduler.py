@@ -17,7 +17,7 @@ class _DiscoveryScheduler:
             self.cancel_discovery(ip_address)
             
             # Set delay based on whether it's first time
-            delay = 5 if is_first_time else 60  # 5 minutes for first time, 1 minute for retries
+            delay = 60 if is_first_time else 10  # 1 minute for first time, 10 seconds for retries
             
             self.logger.info(f"Scheduling discovery for {ip_address} in {delay} seconds")
             timer = threading.Timer(delay, self._execute_discovery, args=(ip_address,))

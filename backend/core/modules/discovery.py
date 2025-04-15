@@ -626,11 +626,63 @@ class _NetworkDiscoverer:
             self.logger.warning(f"Remote interface {remote_system_name}:{remote_interface_name} not found")
             return
         
+        # Check if either interface is a subinterface
+        local_is_subinterface = '.' in local_interface.name
+        remote_is_subinterface = '.' in remote_interface.name
+        
+        # If one is a subinterface and the other is physical, look for matching subinterface
+        if local_is_subinterface != remote_is_subinterface:
+            if local_is_subinterface:
+                # Local is subinterface, remote is physical, find matching remote subinterface
+                matching_remote = self.find_matching_subinterface(local_interface, remote_interface)
+                if matching_remote:
+                    remote_interface = matching_remote
+                else:
+                    self.logger.debug(f"No matching subinterface found for {local_interface} on remote router")
+                    return
+            else:
+                # Remote is subinterface, local is physical, find matching local subinterface
+                matching_local = self.find_matching_subinterface(remote_interface, local_interface)
+                if matching_local:
+                    local_interface = matching_local
+                else:
+                    self.logger.debug(f"No matching subinterface found for {remote_interface} on local router")
+                    return
+        
         # Create the connection
         with transaction.atomic():
             local_interface.connected_interfaces.add(remote_interface)
             self.logger.debug(f"Connected {local_interface} to {remote_interface}")
             self.stats["connections"]["created"] += 1
+
+    def find_matching_subinterface(self, subinterface, physical_interface):
+        if not subinterface.vlan:
+            self.logger.warning(f"Subinterface {subinterface} has no VLAN assigned")
+            return None
+        
+        # Extract base physical interface name from physical_interface
+        base_name = physical_interface.name
+        
+        # Find all subinterfaces of the physical interface with the same VLAN
+        try:
+            matching_subinterface = Interface.objects.get(
+                router=physical_interface.router,
+                name__startswith=f"{base_name}.",
+                vlan=subinterface.vlan
+            )
+            self.logger.debug(f"Found matching subinterface {matching_subinterface} with VLAN {subinterface.vlan}")
+            return matching_subinterface
+        except Interface.DoesNotExist:
+            self.logger.debug(f"No matching subinterface with VLAN {subinterface.vlan} found on {physical_interface.router}")
+            return None
+        except Interface.MultipleObjectsReturned:
+            self.logger.warning(f"Multiple matching subinterfaces with VLAN {subinterface.vlan} found on {physical_interface.router}")
+            # Get the first one in this case
+            return Interface.objects.filter(
+                router=physical_interface.router,
+                name__startswith=f"{base_name}.",
+                vlan=subinterface.vlan
+            ).first()
     
     def normalize_interface_name(self, port_id):
         # Common interface abbreviation mappings
