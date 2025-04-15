@@ -449,42 +449,16 @@ const saveVPN = async () => {
     }
 
     if (isEditing.value) {
-      // Update VPN basic info
+      // Include sites in the update
+      vpnData.sites = selectedSites.value.map((site) => site.id)
       await VPNService.updateVPN(vpn.value.id, vpnData)
-
-      // Handle site changes
-      const existingSites = new Set(vpn.value.sites?.map((site) => site.id) || [])
-      const selectedSiteIds = new Set(selectedSites.value.map((site) => site.id))
-
-      try {
-        // Remove sites that were unselected
-        const sitesToRemove = [...existingSites].filter((id) => !selectedSiteIds.has(id))
-        for (const siteId of sitesToRemove) {
-          await VPNService.removeSiteFromVPN(vpn.value.id, siteId)
-        }
-
-        // Add newly selected sites
-        const sitesToAdd = [...selectedSiteIds].filter((id) => !existingSites.has(id))
-        for (const siteId of sitesToAdd) {
-          await VPNService.addSiteToVPN(vpn.value.id, siteId)
-        }
-      } catch (siteError) {
-        throw new Error(`Failed to update VPN sites: ${siteError}`)
-      }
     } else {
       // Create new VPN
       const savedVPN = await VPNService.createVPN(vpnData)
-
-      try {
-        // Add selected sites
-        for (const site of selectedSites.value) {
-          await VPNService.addSiteToVPN(savedVPN.id, site.id)
-        }
-      } catch (siteError) {
-        // If adding sites fails, delete the VPN to maintain consistency
-        await VPNService.deleteVPN(savedVPN.id)
-        throw new Error(`Failed to add sites to VPN: ${siteError}`)
-      }
+      // Include initial sites in a separate update
+      await VPNService.updateVPN(savedVPN.id, {
+        sites: selectedSites.value.map((site) => site.id),
+      })
     }
 
     // Refresh VPN list and close dialog
