@@ -1,4 +1,5 @@
 import json
+import ipaddress
 from django.http import JsonResponse
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
@@ -9,6 +10,7 @@ from django.core.exceptions import ValidationError
 from core.settings import Settings, get_settings
 from core.modules.controller import NetworkController
 from core.modules.discovery import NetworkDiscoverer
+from core.modules.discovery_scheduler import DiscoveryScheduler
 from core.modules.dhcp import DHCPServer
 from core.modules.tftp import TFTPServer
 
@@ -103,11 +105,22 @@ class SettingsSetupView(View):
                 'management_vrf', 'bgp_as'
             ]
             
-            # Check for missing fields
-            missing = [f for f in required_fields if f not in data]
+            # Check for missing or empty fields
+            missing = [f for f in required_fields if not data.get(f)]
             if missing:
                 return JsonResponse({
-                    'message': f'Missing required fields: {", ".join(missing)}'
+                    'message': f'Missing or empty required fields: {", ".join(missing)}'
+                }, status=400)
+
+            # Validate data types and formats
+            if not isinstance(data.get('bgp_as'), int):
+                return JsonResponse({
+                    'message': 'BGP AS must be an integer'
+                }, status=400)
+
+            if not isinstance(data.get('dhcp_lease_time'), int):
+                return JsonResponse({
+                    'message': 'DHCP lease time must be an integer'
                 }, status=400)
 
             # Create settings
@@ -116,7 +129,7 @@ class SettingsSetupView(View):
                 restconf_password=data['restconf_password'],
                 host_interface_id=data['host_interface_id'],
                 host_address=data['host_address'],
-                host_subnet_mask=data['host_subnet_mask'],
+                host_subnet_mask=str(ipaddress.IPv4Network(f"{data['host_address']}/{data['host_subnet_mask']}", strict=False)),
                 dhcp_provider_network_address=data['host_address'],
                 dhcp_provider_network_subnet_mask=data['host_subnet_mask'],
                 dhcp_sites_network_address=data['dhcp_sites_network_address'],
@@ -132,6 +145,7 @@ class SettingsSetupView(View):
             # Initialize services
             NetworkController.initialize()
             NetworkDiscoverer.initialize()
+            DiscoveryScheduler.start_periodic_discovery()
             DHCPServer.start()
             TFTPServer.start()
             
@@ -149,5 +163,5 @@ class SettingsSetupView(View):
             
         except Exception as e:
             return JsonResponse({
-                'message': str(e)
-            }, status=500)
+                'message': "Failed configuring settings"
+            }, status=400)
