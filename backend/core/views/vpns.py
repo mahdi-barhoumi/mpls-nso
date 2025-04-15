@@ -81,12 +81,51 @@ class VPNView(View):
             vpn = VPN.objects.get(id=vpn_id)
             data = json.loads(request.body)
             
-            # Update only allowed fields
+            # Update basic fields
             if 'name' in data:
                 vpn.name = data['name']
             if 'description' in data:
                 vpn.description = data['description']
                 
+            # Handle site updates if provided
+            if 'sites' in data:
+                new_site_ids = set(data['sites'])
+                current_site_ids = set(vpn.sites.values_list('id', flat=True))
+                
+                # Sites to add
+                sites_to_add = new_site_ids - current_site_ids
+                for site_id in sites_to_add:
+                    try:
+                        site = Site.objects.get(id=site_id)
+                        if site.customer != vpn.customer:
+                            return JsonResponse({
+                                'error': f'Site {site_id} belongs to a different customer'
+                            }, status=400)
+                        if not site.vrf or not site.ospf_process_id:
+                            return JsonResponse({
+                                'error': f'Site {site_id} routing must be enabled before adding to VPN'
+                            }, status=400)
+                        if not NetworkController.add_site_to_vpn(site, vpn):
+                            return JsonResponse({
+                                'error': f'Failed to add site {site_id} to VPN'
+                            }, status=500)
+                    except Site.DoesNotExist:
+                        return JsonResponse({
+                            'error': f'Site {site_id} not found'
+                        }, status=404)
+                
+                # Sites to remove
+                sites_to_remove = current_site_ids - new_site_ids
+                for site_id in sites_to_remove:
+                    try:
+                        site = Site.objects.get(id=site_id)
+                        if not NetworkController.remove_site_from_vpn(site, vpn):
+                            return JsonResponse({
+                                'error': f'Failed to remove site {site_id} from VPN'
+                            }, status=500)
+                    except Site.DoesNotExist:
+                        pass  # Skip if site no longer exists
+            
             vpn.save()
             
             return JsonResponse({
@@ -110,6 +149,7 @@ class VPNView(View):
             return JsonResponse({'error': 'Invalid JSON'}, status=400)
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
+
     def delete(self, request, vpn_id):
         try:
             vpn = VPN.objects.get(id=vpn_id)
@@ -181,4 +221,3 @@ class VPNSiteView(View):
             return JsonResponse({'error': 'VPN or Site not found'}, status=404)
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
-    
