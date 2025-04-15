@@ -23,12 +23,15 @@ export default {
     }
   },
 
-  async setupSettings(settingsData) {
+  async setupNetwork(networkData) {
     try {
-      const response = await axios.post(`${API_URL}settings/`, settingsData)
+      const response = await axios.post(`${API_URL}settings/`, networkData)
       return response.data
     } catch (error) {
-      console.error('Error setting up settings:', error)
+      console.error('Error setting up network:', error)
+      if (error.response && error.response.data) {
+        throw new Error(error.response.data.message || 'Network setup failed')
+      }
       throw error
     }
   },

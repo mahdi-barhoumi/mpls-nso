@@ -29,7 +29,7 @@ class _HostNetworkManager:
             parts = line.split()
             if len(parts) >= 4:
                 interfaces.append({
-                    'index': int(parts[0]),
+                    'id': int(parts[0]),
                     'state': parts[3],
                     'name': ' '.join(parts[4:])
                 })
@@ -45,7 +45,7 @@ class _HostNetworkManager:
             if len(parts) >= 6:
                 routes.append({
                     'prefix': parts[3],
-                    'index': parts[4],
+                    'id': parts[4],
                     'gateway': ' '.join(parts[5:])
                 })
         

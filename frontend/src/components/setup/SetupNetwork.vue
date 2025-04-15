@@ -1,8 +1,21 @@
 <template>
   <div
-    class="bg-surface-0 dark:bg-surface-900 py-9 px-8 sm:px-20 rounded-[2.5rem] w-full max-w-[48rem] mx-auto"
+    class="bg-surface-0 dark:bg-surface-900 py-12 px-8 sm:px-20 rounded-[2.5rem] w-full max-w-[48rem] mx-auto"
   >
-    <div class="grid gap-8">
+    <div
+      v-if="networkSettingsExist"
+      class="flex flex-col items-center justify-center text-center py-12"
+    >
+      <i class="pi pi-cog text-4xl text-primary mb-4"></i>
+      <div class="text-surface-900 dark:text-surface-0 font-medium text-2xl mb-2">
+        Network Settings Already Exist
+      </div>
+      <div class="text-muted-color mb-6">
+        Network settings have already been configured. You can proceed to the next step.
+      </div>
+      <Button label="Next" icon="pi pi-arrow-right" iconPos="right" @click="$emit('next')" />
+    </div>
+    <div v-else class="grid gap-8">
       <!-- Host Network Section -->
       <div class="col-span-12 md:col-span-6">
         <div class="bg-surface-50 dark:bg-surface-900 p-6 rounded-2xl h-full">
@@ -21,7 +34,7 @@
               <label for="host_interface" class="text-surface-600 dark:text-surface-200 font-medium"
                 >Host Interface</label
               >
-              <Dropdown
+              <Select
                 id="host_interface"
                 v-model="networkData.host_interface_id"
                 :options="hostInterfaces"
@@ -229,6 +242,7 @@ const emit = defineEmits(['prev', 'next'])
 
 const submitted = ref(false)
 const hostInterfaces = ref([])
+const networkSettingsExist = ref(false)
 
 const networkData = reactive({
   management_vrf: '',
@@ -244,6 +258,7 @@ const networkData = reactive({
 const handleNext = async () => {
   submitted.value = true
 
+  // Validation check
   if (
     !networkData.management_vrf ||
     !networkData.bgp_as ||
@@ -254,32 +269,52 @@ const handleNext = async () => {
     !networkData.dhcp_sites_network_subnet_mask ||
     !networkData.dhcp_lease_time
   ) {
+    toast.add({
+      severity: 'error',
+      summary: 'Validation Error',
+      detail: 'Please fill in all required fields',
+      life: 3000,
+    })
     return
   }
 
   try {
     await SetupService.setupNetwork(networkData)
     submitted.value = false
+    networkSettingsExist.value = true // Update local state on success
     emit('next')
   } catch (error) {
     toast.add({
       severity: 'error',
       summary: 'Error',
-      detail: error.response?.data?.message || 'Failed to save network settings',
+      detail: error.message || 'Failed to save network settings',
       life: 3000,
     })
+    // If settings already exist, update UI
+    if (
+      error.response?.status === 400 &&
+      error.response?.data?.message?.includes('already exist')
+    ) {
+      networkSettingsExist.value = true
+    }
   }
 }
 
 onMounted(async () => {
   try {
-    const interfaces = await SetupService.getHostInterfaces()
-    hostInterfaces.value = interfaces
+    const status = await SetupService.checkSetupStatus()
+    networkSettingsExist.value = status.has_settings
+
+    if (!networkSettingsExist.value) {
+      // Only fetch interfaces if settings don't exist
+      const interfaces = await SetupService.getHostInterfaces()
+      hostInterfaces.value = interfaces
+    }
   } catch (error) {
     toast.add({
       severity: 'error',
       summary: 'Error',
-      detail: 'Failed to fetch host interfaces',
+      detail: 'Failed to check setup status',
       life: 3000,
     })
   }
@@ -290,7 +325,8 @@ onMounted(async () => {
 :deep(.p-password-input),
 :deep(.p-inputtext),
 :deep(.p-inputnumber-input),
-:deep(.p-dropdown) {
+:deep(.p-dropdown),
+:deep(.p-select) {
   width: 100%;
 }
 :deep(.p-inputnumber) {

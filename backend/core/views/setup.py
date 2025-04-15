@@ -103,11 +103,22 @@ class SettingsSetupView(View):
                 'management_vrf', 'bgp_as'
             ]
             
-            # Check for missing fields
-            missing = [f for f in required_fields if f not in data]
+            # Check for missing or empty fields
+            missing = [f for f in required_fields if not data.get(f)]
             if missing:
                 return JsonResponse({
-                    'message': f'Missing required fields: {", ".join(missing)}'
+                    'message': f'Missing or empty required fields: {", ".join(missing)}'
+                }, status=400)
+
+            # Validate data types and formats
+            if not isinstance(data.get('bgp_as'), int):
+                return JsonResponse({
+                    'message': 'BGP AS must be an integer'
+                }, status=400)
+
+            if not isinstance(data.get('dhcp_lease_time'), int):
+                return JsonResponse({
+                    'message': 'DHCP lease time must be an integer'
                 }, status=400)
 
             # Create settings
