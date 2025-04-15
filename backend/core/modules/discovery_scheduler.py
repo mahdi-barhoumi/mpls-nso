@@ -48,6 +48,8 @@ class _DiscoveryScheduler:
     
     def start_periodic_discovery(self):
         with self.lock:
+            if not NetworkDiscoverer.initialized:
+                return
             if self.network_discovery_timer:
                 self.network_discovery_timer.cancel()
             
