@@ -9,9 +9,9 @@ from core.models import *
 def test_view(request):
     try:
 
-        router = Router.objects.get(pk=1)
+        interface = Interface.objects.get(pk=33)
 
-        data = router.delete()
+        data = NetworkController.enable_interface(interface)
 
         return JsonResponse(data, safe=False)
 
