@@ -110,6 +110,7 @@ class VPNView(View):
             return JsonResponse({'error': 'Invalid JSON'}, status=400)
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
+        
     def delete(self, request, vpn_id):
         try:
             vpn = VPN.objects.get(id=vpn_id)
