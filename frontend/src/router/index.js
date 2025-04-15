@@ -6,13 +6,20 @@ import axios from 'axios'
 const requiresSetup = async (to, from, next) => {
   try {
     const response = await axios.get('http://127.0.0.1:8000/api/setup/status/')
-    if (response.data.needs_setup && to.name !== 'setup') {
-      next({ name: 'setup' })
-    } else if (!response.data.needs_setup && to.name === 'setup') {
-      next({ name: 'dashboard' })
+    if (to.name === 'setup') {
+      // If setup is completed, redirect to dashboard
+      if (!response.data.needs_setup) {
+        next({ name: 'dashboard' })
+        return
+      }
     } else {
-      next()
+      // For other routes, redirect to setup if needed
+      if (response.data.needs_setup) {
+        next({ name: 'setup' })
+        return
+      }
     }
+    next()
   } catch (error) {
     console.error('Error checking setup status:', error)
     next()
@@ -26,6 +33,7 @@ const router = createRouter({
       path: '/setup',
       name: 'setup',
       component: () => import('@/views/Setup.vue'),
+      beforeEnter: requiresSetup,
     },
     {
       path: '/',
@@ -69,7 +77,6 @@ const router = createRouter({
       name: 'notfound',
       component: () => import('@/views/pages/NotFound.vue'),
     },
-
     {
       path: '/auth/login',
       name: 'login',
@@ -86,38 +93,11 @@ const router = createRouter({
       component: () => import('@/views/pages/auth/Error.vue'),
     },
     {
-      path: '/register',
-      name: 'register',
-      component: () => import('@/views/pages/auth/Register.vue'),
-    },
-    {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
       component: () => import('@/views/pages/NotFound.vue'),
     },
   ],
-})
-
-// Navigation guard to check setup status
-router.beforeEach(async (to, from, next) => {
-  if (to.path === '/setup') {
-    next()
-    return
-  }
-
-  try {
-    const response = await fetch('http://127.0.0.1:8000/api/setup/status/')
-    const data = await response.json()
-
-    if (data.needs_setup) {
-      next('/setup')
-    } else {
-      next()
-    }
-  } catch (error) {
-    console.error('Error checking setup status:', error)
-    next()
-  }
 })
 
 export default router
