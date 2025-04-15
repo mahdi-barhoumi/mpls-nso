@@ -945,14 +945,6 @@ class _NetworkController:
     def delete_vpn(self, vpn) -> bool:
         try:
             self.logger.info(f"Deleting VPN {vpn}")
-            
-            # Remove all sites from the VPN first
-            for site in vpn.sites.all():
-                if not self.remove_site_from_vpn(site, vpn):
-                    self.logger.error(f"Failed to remove site {site} from VPN {vpn}")
-                    return False
-                site.vpn = None
-                site.save()
 
             # Delete the VPN object
             vpn.delete()

@@ -28,6 +28,11 @@ const router = createRouter({
           name: 'sites',
           component: () => import('@/views/pages/SiteCrud.vue'),
         },
+        {
+          path: '/vpn',
+          name: 'vpns',
+          component: () => import('@/views/pages/VPNCrud.vue'),
+        },
       ],
     },
     {
