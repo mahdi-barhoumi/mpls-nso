@@ -1,4 +1,5 @@
 import json
+import ipaddress
 from django.http import JsonResponse
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
@@ -127,7 +128,7 @@ class SettingsSetupView(View):
                 restconf_password=data['restconf_password'],
                 host_interface_id=data['host_interface_id'],
                 host_address=data['host_address'],
-                host_subnet_mask=data['host_subnet_mask'],
+                host_subnet_mask=str(ipaddress.IPv4Network(f"{data['host_address']}/{data['host_subnet_mask']}", strict=False)),
                 dhcp_provider_network_address=data['host_address'],
                 dhcp_provider_network_subnet_mask=data['host_subnet_mask'],
                 dhcp_sites_network_address=data['dhcp_sites_network_address'],
