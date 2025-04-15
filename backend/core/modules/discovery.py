@@ -332,16 +332,14 @@ class _NetworkDiscoverer:
             )
             
             # Process route targets
-            address_family = vrf_def.get('address-family', {})
-            ipv4 = address_family.get('ipv4', {})
-            route_target = ipv4.get('route-target', {})
+            route_target = vrf_def.get('route-target', {})
             
             # Get existing route targets for this VRF
             existing_rts = set(RouteTarget.objects.filter(vrf=vrf).values_list('value', 'target_type'))
             discovered_rts = set()
-            
+
             # Import route targets
-            import_rts = route_target.get('import-route-target', {}).get('without-stitching', [])
+            import_rts = route_target.get('import', [])
             for rt in import_rts:
                 rt_value = rt.get('asn-ip', '')
                 if rt_value:
@@ -353,7 +351,7 @@ class _NetworkDiscoverer:
                     )
             
             # Export route targets
-            export_rts = route_target.get('export-route-target', {}).get('without-stitching', [])
+            export_rts = route_target.get('export', [])
             for rt in export_rts:
                 rt_value = rt.get('asn-ip', '')
                 if rt_value:
