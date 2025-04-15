@@ -7,18 +7,12 @@ from core.modules.discovery import NetworkDiscoverer
 @require_http_methods(["GET"])
 def discover_network(request):
     try:
-        # Initialize discovery service and discover network
-        discoverer = NetworkDiscoverer()
-        result = discoverer.discover_network()
+        result = NetworkDiscoverer.discover_network()
         
         # Return results
-        return JsonResponse({
-            'status': 'success',
-            'data': result
-        })
+        return JsonResponse(result)
     
-    except Exception as e:
+    except Exception as exception:
         return JsonResponse({
-            'status': 'error',
-            'message': str(e)
-        }, status=500)
+            'message': "Failed running network discovery"
+        }, status=400)

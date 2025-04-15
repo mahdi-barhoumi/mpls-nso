@@ -1,6 +1,7 @@
 images/*
-!images/.gitkeep
+!**/.gitkeep
+!**/__init__.py
 **/__pycache__/
 **/db.sqlite3
 backend/core/migrations/*
-!backend/core/migrations/__init__.py
+backend/logs/*

@@ -234,6 +234,10 @@ class Interface(ImmutableFieldMixin, models.Model):
     @property
     def is_connected(self):
         return self.connected_interfaces.exists() or self.connected_from.exists()
+    
+    @property
+    def is_management_interface(self):
+        return self.ip_address == self.router.management_ip_address
 
 class Site(models.Model):
     name = models.CharField(max_length=255, help_text="Site name")
@@ -328,6 +332,11 @@ class VPN(models.Model):
         return self.name
     
     def validate(self):
+        # Get settings first
+        settings = get_settings()
+        if not settings:
+            raise ValidationError("Settings must be set first before validating VPNs")
+
         # Collect all sites in this VPN
         vpn_sites = self.sites.all()
         
@@ -335,37 +344,23 @@ class VPN(models.Model):
         if vpn_sites.count() <= 1:
             return True
         
-        # First, validate that each site's VRF exports its own route distinguisher as a route target
+        # Generate the expected route target for this VPN
+        vpn_route_target = f"{settings.bgp_as}:{self.id}"
+        
+        # Validate that each site's VRF exports and imports the VPN route target
         for site in vpn_sites:
             if not site.vrf:
                 raise ValidationError(f"Site '{site.name}' has no VRF assigned and cannot participate in VPN '{self.name}'")
             
-            # Check if the VRF exports its own route distinguisher
+            # Check if the VRF exports the VPN route target
             export_targets = set(site.vrf.export_targets)
-            if site.vrf.route_distinguisher not in export_targets:
-                raise ValidationError(f"VRF '{site.vrf.name}' on site '{site.name}' must export its own route distinguisher '{site.vrf.route_distinguisher}' as a route target")
-        
-        # Then, validate that each site's VRF imports other sites' route distinguishers
-        for site in vpn_sites:
-            # Get all other sites in this VPN
-            other_sites = vpn_sites.exclude(pk=site.pk)
+            if vpn_route_target not in export_targets:
+                raise ValidationError(f"VRF '{site.vrf.name}' on site '{site.name}' must export VPN route target '{vpn_route_target}'")
             
-            # Collect all route distinguishers from other sites' VRFs that this site's VRF should import
-            required_imports = set()
-            for other_site in other_sites:
-                if other_site.vrf:
-                    # Add the route distinguisher as a required import route target
-                    required_imports.add(other_site.vrf.route_distinguisher)
-            
-            # Get current import RTs for this site's VRF
-            current_imports = set(site.vrf.import_targets)
-            
-            # Check if any required RTs are missing
-            missing_rts = required_imports - current_imports
-            
-            if missing_rts:
-                missing_list = ", ".join(missing_rts)
-                raise ValidationError(f"VRF '{site.vrf.name}' on site '{site.name}' is missing required import route targets: {missing_list}")
+            # Check if the VRF imports the VPN route target
+            import_targets = set(site.vrf.import_targets)
+            if vpn_route_target not in import_targets:
+                raise ValidationError(f"VRF '{site.vrf.name}' on site '{site.name}' must import VPN route target '{vpn_route_target}'")
         
         return True
 

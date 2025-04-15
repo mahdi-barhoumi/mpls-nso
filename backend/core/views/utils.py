@@ -1,5 +1,3 @@
-import re
-import subprocess
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
@@ -14,13 +12,9 @@ def list_host_interfaces(request):
         # Sort interfaces by ID
         interfaces.sort(key=lambda x: x['index'])
         
-        return JsonResponse({
-            'status': 'success',
-            'interfaces': interfaces
-        })
+        return JsonResponse(interfaces, status=200, safe=False)
 
-    except Exception as e:
+    except Exception as exception:
         return JsonResponse({
-            'status': 'error',
-            'message': f'Unexpected error: {str(e)}'
-        }, status=500)
+            'message': "Failed fetching host interfaces"
+        }, status=400)

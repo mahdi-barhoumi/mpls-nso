@@ -3,6 +3,8 @@ import os
 import struct
 import logging
 from threading import Thread, Event
+from django.apps import apps
+from core.settings import get_settings
 
 # TFTP Opcodes
 TFTP_RRQ = 1    # Read Request
@@ -16,7 +18,7 @@ TFTP_ERROR_ACCESS_VIOLATION = 2
 TFTP_ERROR_ILLEGAL_OPERATION = 4
 TFTP_ERROR_UNKNOWN_TRANSFER_ID = 5
 
-class TFTPServer:
+class _TFTPServer:
     def __init__(self):
         self.root_dir = None
         self.server_ip = None
@@ -147,20 +149,26 @@ class TFTPServer:
             self.running = False
             self.logger.info('TFTP server stopped')
     
-    def start(self, root_dir, server_ip, port=69, max_block_size=512):
+    def start(self, root_dir=None, server_ip=None, port=69, max_block_size=512):
         if self.running:
             self.logger.warning("TFTP server is already running")
             return False
             
-        # Convert relative path to absolute path
-        self.root_dir = os.path.abspath(root_dir)
-        self.server_ip = server_ip
-        self.port = port
-        self.max_block_size = max_block_size
-        self.stop_event.clear()
-        
-        # Ensure root directory exists
         try:
+            # Get system settings
+            settings = get_settings()
+            if not settings:
+                self.logger.warning("Cannot start TFTP server: No system settings found")
+                return False
+
+            # Set server parameters using provided values or defaults
+            self.root_dir = root_dir or os.path.join(apps.get_app_config('core').path, 'data\\tftp-files')
+            self.server_ip = server_ip or settings.host_address
+            self.port = port
+            self.max_block_size = max_block_size
+            self.stop_event.clear()
+            
+            # Ensure root directory exists
             os.makedirs(self.root_dir, exist_ok=True)
             
             # Create main listening socket
@@ -222,6 +230,7 @@ class TFTPServer:
             return []
             
         files = []
+        
         try:
             for file in os.listdir(self.root_dir):
                 file_path = os.path.join(self.root_dir, file)
@@ -231,7 +240,39 @@ class TFTPServer:
                         'size': os.path.getsize(file_path),
                         'modified': os.path.getmtime(file_path)
                     })
+
         except Exception as e:
             self.logger.error(f"Error listing files: {e}")
             
         return files
+
+    def add_file(self, file):
+        if not self.root_dir:
+            raise Exception('TFTP server root directory not set')
+
+        filename = file.name
+        file_path = os.path.join(self.root_dir, filename)
+
+        with open(file_path, 'wb+') as destination:
+            for chunk in file.chunks():
+                destination.write(chunk)
+
+        return filename
+
+    def delete_file(self, filename):
+        if not self.root_dir:
+            raise Exception('TFTP server root directory not set')
+
+        file_path = os.path.realpath(os.path.normpath(os.path.join(self.root_dir, filename)))
+
+        if not file_path.startswith(self.root_dir):
+            raise Exception('Access denied')
+
+        if not os.path.exists(file_path):
+            raise Exception(f'File {filename} not found')
+
+        os.remove(file_path)
+        return filename
+
+TFTPServer = _TFTPServer()
+TFTPServer.start()

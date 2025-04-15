@@ -1,5 +1,4 @@
 from django.http import JsonResponse
-from django.core.serializers import serialize
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from core.modules.controller import NetworkController
@@ -10,9 +9,9 @@ from core.models import *
 def test_view(request):
     try:
 
-        interface = Interface.objects.get(pk=34)
+        router = Router.objects.get(pk=1)
 
-        data = NetworkController.create_or_update_interface(interface)
+        data = NetworkController.set_router_hostname(router, "PE1")
 
         return JsonResponse(data, safe=False)
 

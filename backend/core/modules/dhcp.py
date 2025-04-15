@@ -6,6 +6,8 @@ from threading import Thread, Event
 from datetime import timedelta
 from django.utils import timezone
 from core.models import DHCPLease, DHCPScope
+from core.modules.discovery_scheduler import DiscoveryScheduler
+from core.settings import get_settings
 
 # DHCP Message Type Options
 DHCP_DISCOVER = 1
@@ -32,7 +34,7 @@ DHCP_TFTP_SERVER_IP = 150
 # Fixed config filename
 CONFIG_FILENAME = "router-confg"
 
-class DHCPServer:
+class _DHCPServer:
     def __init__(self): 
         self.server_ip = None
         self.tftp_server_ip = None
@@ -276,6 +278,9 @@ class DHCPServer:
             
             self.logger.info(f'Acknowledging IP {available_ip} to client {client_mac} (Hostname: {hostname})')
             
+            # Schedule discovery for the newly acknowledged IP
+            DiscoveryScheduler.schedule_discovery(available_ip)
+            
             ack_packet = self.create_dhcp_packet(data, DHCP_ACK, available_ip)
             
             if giaddr != '0.0.0.0':
@@ -348,18 +353,24 @@ class DHCPServer:
             self.running = False
             self.logger.info('DHCP server stopped')
     
-    def start(self, server_ip, main_scope_address, main_scope_subnet_mask, tftp_server_ip=None, lease_time=86400, config_filename=CONFIG_FILENAME):
+    def start(self, server_ip=None, tftp_server_ip=None, main_scope_address=None, main_scope_subnet_mask=None, lease_time=None, config_filename=CONFIG_FILENAME):
         if self.running:
             self.logger.warning("DHCP server is already running")
             return False
         
         try:
-            # Set server parameters
-            self.server_ip = server_ip
-            self.tftp_server_ip = tftp_server_ip or server_ip
-            self.main_scope_address = main_scope_address
-            self.main_scope_subnet_mask = main_scope_subnet_mask
-            self.lease_time = lease_time
+            # Get system settings
+            settings = get_settings()
+            if not settings:
+                self.logger.warning("Cannot start DHCP server: No system settings found")
+                return False
+            
+            # Set server parameters using provided values or defaults from settings
+            self.server_ip = server_ip or settings.host_address
+            self.tftp_server_ip = tftp_server_ip or settings.host_address
+            self.main_scope_address = main_scope_address or settings.dhcp_provider_network_address
+            self.main_scope_subnet_mask = main_scope_subnet_mask or settings.dhcp_provider_network_subnet_mask
+            self.lease_time = lease_time or settings.dhcp_lease_time
             self.config_filename = config_filename
             
             self.stop_event.clear()
@@ -428,3 +439,6 @@ class DHCPServer:
                 'expiry': lease.expiry_time.timestamp()
             }
         return leases
+
+DHCPServer = _DHCPServer()
+DHCPServer.start()
