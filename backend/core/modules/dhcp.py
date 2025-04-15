@@ -285,7 +285,7 @@ class _DHCPServer:
         if available_ip and (not requested_ip or available_ip == requested_ip):
             # Check if this is the first time this MAC has received a lease
             is_first_time = not self.get_lease_by_mac(client_mac)
-
+            
             self.create_or_update_lease(
                 mac_address=client_mac,
                 ip_address=available_ip,
@@ -294,7 +294,7 @@ class _DHCPServer:
             )
             
             self.logger.info(f'Acknowledging IP {available_ip}/{subnet_mask} to client {client_mac} (Hostname: {hostname})')
-            
+
             # Schedule discovery with is_first_time flag
             DiscoveryScheduler.schedule_discovery(available_ip, is_first_time=is_first_time)
             
