@@ -6,6 +6,12 @@
         <Button icon="pi pi-search-plus" class="p-button-secondary" @click="zoomIn" />
         <Button icon="pi pi-search-minus" class="p-button-secondary" @click="zoomOut" />
         <Button label="Reset" icon="pi pi-refresh" class="p-button-secondary" @click="resetView" />
+        <Button
+          label="Save Layout"
+          icon="pi pi-save"
+          class="p-button-secondary"
+          @click="saveLayout"
+        />
       </div>
     </div>
 
@@ -17,8 +23,10 @@
         :edges="graphData.edges"
         :layouts="layouts"
         :configs="configs"
+        @mouseup="saveLayout"
         @node-click="onNodeClick"
         @edge-click="onEdgeClick"
+        @layout-updated="onLayoutUpdated"
         class="h-full w-full"
       >
         <!-- Define custom node rendering -->
@@ -115,6 +123,12 @@ import { MappingService } from '@/service/MappingService.js'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 
+const STORAGE_KEYS = {
+  NODES: 'network-graph-nodes',
+  LAYOUTS: 'network-graph-layouts',
+  FETCHED_NODES: 'network-graph-fetched-nodes',
+}
+
 export default {
   name: 'NetworkMap',
   components: {
@@ -133,6 +147,7 @@ export default {
       layouts: {
         nodes: {},
       },
+      fetchedNodeIds: new Set(),
       configs: {
         view: {
           panEnabled: true,
@@ -154,6 +169,7 @@ export default {
               color: '#000',
             },
           },
+          draggable: true, // Ensure nodes are draggable
         },
         edge: {
           normal: {
@@ -167,11 +183,16 @@ export default {
         },
       },
       selectedElement: null,
+      saveDebounce: null,
     }
   },
   created() {
+    // Load persisted data
+    this.loadPersistedData()
+
     // Initial fetch
     this.fetchNetworkData()
+
     // Set up polling every 30 seconds
     this.pollingInterval = setInterval(() => {
       this.fetchNetworkData()
@@ -182,16 +203,79 @@ export default {
     if (this.pollingInterval) {
       clearInterval(this.pollingInterval)
     }
+
+    // Clear any pending debounce
+    if (this.saveDebounce) {
+      clearTimeout(this.saveDebounce)
+    }
   },
   methods: {
+    loadPersistedData() {
+      try {
+        // Load previously fetched node IDs
+        const fetchedNodesJson = localStorage.getItem(STORAGE_KEYS.FETCHED_NODES)
+        if (fetchedNodesJson) {
+          this.fetchedNodeIds = new Set(JSON.parse(fetchedNodesJson))
+        }
+
+        // Load persisted layouts
+        const layoutsJson = localStorage.getItem(STORAGE_KEYS.LAYOUTS)
+        if (layoutsJson) {
+          this.layouts.nodes = JSON.parse(layoutsJson)
+        }
+
+        // Load persisted nodes
+        const nodesJson = localStorage.getItem(STORAGE_KEYS.NODES)
+        if (nodesJson) {
+          this.graphData.nodes = JSON.parse(nodesJson)
+        }
+      } catch (error) {
+        console.error('Error loading persisted data:', error)
+        // If there's an error loading persisted data, fallback to default behavior
+        this.fetchedNodeIds = new Set()
+        this.layouts = { nodes: {} }
+      }
+    },
+
+    persistData() {
+      try {
+        // Save fetched node IDs
+        localStorage.setItem(STORAGE_KEYS.FETCHED_NODES, JSON.stringify([...this.fetchedNodeIds]))
+
+        // Save layouts
+        localStorage.setItem(STORAGE_KEYS.LAYOUTS, JSON.stringify(this.layouts.nodes))
+
+        // Save nodes
+        localStorage.setItem(STORAGE_KEYS.NODES, JSON.stringify(this.graphData.nodes))
+      } catch (error) {
+        console.error('Error persisting data:', error)
+      }
+    },
+
+    // Use both event handlers to ensure we catch the drag event regardless of library version
+    onLayoutUpdated(event) {
+      // This is called whenever the layout is changed
+      console.log('Layout updated:', event)
+
+      // Debounce the save operation to avoid excessive writes
+      if (this.saveDebounce) {
+        clearTimeout(this.saveDebounce)
+      }
+
+      this.saveDebounce = setTimeout(() => {
+        this.persistData()
+      }, 500) // Save after 500ms of inactivity
+    },
+
     async fetchNetworkData() {
       try {
         const data = await MappingService.fetchNetworkData()
 
-        // Convert arrays to objects for v-network-graph
-        const nodesObj = {}
+        // Convert arrays to objects for v-network-graph, maintaining previously fetched nodes
+        const nodesObj = { ...this.graphData.nodes }
         data.nodes.forEach((node) => {
           nodesObj[node.id] = node
+          this.fetchedNodeIds.add(node.id)
         })
 
         const edgesObj = {}
@@ -204,7 +288,11 @@ export default {
           edges: edgesObj,
         }
 
-        this.generateCircularLayout()
+        // Only generate circular layout for nodes that don't have saved positions
+        this.generateLayoutForNewNodes(Object.keys(nodesObj))
+
+        // Persist the updated data
+        this.persistData()
 
         // Ensure the graph is centered after data is loaded
         this.$nextTick(() => {
@@ -214,6 +302,31 @@ export default {
         console.error('Error fetching network data:', error)
       }
     },
+
+    generateLayoutForNewNodes(nodeIds) {
+      // Only generate layout for nodes that don't already have positions
+      const newNodeIds = nodeIds.filter((id) => !this.layouts.nodes[id])
+
+      if (newNodeIds.length === 0) return
+
+      const centerX = 500
+      const centerY = 300
+      const radius = 250
+
+      // Keep existing layouts and only add new ones
+      const updatedLayouts = { ...this.layouts.nodes }
+
+      newNodeIds.forEach((id, index) => {
+        const angle = (index / newNodeIds.length) * 2 * Math.PI
+        updatedLayouts[id] = {
+          x: centerX + radius * Math.cos(angle),
+          y: centerY + radius * Math.sin(angle),
+        }
+      })
+
+      this.layouts = { nodes: updatedLayouts }
+    },
+
     generateCircularLayout() {
       const nodeIds = Object.keys(this.graphData.nodes)
       const centerX = 500
@@ -230,7 +343,14 @@ export default {
       })
 
       this.layouts = { nodes: layouts }
+      this.persistData()
     },
+
+    saveLayout() {
+      this.persistData()
+      // Show a small success notification or toast here
+    },
+
     getNodeIcon(nodeId) {
       const node = this.graphData.nodes[nodeId]
       if (node.role === 'P') {
@@ -240,10 +360,12 @@ export default {
       }
       return '/demo/images/routers/router-in-building.svg'
     },
+
     getNodeName(nodeId) {
       const node = this.graphData.nodes[nodeId]
       return node.label
     },
+
     onNodeClick(event) {
       const nodeId = event.node
       const node = this.graphData.nodes[nodeId]
@@ -254,6 +376,7 @@ export default {
         }
       }
     },
+
     onEdgeClick(event) {
       const edgeId = event.edge
       const edge = this.graphData.edges[edgeId]
@@ -264,15 +387,19 @@ export default {
         }
       }
     },
+
     closeDetails() {
       this.selectedElement = null
     },
+
     zoomIn() {
       this.$refs.graph.zoomIn()
     },
+
     zoomOut() {
       this.$refs.graph.zoomOut()
     },
+
     resetView() {
       this.$refs.graph.fitToContents()
     },
