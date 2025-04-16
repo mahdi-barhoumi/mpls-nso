@@ -13,7 +13,7 @@ def test_view(request):
         interface = Interface.objects.get(pk=33)
         interface = Interface.objects.get(pk=33)
 
-        data = NetworkController.enable_interface(interface)
+        data = NetworkDiscoverer.discover_single_device("172.0.0.6")
 
         return JsonResponse(data, safe=False)
 
