@@ -234,7 +234,7 @@ class Interface(ImmutableFieldMixin, models.Model):
 
     @property
     def is_connected(self):
-        return self.connected_interfaces.exists() or self.connected_interfaces.exists()
+        return self.connected_interfaces.exists()
     
     @property
     def is_management_interface(self):
