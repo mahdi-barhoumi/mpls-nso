@@ -5,8 +5,8 @@ import { ref } from 'vue'
 
 const selectedRouter = ref(null)
 
-const handleRouterSelect = (routerId) => {
-  selectedRouter.value = routerId
+const handleRouterSelect = (router) => {
+  selectedRouter.value = router
 }
 </script>
 

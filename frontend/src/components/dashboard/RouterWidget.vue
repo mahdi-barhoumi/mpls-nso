@@ -1,40 +1,107 @@
 <template>
-  <div class="surface-card p-4 border-round shadow-2">
-    <div v-if="selectedRouter">
-      <h2 class="text-xl font-bold mb-4">Router Details</h2>
-      <div class="grid">
-        <div class="col-12 mb-3">
-          <span class="font-bold">Hostname: </span>
-          <span>{{ routerData?.hostname }}</span>
+  <div class="col-span-12">
+    <div class="card mb-1 p-3" v-if="selectedRouter">
+      <div class="flex justify-between items-center mb-2">
+        <div>
+          <span class="block text-muted-color font-medium mb-2">Router Details</span>
+          <div class="text-surface-900 dark:text-surface-0 font-medium text-lg">
+            {{ routerData?.hostname }}
+          </div>
         </div>
-        <div class="col-12 mb-3">
-          <span class="font-bold">Role: </span>
-          <span>{{ routerData?.role }}</span>
+        <div
+          class="flex items-center justify-center bg-blue-100 dark:bg-blue-400/10 rounded-border"
+          style="width: 2rem; height: 2rem"
+        >
+          <i class="pi pi-server text-blue-500 !text-lg"></i>
         </div>
-        <div class="col-12 mb-3">
-          <span class="font-bold">Management IP: </span>
-          <span>{{ routerData?.management_ip }}</span>
+      </div>
+
+      <div class="grid gap-2">
+        <div class="col-12 md:col-4 mb-2">
+          <div class="card mb-0 p-2">
+            <div class="flex justify-between items-center mb-1">
+              <div>
+                <span class="block text-muted-color font-medium text-sm">Role</span>
+                <div class="text-surface-900 dark:text-surface-0 text-sm">
+                  {{ routerData?.role }}
+                </div>
+              </div>
+              <div
+                class="flex items-center justify-center bg-orange-100 dark:bg-orange-400/10 rounded-border"
+                style="width: 1.5rem; height: 1.5rem"
+              >
+                <i class="pi pi-cog text-orange-500 text-sm"></i>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="col-12 mb-3">
-          <h3 class="text-lg font-bold mb-2">Interfaces</h3>
-          <div v-if="interfaces" class="surface-100 p-3 border-round">
-            <div
-              v-for="iface in interfaces"
-              :key="iface.name"
-              class="mb-3 p-2 border-bottom-1 surface-border"
-            >
-              <div class="font-bold">{{ iface.name }}</div>
-              <div class="pl-3">
-                <div v-if="iface.ip_address">IP: {{ iface.ip_address }}</div>
-                <div>Type: {{ iface.category }}</div>
-                <div>Status: {{ iface.is_connected ? 'Connected' : 'Not Connected' }}</div>
+
+        <div class="col-12 md:col-4 mb-2">
+          <div class="card mb-0 p-2">
+            <div class="flex justify-between items-center mb-1">
+              <div>
+                <span class="block text-muted-color font-medium text-sm">Management IP</span>
+                <div class="text-surface-900 dark:text-surface-0 text-sm">
+                  {{ routerData?.management_ip }}
+                </div>
+              </div>
+              <div
+                class="flex items-center justify-center bg-cyan-100 dark:bg-cyan-400/10 rounded-border"
+                style="width: 1.5rem; height: 1.5rem"
+              >
+                <i class="pi pi-desktop text-cyan-500 text-sm"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12">
+          <div class="card mb-0 p-2">
+            <div class="flex justify-between items-center mb-2">
+              <span class="text-lg font-medium">Interfaces</span>
+              <div
+                class="flex items-center justify-center bg-purple-100 dark:bg-purple-400/10 rounded-border"
+                style="width: 1.5rem; height: 1.5rem"
+              >
+                <i class="pi pi-sitemap text-purple-500 text-sm"></i>
+              </div>
+            </div>
+
+            <div v-if="interfaces" class="grid gap-2 interfaces-scroll">
+              <div
+                v-for="iface in interfaces"
+                :key="iface.name"
+                class="col-12 sm:col-6 md:col-4 xl:col-3"
+              >
+                <div class="surface-100 p-2 border-round mb-1">
+                  <div class="font-medium mb-1 text-sm">{{ iface.name }}</div>
+                  <div class="text-xs text-muted-color">
+                    <div v-if="iface.ip_address">IP: {{ iface.ip_address }}</div>
+                    <div>Type: {{ iface.category }}</div>
+                    <div class="flex align-items-center gap-1">
+                      Status:
+                      <i
+                        :class="[
+                          'pi',
+                          iface.is_connected
+                            ? 'pi-check-circle text-green-500'
+                            : 'pi-times-circle text-red-500',
+                        ]"
+                      ></i>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
     </div>
-    <div v-else class="text-center p-4 text-500">Select a router from the map to view details</div>
+    <div v-else class="card mb-0 p-4">
+      <div class="text-center text-muted-color text-sm">
+        Select a router from the map to view details
+      </div>
+    </div>
   </div>
 </template>
 
@@ -71,8 +138,7 @@ export default {
   methods: {
     async fetchRouterData(id) {
       try {
-        const routers = await RouterService.getRouters()
-        this.routerData = routers.find((r) => r.id === id)
+        this.routerData = await RouterService.getRouterById(id)
         this.interfaces = await RouterService.getRouterInterfaces(id)
       } catch (error) {
         console.error('Error fetching router data:', error)
@@ -86,5 +152,28 @@ export default {
 .surface-card {
   height: 100%;
   overflow-y: auto;
+}
+
+/* Make interfaces section scrollable and compact */
+.interfaces-scroll {
+  max-height: 220px;
+  overflow-y: auto;
+  margin-bottom: 0.5rem;
+  padding-right: 2px;
+}
+
+/* Reduce card and grid spacing for compactness */
+.card {
+  padding: 0.75rem !important;
+}
+.grid {
+  margin: 0 !important;
+  gap: 0.5rem !important;
+}
+.col-12,
+.md\:col-4,
+.sm\:col-6,
+.xl\:col-3 {
+  padding: 0 !important;
 }
 </style>

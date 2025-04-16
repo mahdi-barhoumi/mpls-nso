@@ -46,6 +46,21 @@ export default {
   },
 
   /**
+   * Fetch a router by its ID
+   * @param {string} routerId - ID of the router to fetch
+   * @returns {Promise<Object>} Router details
+   */
+  async getRouterById(routerId) {
+    try {
+      const response = await axios.get(`${API_URL}${routerId}/`)
+      return response.data
+    } catch (error) {
+      console.error(`Error fetching router ${routerId}:`, error)
+      throw error
+    }
+  },
+
+  /**
    * Fetch interfaces for a specific router
    * @param {string} routerId - ID of the router
    * @returns {Promise<Array>} List of interfaces for the router

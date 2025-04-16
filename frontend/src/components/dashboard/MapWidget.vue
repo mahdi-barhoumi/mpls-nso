@@ -1,92 +1,137 @@
 <template>
-  <div class="network-container">
-    <!-- Toolbar for zoom and filtering -->
-    <div class="p-4 flex items-center justify-between surface-card shadow-2 border-round">
-      <div class="flex gap-1">
-        <Button icon="pi pi-search-plus" class="p-button-secondary" @click="zoomIn" />
-        <Button icon="pi pi-search-minus" class="p-button-secondary" @click="zoomOut" />
-        <Button label="Reset" icon="pi pi-refresh" class="p-button-secondary" @click="resetView" />
-        <Button
-          label="Save Layout"
-          icon="pi pi-save"
-          class="p-button-secondary"
-          @click="saveLayout"
-        />
-      </div>
-    </div>
-
-    <!-- Network Graph -->
-    <div class="network-graph-container surface-card shadow-2 border-round mt-3">
-      <v-network-graph
-        ref="graph"
-        :nodes="graphData.nodes"
-        :edges="graphData.edges"
-        :layouts="layouts"
-        :configs="configs"
-        :event-handlers="eventHandlers"
-        @mouseup="saveLayout"
-        @layout-updated="onLayoutUpdated"
-        class="h-full w-full"
-      >
-        <!-- Define custom node rendering -->
-        <template #override-node="{ nodeId, scale = 1, config, ...slotProps }">
-          <!-- <circle :r="config.radius * scale" :fill="`var(--p-primary-color)`" v-bind="slotProps" /> -->
-          <text
-            :x="0"
-            :y="(config.radius + 10) * scale"
-            :font-size="12 * scale"
-            text-anchor="middle"
-            dominant-baseline="central"
-            fill="var(--p-blue-600)"
+  <div class="col-span-12">
+    <div class="card mb-3">
+      <div class="flex justify-between mb-4">
+        <div>
+          <span class="block text-muted-color font-medium mb-2">Network Topology</span>
+          <div class="flex gap-2">
+            <div class="flex items-center gap-2">
+              <div
+                class="flex items-center justify-center bg-blue-100 dark:bg-blue-400/10 rounded-border"
+                style="width: 1.5rem; height: 1.5rem"
+              >
+                <i class="pi pi-circle-fill text-blue-500 text-xs"></i>
+              </div>
+              <span class="text-sm">P Router</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <div
+                class="flex items-center justify-center bg-orange-100 dark:bg-orange-400/10 rounded-border"
+                style="width: 1.5rem; height: 1.5rem"
+              >
+                <i class="pi pi-circle-fill text-orange-500 text-xs"></i>
+              </div>
+              <span class="text-sm">PE Router</span>
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <div
+            class="flex items-center justify-center bg-purple-100 dark:bg-purple-400/10 rounded-border p-2"
           >
-            {{ getNodeName(nodeId) }}
-          </text>
-          <image
-            :xlink:href="getNodeIcon(nodeId)"
-            :x="-(config.radius - 8) * scale"
-            :y="-(config.radius - 8) * scale"
-            :width="(config.radius - 8) * 2 * scale"
-            :height="(config.radius - 8) * 2 * scale"
-          />
-        </template>
+            <Button
+              icon="pi pi-search-plus"
+              class="p-button-text p-button-rounded"
+              @click="zoomIn"
+            />
+          </div>
+          <div
+            class="flex items-center justify-center bg-cyan-100 dark:bg-cyan-400/10 rounded-border p-2"
+          >
+            <Button
+              icon="pi pi-search-minus"
+              class="p-button-text p-button-rounded"
+              @click="zoomOut"
+            />
+          </div>
+          <div
+            class="flex items-center justify-center bg-orange-100 dark:bg-orange-400/10 rounded-border p-2"
+          >
+            <Button
+              icon="pi pi-refresh"
+              class="p-button-text p-button-rounded"
+              @click="resetView"
+            />
+          </div>
+          <div
+            class="flex items-center justify-center bg-blue-100 dark:bg-blue-400/10 rounded-border p-2"
+          >
+            <Button icon="pi pi-save" class="p-button-text p-button-rounded" @click="saveLayout" />
+          </div>
+        </div>
+      </div>
 
-        <!-- Define custom edge labels -->
-        <template #edge-label="{ edge, scale = 1, ...slotProps }">
-          <v-edge-label
-            v-if="
-              edge.sourceInterfaceType === 'physical' && edge.targetInterfaceType === 'physical'
-            "
-            :text="edge.subnet"
-            align="center"
-            vertical-align="above"
-            v-bind="slotProps"
-            fill="var(--p-primary-500)"
-            :font-size="10 * (scale || 1)"
-          />
-          <v-edge-label
-            v-if="
-              edge.sourceInterfaceType === 'physical' && edge.targetInterfaceType === 'physical'
-            "
-            :text="edge.sourceInterfaceName"
-            align="source"
-            vertical-align="above"
-            v-bind="slotProps"
-            fill="var(--text-color)"
-            :font-size="10 * (scale || 1)"
-          />
-          <v-edge-label
-            v-if="
-              edge.sourceInterfaceType === 'physical' && edge.targetInterfaceType === 'physical'
-            "
-            :text="edge.targetInterfaceName"
-            align="target"
-            vertical-align="above"
-            v-bind="slotProps"
-            :font-size="10 * (scale || 1)"
-            fill="var(--text-color)"
-          />
-        </template>
-      </v-network-graph>
+      <div class="network-graph-container border-round mt-3">
+        <v-network-graph
+          ref="graph"
+          :nodes="graphData.nodes"
+          :edges="graphData.edges"
+          :layouts="layouts"
+          :configs="configs"
+          :event-handlers="eventHandlers"
+          @mouseup="saveLayout"
+          @layout-updated="onLayoutUpdated"
+          class="h-full w-full"
+        >
+          <!-- Define custom node rendering -->
+          <template #override-node="{ nodeId, scale = 1, config, ...slotProps }">
+            <text
+              :x="0"
+              :y="(config.radius + 10) * scale"
+              :font-size="12 * scale"
+              text-anchor="middle"
+              dominant-baseline="central"
+              fill="var(--p-blue-600)"
+            >
+              {{ getNodeName(nodeId) }}
+            </text>
+            <image
+              :xlink:href="getNodeIcon(nodeId)"
+              :x="-(config.radius - 8) * scale"
+              :y="-(config.radius - 8) * scale"
+              :width="(config.radius - 8) * 2 * scale"
+              :height="(config.radius - 8) * 2 * scale"
+            />
+          </template>
+
+          <!-- Define custom edge labels -->
+          <template #edge-label="{ edge, scale = 1, ...slotProps }">
+            <v-edge-label
+              v-if="
+                edge.sourceInterfaceType === 'physical' && edge.targetInterfaceType === 'physical'
+              "
+              :text="edge.subnet"
+              align="center"
+              vertical-align="above"
+              v-bind="slotProps"
+              fill="var(--p-primary-500)"
+              :font-size="10 * (scale || 1)"
+            />
+            <v-edge-label
+              v-if="
+                edge.sourceInterfaceType === 'physical' && edge.targetInterfaceType === 'physical'
+              "
+              :text="edge.sourceInterfaceName"
+              align="source"
+              vertical-align="above"
+              v-bind="slotProps"
+              fill="var(--text-color)"
+              :font-size="10 * (scale || 1)"
+            />
+            <v-edge-label
+              v-if="
+                edge.sourceInterfaceType === 'physical' && edge.targetInterfaceType === 'physical'
+              "
+              :text="edge.targetInterfaceName"
+              align="target"
+              vertical-align="above"
+              v-bind="slotProps"
+              :font-size="10 * (scale || 1)"
+              fill="var(--text-color)"
+            />
+          </template>
+        </v-network-graph>
+      </div>
     </div>
   </div>
 </template>
@@ -367,6 +412,17 @@ export default {
 <style scoped>
 .network-graph-container {
   height: 600px;
-  background-color: var(--surface-card);
+  background-color: var(--surface-ground);
+  border: 1px solid var(--surface-border);
+}
+
+.p-button.p-button-text {
+  color: var(--primary-color);
+  padding: 0;
+}
+
+.p-button.p-button-text:hover {
+  background: transparent;
+  color: var(--primary-600);
 }
 </style>
