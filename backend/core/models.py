@@ -187,7 +187,7 @@ class Interface(ImmutableFieldMixin, models.Model):
     dhcp_helper_address = models.GenericIPAddressField(null=True, protocol='ipv4', help_text="DHCP helper address if applicable")
     vlan = models.PositiveIntegerField(null=True, validators=[MinValueValidator(1), MaxValueValidator(4094)], help_text="VLAN if applicable")
     vrf = models.ForeignKey(VRF, null=True, on_delete=models.SET_NULL, related_name='interfaces')
-    connected_interfaces = models.ManyToManyField('self', symmetrical=False, related_name='connected_from')
+    connected_interfaces = models.ManyToManyField('self', symmetrical=True, related_name='connected_from')
     first_discovered = models.DateTimeField(auto_now_add=True, help_text="When this interface was first discovered")
     last_discovered = models.DateTimeField(auto_now=True, help_text="When this interface was last discovered")
     
@@ -251,6 +251,7 @@ class Site(models.Model):
     vrf = models.ForeignKey(VRF, null=True, on_delete=models.SET_NULL, related_name='sites', help_text="VRF for this site")
     ospf_process_id = models.PositiveIntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(65535)], help_text="OSPF process ID used by the PE router for this site's routing")
     router = models.ForeignKey(Router, null=True, on_delete=models.SET_NULL, related_name='sites', help_text="Customer edge router for this site")
+    has_routing = models.BooleanField(default=False, help_text="Whether routing is enabled for this site")
 
     class Meta:
         unique_together = [['customer', 'name']]
