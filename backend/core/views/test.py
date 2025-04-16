@@ -12,11 +12,7 @@ def test_view(request):
 
         interface = Interface.objects.get(pk=33)
 
-<<<<<<< HEAD
-        data = NetworkController.enable_interface(interface)
-=======
         data = NetworkDiscoverer.discover_single_device("172.0.0.6")
->>>>>>> origin/28-fix-site-deletion-and-interface-connection
 
         return JsonResponse(data, safe=False)
 

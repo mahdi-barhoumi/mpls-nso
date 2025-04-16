@@ -7,22 +7,14 @@ import { useToast } from 'primevue/usetoast'
 
 const router = useRouter()
 const toast = useToast()
-<<<<<<< HEAD
 const username = ref('')
-=======
-const email = ref('')
->>>>>>> origin/28-fix-site-deletion-and-interface-connection
 const password = ref('')
 const checked = ref(false)
 
 const handleLogin = async () => {
   try {
     const auth = new AuthService()
-<<<<<<< HEAD
     await auth.login(username.value, password.value)
-=======
-    await auth.login(email.value, password.value)
->>>>>>> origin/28-fix-site-deletion-and-interface-connection
     router.push('/')
   } catch (error) {
     toast.add({
@@ -62,46 +54,26 @@ const handleLogin = async () => {
           <form @submit.prevent="handleLogin">
             <div>
               <label
-<<<<<<< HEAD
                 for="username"
-=======
-                for="email1"
->>>>>>> origin/28-fix-site-deletion-and-interface-connection
                 class="block text-surface-900 dark:text-surface-0 text-xl font-medium mb-2"
                 >Username</label
               >
               <InputText
-<<<<<<< HEAD
                 id="username"
                 type="text"
                 placeholder="Username"
                 class="w-full md:w-[30rem] mb-8"
                 v-model="username"
-=======
-                id="email1"
-                type="text"
-                placeholder="Username"
-                class="w-full md:w-[30rem] mb-8"
-                v-model="email"
->>>>>>> origin/28-fix-site-deletion-and-interface-connection
                 required
               />
 
               <label
-<<<<<<< HEAD
                 for="password"
-=======
-                for="password1"
->>>>>>> origin/28-fix-site-deletion-and-interface-connection
                 class="block text-surface-900 dark:text-surface-0 font-medium text-xl mb-2"
                 >Password</label
               >
               <Password
-<<<<<<< HEAD
                 id="password"
-=======
-                id="password1"
->>>>>>> origin/28-fix-site-deletion-and-interface-connection
                 v-model="password"
                 placeholder="Password"
                 :toggleMask="true"
