@@ -62,8 +62,13 @@ export default {
   async getConnectedInterfaces(routerId) {
     try {
       const response = await this.getRouterInterfaces(routerId)
-      console.log('Connected interfaces:', response)
-      return response.filter((interfaceObj) => interfaceObj.is_connected === false)
+      // Only interfaces that are not connected, are physical, and not management
+      return response.filter(
+        (interfaceObj) =>
+          interfaceObj.is_connected === false &&
+          interfaceObj.category === 'physical' &&
+          interfaceObj.is_management === false,
+      )
     } catch (error) {
       console.error(`Error fetching connected interfaces for router ${routerId}:`, error)
       throw error
