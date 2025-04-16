@@ -1,6 +1,6 @@
 <template>
   <div
-    class="bg-surface-0 dark:bg-surface-900 py-12 px-8 sm:px-20 rounded-[2.5rem] w-full max-w-[48rem] mx-auto"
+    class="bg-surface-0 dark:bg-surface-900 py-12 px-8 sm:px-20 rounded-[2.5rem] w-full max-w-[80rem] mx-auto"
   >
     <div
       v-if="networkSettingsExist"
@@ -15,9 +15,9 @@
       </div>
       <Button label="Next" icon="pi pi-arrow-right" iconPos="right" @click="$emit('next')" />
     </div>
-    <div v-else class="grid gap-8">
+    <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-8">
       <!-- Host Network Section -->
-      <div class="col-span-12 md:col-span-6">
+      <div class="col-span-1">
         <div class="bg-surface-50 dark:bg-surface-900 p-6 rounded-2xl h-full">
           <div class="flex items-center mb-4">
             <span
@@ -78,11 +78,42 @@
             <small v-if="submitted && !networkData.bgp_as" class="p-error block mb-2">
               BGP AS number is required
             </small>
+            <span class="p-float-label w-full">
+              <label for="host_address" class="text-surface-600 dark:text-surface-200 font-medium"
+                >Host Address</label
+              >
+              <InputText
+                id="host_address"
+                v-model.trim="networkData.host_address"
+                class="w-full mt-2"
+                :class="{ 'p-invalid': submitted && !networkData.host_address }"
+              />
+            </span>
+            <small v-if="submitted && !networkData.host_address" class="p-error block mb-2">
+              Host address is required
+            </small>
+
+            <span class="p-float-label w-full">
+              <label
+                for="host_subnet_mask"
+                class="text-surface-600 dark:text-surface-200 font-medium"
+                >Host Subnet Mask</label
+              >
+              <InputText
+                id="host_subnet_mask"
+                v-model.trim="networkData.host_subnet_mask"
+                class="w-full mt-2"
+                :class="{ 'p-invalid': submitted && !networkData.host_subnet_mask }"
+              />
+            </span>
+            <small v-if="submitted && !networkData.host_subnet_mask" class="p-error block mb-2">
+              Host subnet mask is required
+            </small>
           </div>
         </div>
       </div>
       <!-- RESTCONF Section -->
-      <div class="col-span-12 md:col-span-6">
+      <div class="col-span-1">
         <div class="bg-surface-50 dark:bg-surface-900 p-6 rounded-2xl h-full">
           <div class="flex items-center mb-4">
             <span
@@ -140,7 +171,7 @@
         </div>
       </div>
       <!-- DHCP Configuration Section -->
-      <div class="col-span-12">
+      <div class="col-span-1">
         <div class="bg-surface-50 dark:bg-surface-900 p-6 rounded-2xl h-full">
           <div class="flex items-center mb-4">
             <span
@@ -152,78 +183,74 @@
               >DHCP Configuration</span
             >
           </div>
-          <div class="flex flex-col gap-2 md:flex-row md:gap-8">
-            <div class="flex-1 flex flex-col gap-2">
-              <span class="p-float-label w-full">
-                <label
-                  for="dhcp_sites_network_address"
-                  class="text-surface-600 dark:text-surface-200 font-medium"
-                  >Sites Network Address</label
-                >
-                <InputText
-                  id="dhcp_sites_network_address"
-                  v-model.trim="networkData.dhcp_sites_network_address"
-                  class="w-full mt-2"
-                  :class="{ 'p-invalid': submitted && !networkData.dhcp_sites_network_address }"
-                />
-              </span>
-              <small
-                v-if="submitted && !networkData.dhcp_sites_network_address"
-                class="p-error block mt-2"
+          <div class="flex flex-col gap-2">
+            <span class="p-float-label w-full">
+              <label
+                for="dhcp_sites_network_address"
+                class="text-surface-600 dark:text-surface-200 font-medium"
+                >Sites Network Address</label
               >
-                DHCP sites network address is required
-              </small>
-            </div>
-            <div class="flex-1 flex flex-col gap-2">
-              <span class="p-float-label w-full">
-                <label
-                  for="dhcp_sites_network_subnet_mask"
-                  class="text-surface-600 dark:text-surface-200 font-medium"
-                  >Sites Network Subnet Mask</label
-                >
-                <InputText
-                  id="dhcp_sites_network_subnet_mask"
-                  v-model.trim="networkData.dhcp_sites_network_subnet_mask"
-                  class="w-full mt-2"
-                  :class="{
-                    'p-invalid': submitted && !networkData.dhcp_sites_network_subnet_mask,
-                  }"
-                />
-              </span>
-              <small
-                v-if="submitted && !networkData.dhcp_sites_network_subnet_mask"
-                class="p-error block mt-2"
+              <InputText
+                id="dhcp_sites_network_address"
+                v-model.trim="networkData.dhcp_sites_network_address"
+                class="w-full mt-2"
+                :class="{ 'p-invalid': submitted && !networkData.dhcp_sites_network_address }"
+              />
+            </span>
+            <small
+              v-if="submitted && !networkData.dhcp_sites_network_address"
+              class="p-error block mt-2"
+            >
+              DHCP sites network address is required
+            </small>
+
+            <span class="p-float-label w-full">
+              <label
+                for="dhcp_sites_network_subnet_mask"
+                class="text-surface-600 dark:text-surface-200 font-medium"
+                >Sites Network Subnet Mask</label
               >
-                DHCP sites network subnet mask is required
-              </small>
-            </div>
-            <div class="flex-1 flex flex-col gap-2">
-              <span class="p-float-label w-full">
-                <label
-                  for="dhcp_lease_time"
-                  class="text-surface-600 dark:text-surface-200 font-medium"
-                  >DHCP Lease Time</label
-                >
-                <InputNumber
-                  id="dhcp_lease_time"
-                  v-model="networkData.dhcp_lease_time"
-                  :min="86400"
-                  suffix=" seconds"
-                  :useGrouping="false"
-                  class="w-full mt-2"
-                  :class="{ 'p-invalid': submitted && !networkData.dhcp_lease_time }"
-                />
-              </span>
-              <small v-if="submitted && !networkData.dhcp_lease_time" class="p-error block mt-2">
-                DHCP lease time is required (minimum 86400 seconds)
-              </small>
-            </div>
+              <InputText
+                id="dhcp_sites_network_subnet_mask"
+                v-model.trim="networkData.dhcp_sites_network_subnet_mask"
+                class="w-full mt-2"
+                :class="{
+                  'p-invalid': submitted && !networkData.dhcp_sites_network_subnet_mask,
+                }"
+              />
+            </span>
+            <small
+              v-if="submitted && !networkData.dhcp_sites_network_subnet_mask"
+              class="p-error block mt-2"
+            >
+              DHCP sites network subnet mask is required
+            </small>
+
+            <span class="p-float-label w-full">
+              <label
+                for="dhcp_lease_time"
+                class="text-surface-600 dark:text-surface-200 font-medium"
+                >DHCP Lease Time</label
+              >
+              <InputNumber
+                id="dhcp_lease_time"
+                v-model="networkData.dhcp_lease_time"
+                :min="86400"
+                suffix=" seconds"
+                :useGrouping="false"
+                class="w-full mt-2"
+                :class="{ 'p-invalid': submitted && !networkData.dhcp_lease_time }"
+              />
+            </span>
+            <small v-if="submitted && !networkData.dhcp_lease_time" class="p-error block mt-2">
+              DHCP lease time is required (minimum 86400 seconds)
+            </small>
           </div>
         </div>
       </div>
       <!-- Navigation Buttons -->
-      <div class="col-span-12">
-        <div class="flex items-center justify-between mt-8">
+      <div class="col-span-3 mt-8">
+        <div class="flex items-center justify-between">
           <Button label="Back" icon="pi pi-arrow-left" text @click="$emit('prev')" />
           <Button label="Next" icon="pi pi-arrow-right" iconPos="right" @click="handleNext" />
         </div>
@@ -248,6 +275,8 @@ const networkData = reactive({
   management_vrf: '',
   bgp_as: null,
   host_interface_id: null,
+  host_address: '',
+  host_subnet_mask: '',
   restconf_username: '',
   restconf_password: '',
   dhcp_sites_network_address: '',
@@ -263,6 +292,8 @@ const handleNext = async () => {
     !networkData.management_vrf ||
     !networkData.bgp_as ||
     !networkData.host_interface_id ||
+    !networkData.host_address ||
+    !networkData.host_subnet_mask ||
     !networkData.restconf_username ||
     !networkData.restconf_password ||
     !networkData.dhcp_sites_network_address ||

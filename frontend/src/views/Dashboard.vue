@@ -1,14 +1,22 @@
 <script setup>
 import MapWidget from '@/components/dashboard/MapWidget.vue'
-import CustomerCrud from './pages/CustomerCrud.vue'
+import RouterWidget from '@/components/dashboard/RouterWidget.vue'
+import { ref } from 'vue'
+
+const selectedRouter = ref(null)
+
+const handleRouterSelect = (router) => {
+  selectedRouter.value = router
+}
 </script>
 
 <template>
   <div class="grid grid-cols-12 gap-8">
-    <!-- The next two sections are split into two equal parts for larger screens (6 columns each) -->
     <div class="col-span-12 xl:col-span-8">
-      <MapWidget />
+      <MapWidget @node-selected="handleRouterSelect" />
     </div>
-    <div class="col-span-12 xl:col-span-4"></div>
+    <div class="col-span-12 xl:col-span-4">
+      <RouterWidget :selected-router="selectedRouter" />
+    </div>
   </div>
 </template>
