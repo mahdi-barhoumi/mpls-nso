@@ -924,10 +924,6 @@ class _NetworkController:
 
             # Unassign the PE interface if assigned
             if site.assigned_interface:
-                if not self.unassign_interface(site.assigned_interface, site):
-                    self.logger.error(f"Failed to unassign interface from site")
-                    return False
-
                 # Delete any subinterfaces on the PE interface
                 for subinterface in Interface.objects.filter(
                     router=site.assigned_interface.router,
@@ -937,8 +933,14 @@ class _NetworkController:
                         self.logger.error(f"Failed to delete subinterface {subinterface}")
                         return False
 
+                pe_interface = site.assigned_interface
+
+                if not self.unassign_interface(site.assigned_interface, site):
+                    self.logger.error(f"Failed to unassign interface from site")
+                    return False
+
                 # Disable the PE interface
-                if not self.disable_interface(site.assigned_interface):
+                if not self.disable_interface(pe_interface):
                     self.logger.error(f"Failed to disable PE interface")
                     return False
 

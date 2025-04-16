@@ -131,39 +131,78 @@ class _NetworkDiscoverer:
     def discover_single_device(self, ip_address):
         self.logger.info(f"Starting single device discovery for {ip_address}")
         
-        # Reset reachable_routers to track just this device
-        previous_reachable = self.reachable_routers.copy()
+        if not self.initialized:
+            self.initialize()
+        
+        # Reset statistics for this run
+        device_stats = {
+            "discovered": False,
+            "routers": {
+                "created": 0,
+                "updated": 0
+            },
+            "vrfs": {
+                "created": 0,
+                "updated": 0,
+                "removed": 0
+            },
+            "interfaces": {
+                "created": 0,
+                "updated": 0,
+                "removed": 0
+            },
+            "connections": {
+                "created": 0
+            }
+        }
+        
+        # Clear the reachable_routers set for this specific discovery
         self.reachable_routers = set()
         
-        # Discover the device
-        device_data = self.discover_ip(ip_address)
-        
-        if device_data:
-            # Get discovered router
-            router = None
-            for r in self.reachable_routers:
-                if r.management_ip_address == ip_address:
-                    router = r
-                    break
+        try:
+            # Discover the device
+            device_data = self.discover_ip(ip_address)
+            if not device_data:
+                self.logger.warning(f"Failed to discover device at {ip_address}")
+                return device_stats
             
-            if router:
-                # Process connections for this router
-                self.logger.info(f"Updating connections for router {router.hostname}")
-                self.process_router_connections(router)
-                
-                # Update router role stats for this discovery
-                if router.role == 'P':
-                    self.stats["routers"]["provider_core"] += 1
-                elif router.role == 'PE':
-                    self.stats["routers"]["provider_edge"] += 1
-                elif router.role == 'CE':
-                    self.stats["routers"]["customer_edge"] += 1
+            device_stats["discovered"] = True
+            device_stats["hostname"] = device_data["hostname"]
+            device_stats["role"] = device_data["role"]
+            
+            # Get the router object
+            router = self.router_cache.get(device_data["hostname"])
+            if not router:
+                self.logger.warning(f"Router object not found in cache for {device_data['hostname']}")
+                try:
+                    router = Router.objects.get(chassis_id=device_data["chassis_id"])
+                except Router.DoesNotExist:
+                    self.logger.error(f"Router with chassis ID {device_data['chassis_id']} not found in database")
+                    return device_stats
+            
+            # Update router connection information
+            self.logger.info(f"Updating connections for {router.hostname}")
+            self.process_router_connections(router)
+            
+            # Update device statistics from the overall stats
+            device_stats["routers"]["created"] = self.stats["routers"]["created"]
+            device_stats["routers"]["updated"] = self.stats["routers"]["updated"]
+            device_stats["vrfs"]["created"] = self.stats["vrfs"]["created"]
+            device_stats["vrfs"]["updated"] = self.stats["vrfs"]["updated"]
+            device_stats["vrfs"]["removed"] = self.stats["vrfs"]["removed"]
+            device_stats["interfaces"]["created"] = self.stats["interfaces"]["created"]
+            device_stats["interfaces"]["updated"] = self.stats["interfaces"]["updated"]
+            device_stats["interfaces"]["removed"] = self.stats["interfaces"]["removed"]
+            device_stats["connections"]["created"] = self.stats["connections"]["created"]
+            
+            self.logger.info(f"Single device discovery completed for {ip_address}")
+            return device_stats
         
-        # Restore previous reachable routers
-        discovered = self.reachable_routers
-        self.reachable_routers = previous_reachable | discovered
-        
-        return device_data
+        except Exception as e:
+            self.logger.error(f"Error during single device discovery for {ip_address}: {str(e)}")
+            import traceback
+            self.logger.error(traceback.format_exc())
+            return device_stats
 
     def discover_ip(self, ip_address):
         try:
