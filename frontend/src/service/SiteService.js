@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const API_URL = 'http://127.0.0.1:8000/api/sites/' // Replace with your actual API endpoint
+const API_URL = 'http://127.0.0.1:8000/api/sites/'
 
 export default {
   /**
@@ -16,7 +16,6 @@ export default {
       throw error
     }
   },
-  //TODO: filter interface that are managment or loopback
   async createSite(site) {
     try {
       const response = await axios.post(API_URL, site)
@@ -53,6 +52,21 @@ export default {
       await axios.delete(`${API_URL}${id}/`)
     } catch (error) {
       console.error('Error deleting site:', error)
+      throw error
+    }
+  },
+
+  /**
+   * Enable routing for a site
+   * @param {number} siteId - Site ID
+   * @returns {Promise<Object>} Response data
+   */
+  async enableRouting(siteId) {
+    try {
+      const response = await axios.post(`http://127.0.0.1:8000/api/sites/${siteId}/enable-routing/`)
+      return response.data
+    } catch (error) {
+      console.error('Error enabling routing for site:', error)
       throw error
     }
   },
