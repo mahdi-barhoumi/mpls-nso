@@ -1,13 +1,13 @@
 from django.http import JsonResponse
 from django.views import View
+from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
-from django.views.decorators.cache import cache_page
-from core.models import Router, Interface
+from core.models import Router
 
+@method_decorator(csrf_exempt, name='dispatch')
 class NetworkMapView(View):
     """Network topology view that provides data for frontend visualization."""
 
-    @method_decorator(cache_page(60 * 5))  # Cache for 5 minutes
     def get(self, request):
         # Get all routers with their interfaces
         routers = Router.objects.prefetch_related(

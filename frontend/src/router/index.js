@@ -1,12 +1,44 @@
 import { createRouter, createWebHistory } from 'vue-router'
-
 import AppLayout from '@/layout/AppLayout.vue'
+import axios from 'axios'
+
+// Setup route guard
+const requiresSetup = async (to, from, next) => {
+  try {
+    const response = await axios.get('http://127.0.0.1:8000/api/setup/status/')
+    if (to.name === 'setup') {
+      // If setup is completed, redirect to dashboard
+      if (!response.data.needs_setup) {
+        next({ name: 'dashboard' })
+        return
+      }
+    } else {
+      // For other routes, redirect to setup if needed
+      if (response.data.needs_setup) {
+        next({ name: 'setup' })
+        return
+      }
+    }
+    next()
+  } catch (error) {
+    console.error('Error checking setup status:', error)
+    next()
+  }
+}
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
+      path: '/setup',
+      name: 'setup',
+      component: () => import('@/views/Setup.vue'),
+      beforeEnter: requiresSetup,
+    },
+    {
       path: '/',
       component: AppLayout,
+      beforeEnter: requiresSetup,
       children: [
         {
           path: '/',
@@ -45,7 +77,6 @@ const router = createRouter({
       name: 'notfound',
       component: () => import('@/views/pages/NotFound.vue'),
     },
-
     {
       path: '/auth/login',
       name: 'login',
@@ -60,11 +91,6 @@ const router = createRouter({
       path: '/auth/error',
       name: 'error',
       component: () => import('@/views/pages/auth/Error.vue'),
-    },
-    {
-      path: '/register',
-      name: 'register',
-      component: () => import('@/views/pages/auth/Register.vue'),
     },
     {
       path: '/:pathMatch(.*)*',

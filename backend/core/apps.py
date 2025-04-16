@@ -14,7 +14,13 @@ class CoreConfig(AppConfig):
         from core.settings import Settings
 
         # Set global state
-        self.state = {
-            'has_admin': User.objects.filter(Q(is_superuser=True) | Q(is_staff=True)).exists(),
-            'has_settings': Settings.objects.exists()
-        }
+        try:
+            self.state = {
+                'has_admin': User.objects.filter(Q(is_superuser=True) | Q(is_staff=True)).exists(),
+                'has_settings': Settings.objects.exists()
+            }
+        except:
+            self.state = {
+                'has_admin': False,
+                'has_settings': False
+            }

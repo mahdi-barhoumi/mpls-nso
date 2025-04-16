@@ -10,7 +10,7 @@ def list_host_interfaces(request):
         interfaces = HostNetworkManager.list_interfaces()
 
         # Sort interfaces by ID
-        interfaces.sort(key=lambda x: x['index'])
+        interfaces.sort(key=lambda x: x['id'])
         
         return JsonResponse(interfaces, status=200, safe=False)
 

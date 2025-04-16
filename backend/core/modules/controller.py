@@ -796,6 +796,10 @@ class _NetworkController:
 
     def add_site_to_vpn(self, site, vpn) -> bool:
         try:
+            if vpn in site.vpns.all():
+                self.logger.info(f"Site {site} is already apart of {vpn}")
+                return True
+
             self.logger.info(f"Adding site {site} to VPN {vpn}")
             
             # Get system settings
@@ -906,6 +910,66 @@ class _NetworkController:
             
         except Exception as exception:
             self.logger.error(f"Error deleting VPN {vpn}: {str(exception)}")
+            return False
+
+    def delete_site(self, site) -> bool:
+        try:
+            self.logger.info(f"Deleting site {site}")
+
+            # Remove the site from all VPNs first
+            for vpn in site.vpns.all():
+                if not self.remove_site_from_vpn(site, vpn):
+                    self.logger.error(f"Failed to remove site from VPN {vpn}")
+                    return False
+
+            # Unassign the PE interface if assigned
+            if site.assigned_interface:
+                # Delete any subinterfaces on the PE interface
+                for subinterface in Interface.objects.filter(
+                    router=site.assigned_interface.router,
+                    name__startswith=f"{site.assigned_interface.name}."
+                ):
+                    if not self.delete_interface(subinterface):
+                        self.logger.error(f"Failed to delete subinterface {subinterface}")
+                        return False
+
+                pe_interface = site.assigned_interface
+
+                if not self.unassign_interface(site.assigned_interface, site):
+                    self.logger.error(f"Failed to unassign interface from site")
+                    return False
+
+                # Disable the PE interface
+                if not self.disable_interface(pe_interface):
+                    self.logger.error(f"Failed to disable PE interface")
+                    return False
+
+            # Delete the site's VRF and its route targets if it exists
+            if site.vrf:
+                RouteTarget.objects.filter(vrf=site.vrf).delete()
+                if not self.delete_vrf(site.vrf):
+                    self.logger.error(f"Failed to delete site VRF")
+                    return False
+
+            # Delete the DHCP scope if it exists
+            if site.dhcp_scope:
+                site.dhcp_scope.delete()
+
+            # Delete the CE router and all its interfaces if it exists
+            if site.router:
+                # Delete all interfaces of the CE router first
+                Interface.objects.filter(router=site.router).delete()
+                # Then delete the router itself
+                site.router.delete()
+
+            # Finally delete the site
+            site.delete()
+
+            self.logger.info(f"Successfully deleted site {site}")
+            return True
+
+        except Exception as exception:
+            self.logger.error(f"Error deleting site: {str(exception)}")
             return False
 
 NetworkController = _NetworkController()

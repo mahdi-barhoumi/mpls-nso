@@ -29,7 +29,7 @@ class _HostNetworkManager:
             parts = line.split()
             if len(parts) >= 4:
                 interfaces.append({
-                    'index': int(parts[0]),
+                    'id': int(parts[0]),
                     'state': parts[3],
                     'name': ' '.join(parts[4:])
                 })
@@ -45,13 +45,20 @@ class _HostNetworkManager:
             if len(parts) >= 6:
                 routes.append({
                     'prefix': parts[3],
-                    'index': parts[4],
+                    'id': parts[4],
                     'gateway': ' '.join(parts[5:])
                 })
         
         return routes
     
     def add_route(self, prefix: str, gateway: str, interface: Union[int, str]) -> bool:
+        # Check if route exists and delete it
+        existing_routes = self.list_routes()
+        for route in existing_routes:
+            if route['prefix'] == prefix:
+                self.delete_route(prefix, interface)
+                break
+
         cmd = [
             'netsh', 'interface', 'ipv4', 'add', 'route', f'prefix={prefix}', f'nexthop={gateway}', f'interface={interface}'
         ]
