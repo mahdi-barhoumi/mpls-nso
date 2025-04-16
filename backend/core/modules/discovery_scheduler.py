@@ -34,7 +34,7 @@ class _DiscoveryScheduler:
     def _execute_discovery(self, ip_address: str):
         try:
             self.logger.info(f"Executing discovery for {ip_address}")
-            device_data = NetworkDiscoverer.discover_ip(ip_address)
+            device_data = NetworkDiscoverer.discover_single_device(ip_address)
             
             if not device_data:
                 # If discovery failed, reschedule

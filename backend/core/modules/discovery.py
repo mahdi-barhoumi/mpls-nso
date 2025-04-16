@@ -113,6 +113,9 @@ class _NetworkDiscoverer:
                 except Exception as e:
                     self.logger.error(f"Error processing device at {ip_address}: {str(e)}")
         
+        # Update connections between interfaces after discovery
+        self.update_interface_connections()
+        
         # Update router role counts
         self.stats["routers"]["total"] = len(self.reachable_routers)
         for router in self.reachable_routers:
@@ -125,6 +128,43 @@ class _NetworkDiscoverer:
         
         return self.stats
     
+    def discover_single_device(self, ip_address):
+        self.logger.info(f"Starting single device discovery for {ip_address}")
+        
+        # Reset reachable_routers to track just this device
+        previous_reachable = self.reachable_routers.copy()
+        self.reachable_routers = set()
+        
+        # Discover the device
+        device_data = self.discover_ip(ip_address)
+        
+        if device_data:
+            # Get discovered router
+            router = None
+            for r in self.reachable_routers:
+                if r.management_ip_address == ip_address:
+                    router = r
+                    break
+            
+            if router:
+                # Process connections for this router
+                self.logger.info(f"Updating connections for router {router.hostname}")
+                self.process_router_connections(router)
+                
+                # Update router role stats for this discovery
+                if router.role == 'P':
+                    self.stats["routers"]["provider_core"] += 1
+                elif router.role == 'PE':
+                    self.stats["routers"]["provider_edge"] += 1
+                elif router.role == 'CE':
+                    self.stats["routers"]["customer_edge"] += 1
+        
+        # Restore previous reachable routers
+        discovered = self.reachable_routers
+        self.reachable_routers = previous_reachable | discovered
+        
+        return device_data
+
     def discover_ip(self, ip_address):
         try:
             self.logger.info(f"Processing device at {ip_address}")
@@ -169,9 +209,6 @@ class _NetworkDiscoverer:
             # Process interfaces
             if device_data.get('native_interfaces'):
                 self.process_interfaces(router, device_data['native_interfaces'], device_data['oper_interfaces'])
-            
-            # Process connections for this router immediately
-            self.process_router_connections(router)
             
             return {
                 "hostname": hostname,
