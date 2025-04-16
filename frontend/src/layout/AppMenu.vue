@@ -14,11 +14,6 @@ const model = ref([
     to: '/pages',
     items: [
       {
-        label: 'Landing',
-        icon: 'pi pi-fw pi-globe',
-        to: '/landing',
-      },
-      {
         label: 'Customers',
         icon: 'pi pi-fw pi-users',
         to: '/customers',
