@@ -36,7 +36,8 @@ class SiteView(View):
                             'hostname': site.assigned_interface.router.hostname
                         }
                     } if site.assigned_interface else None,
-                    'router_id': site.router.id if site.router else None
+                   'router_id': site.router.id if site.router else None,
+                    'has_routing': site.has_routing,
                 }
                 
                 return JsonResponse(site_data)
@@ -71,7 +72,8 @@ class SiteView(View):
                                 'hostname': site.assigned_interface.router.hostname
                             }
                         } if site.assigned_interface else None,
-                        'router_id': site.router.id if site.router else None
+                        'router_id': site.router.id if site.router else None,
+                        'has_routing': site.has_routing,
                     }
                     for site in sites
                 ]
@@ -265,10 +267,8 @@ class SiteView(View):
 class SiteRoutingView(View):
     def post(self, request, site_id):
         try:
-            # Get site
             site = get_object_or_404(Site, id=site_id)
             
-            # Check if site has required components
             if not site.router:
                 return JsonResponse({
                     'message': 'Site has no assigned router'
@@ -283,12 +283,42 @@ class SiteRoutingView(View):
             success = NetworkController.enable_routing(site)
             
             if success:
+                site.has_routing = True
+                site.save()
                 return JsonResponse({
                     'message': f'Successfully configured routing for site {site.name}'
                 })
             else:
                 return JsonResponse({
                     'message': 'Failed to configure routing'
+                }, status=500)
+                
+        except Exception as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=500)
+
+    def delete(self, request, site_id):
+        try:
+            site = get_object_or_404(Site, id=site_id)
+            
+            if not site.has_routing:
+                return JsonResponse({
+                    'message': 'Site routing is not enabled'
+                }, status=400)
+            
+            # Disable routing using NetworkController
+            success = NetworkController.disable_routing(site)
+            
+            if success:
+                site.has_routing = False
+                site.save()
+                return JsonResponse({
+                    'message': f'Successfully disabled routing for site {site.name}'
+                })
+            else:
+                return JsonResponse({
+                    'message': 'Failed to disable routing'
                 }, status=500)
                 
         except Exception as e:

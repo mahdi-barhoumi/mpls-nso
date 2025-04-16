@@ -1,4 +1,5 @@
 <template>
+
   <div class="col-span-12">
     <div class="card mb-3">
       <div class="flex justify-between mb-4">
@@ -161,6 +162,12 @@ const STORAGE_KEYS = {
   FETCHED_NODES: 'network-graph-fetched-nodes',
 }
 
+const STORAGE_KEYS = {
+  NODES: 'network-graph-nodes',
+  LAYOUTS: 'network-graph-layouts',
+  FETCHED_NODES: 'network-graph-fetched-nodes',
+}
+
 export default {
   name: 'NetworkMap',
   components: {
@@ -213,6 +220,7 @@ export default {
           },
         },
       },
+
       saveDebounce: null,
       eventHandlers: {
         'node:click': ({ node }) => {
@@ -385,6 +393,7 @@ export default {
 
       this.layouts = { nodes: layouts }
       this.persistData()
+
     },
 
     saveLayout() {
@@ -406,6 +415,7 @@ export default {
       const node = this.graphData.nodes[nodeId]
       return node.label
     },
+
 
     zoomIn() {
       this.$refs.graph.zoomIn()

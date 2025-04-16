@@ -578,6 +578,7 @@ class _NetworkController:
         
         # Verify required ojbects
         if None in [pe_router, ce_router, pe_interface, ce_interface]:
+            print([pe_router, ce_router, pe_interface, ce_interface])
             self.logger.error(f"A required object is missing")
             return False
 
@@ -704,7 +705,148 @@ class _NetworkController:
             return False
 
         self.logger.info(f"Successfully configured routing for site {site}")
+        
+        # Only set has_routing to True if all configuration succeeded
+        site.has_routing = True
+        site.save()
         return True
+
+    # TODO: Fix me
+    def disable_routing(self, site):
+        self.logger.info(f"Disabling routing for site {site}")
+        
+        # Get required objects
+        if not site.has_routing:
+            self.logger.error(f"Site {site} does not have routing enabled")
+            return False
+        
+        settings = get_settings()
+        if not settings:
+            self.logger.error("Cannot disable routing: No system settings found")
+            return False
+
+        pe_router = site.assigned_interface.router
+        ce_router = site.router
+        pe_interface = site.assigned_interface
+        ce_interface = site.assigned_interface.connected_interfaces.first()
+        
+        if None in [pe_router, ce_router, pe_interface, ce_interface]:
+            self.logger.error("Missing required objects to disable routing")
+            return False
+
+        try:
+            # First disable route redistribution
+            if not self.disable_route_redistribution(site):
+                self.logger.error(f"Failed to disable route redistribution for site {site}")
+                return False
+
+            # Remove OSPF process from PE router
+            result = self.restconf.delete(
+                pe_router.management_ip_address,
+                f"Cisco-IOS-XE-native:native/router/router-ospf/ospf/process-id-vrf={site.ospf_process_id}"
+            )
+            
+            if result is None:
+                self.logger.error(f"Failed to remove OSPF process from PE router")
+                return False
+
+            # Remove OSPF process from CE router
+            result = self.restconf.delete(
+                ce_router.management_ip_address,
+                "Cisco-IOS-XE-native:native/router/router-ospf/ospf/process-id=1"
+            )
+
+            if result is None:
+                self.logger.error(f"Failed to remove OSPF process from CE router")
+                return False
+
+            # Reset site routing fields
+            site.ospf_process_id = None
+            site.save()
+
+            # Reset PE interface to management VRF
+            pe_management_vrf = VRF.objects.get(router=pe_router, name=settings.management_vrf)
+            pe_interface.vrf = pe_management_vrf
+            
+            if not self.create_or_update_interface(pe_interface):
+                self.logger.error(f"Failed resetting PE interface {pe_interface}")
+                return False
+
+            # Reset CE interface to default state
+            ce_interface.addressing = "dhcp"
+            ce_interface.ip_address = None
+            ce_interface.subnet_mask = None
+            ce_interface.vrf = None
+            ce_interface.dhcp_helper_address = None
+
+            if not self.create_or_update_interface(ce_interface):
+                self.logger.error(f"Failed resetting CE interface {ce_interface}")
+                return False
+
+            # Delete any subinterfaces
+            for interface in [pe_interface, ce_interface]:
+                subinterfaces = Interface.objects.filter(
+                    router=interface.router,
+                    name__startswith=f"{interface.name}."
+                )
+                for subinterface in subinterfaces:
+                    if not self.delete_interface(subinterface):
+                        self.logger.error(f"Failed to delete subinterface {subinterface}")
+                        return False
+
+            self.logger.info(f"Successfully disabled routing for site {site}")
+            
+            # Only set has_routing to False if all removal succeeded
+            site.has_routing = False
+            site.save()
+            return True
+
+        except Exception as exception:
+            self.logger.error(f"Error disabling routing for site {site}: {str(exception)}")
+            return False
+
+    # TODO: Fix me
+    def disable_route_redistribution(self, site) -> bool:
+        try:
+            self.logger.info(f"Disabling route redistribution for site {site}")
+            
+            # Get system settings
+            settings = get_settings()
+            if not settings:
+                self.logger.error("Cannot disable route redistribution: No system settings found")
+                return False
+                
+            # Verify site has PE-CE routing configured
+            if not site.assigned_interface or not site.vrf or not site.ospf_process_id:
+                self.logger.error(f"Site {site} is not properly configured for route redistribution")
+                return False
+
+            # Remove BGP to OSPF redistribution
+            result = self.restconf.delete(
+                site.assigned_interface.router.management_ip_address,
+                f"Cisco-IOS-XE-native:native/router/bgp={settings.bgp_as}/address-family/with-vrf/ipv4/vrf={site.vrf.name}/ipv4-unicast/redistribute-vrf/ospf={site.ospf_process_id}"
+            )
+
+            if result is None:
+                self.logger.error(f"Failed removing BGP to OSPF redistribution for site {site}")
+                return False
+
+            # Remove OSPF to BGP redistribution
+            result = self.restconf.delete(
+                site.assigned_interface.router.management_ip_address,
+                f"Cisco-IOS-XE-native:native/router/router-ospf/ospf/process-id-vrf={site.ospf_process_id}/redistribute/bgp={settings.bgp_as}"
+            )
+
+            if result is None:
+                self.logger.error(f"Failed removing OSPF to BGP redistribution for site {site}")
+                return False
+
+            self.logger.info(f"Successfully disabled route redistribution for site {site}")
+            return True
+
+        except Exception as exception:
+            self.logger.error(f"Error disabling route redistribution for site {site}: {str(exception)}")
+            return False
 
     def enable_route_redistribution(self, site) -> bool:
         try:
