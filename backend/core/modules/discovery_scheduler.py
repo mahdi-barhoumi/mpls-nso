@@ -34,9 +34,9 @@ class _DiscoveryScheduler:
     def _execute_discovery(self, ip_address: str):
         try:
             self.logger.info(f"Executing discovery for {ip_address}")
-            device_data = NetworkDiscoverer.discover_single_device(ip_address)
+            result = NetworkDiscoverer.discover_single_device(ip_address)
             
-            if not device_data:
+            if not result['success']:
                 # If discovery failed, reschedule
                 self.logger.warning(f"Discovery failed for {ip_address}, rescheduling...")
                 self.schedule_discovery(ip_address, is_first_time=False)
@@ -82,4 +82,4 @@ class _DiscoveryScheduler:
             self._schedule_next_discovery()
 
 DiscoveryScheduler = _DiscoveryScheduler()
-#DiscoveryScheduler.start_periodic_discovery()
+DiscoveryScheduler.start_periodic_discovery()

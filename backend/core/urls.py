@@ -42,6 +42,7 @@ urlpatterns = [
     path('sites/', SiteView.as_view()),  
     path('sites/<int:site_id>/', SiteView.as_view()),
     path('sites/<int:site_id>/enable-routing/', SiteRoutingView.as_view()),
+    path('sites/<int:site_id>/disable-routing/', SiteRoutingView.as_view()),
 
     # VPN URLs
     path('vpns/', VPNView.as_view(), name='vpn-list-create'),
