@@ -11,7 +11,7 @@ const handleRouterSelect = (router) => {
 </script>
 
 <template>
-  <div class="grid grid-cols-12 gap-8">
+  <div class="grid grid-cols-12 gap-10">
     <div class="col-span-12 xl:col-span-8">
       <MapWidget @node-selected="handleRouterSelect" />
     </div>

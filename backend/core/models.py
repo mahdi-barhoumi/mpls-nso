@@ -187,7 +187,7 @@ class Interface(ImmutableFieldMixin, models.Model):
     dhcp_helper_address = models.GenericIPAddressField(null=True, protocol='ipv4', help_text="DHCP helper address if applicable")
     vlan = models.PositiveIntegerField(null=True, validators=[MinValueValidator(1), MaxValueValidator(4094)], help_text="VLAN if applicable")
     vrf = models.ForeignKey(VRF, null=True, on_delete=models.SET_NULL, related_name='interfaces')
-    connected_interfaces = models.ManyToManyField('self', symmetrical=True, related_name='connected_from')
+    connected_interfaces = models.ManyToManyField('self', symmetrical=True, related_name='connected_interfaces')
     first_discovered = models.DateTimeField(auto_now_add=True, help_text="When this interface was first discovered")
     last_discovered = models.DateTimeField(auto_now=True, help_text="When this interface was last discovered")
     
@@ -234,7 +234,7 @@ class Interface(ImmutableFieldMixin, models.Model):
 
     @property
     def is_connected(self):
-        return self.connected_interfaces.exists() or self.connected_from.exists()
+        return self.connected_interfaces.exists() or self.connected_interfaces.exists()
     
     @property
     def is_management_interface(self):
