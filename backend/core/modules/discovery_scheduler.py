@@ -82,4 +82,4 @@ class _DiscoveryScheduler:
             self._schedule_next_discovery()
 
 DiscoveryScheduler = _DiscoveryScheduler()
-DiscoveryScheduler.start_periodic_discovery()
+#DiscoveryScheduler.start_periodic_discovery()

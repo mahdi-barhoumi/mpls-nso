@@ -109,6 +109,7 @@ class Router(models.Model):
     management_ip_address = models.GenericIPAddressField(help_text="Router management IP address")
     first_discovered = models.DateTimeField(auto_now_add=True, help_text="When this router was first discovered")
     last_discovered = models.DateTimeField(auto_now=True, help_text="When this router was last discovered")
+    reachable = models.BooleanField(default=False, help_text="Whether the router is currently reachable")
 
     class Meta:
         verbose_name = "Router"

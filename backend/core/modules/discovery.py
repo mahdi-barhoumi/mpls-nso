@@ -23,7 +23,8 @@ class _NetworkDiscoverer:
                 "total": 0,
                 "provider_core": 0,
                 "provider_edge": 0,
-                "customer_edge": 0
+                "customer_edge": 0,
+                "reachable": 0
             },
             "vrfs": {
                 "created": 0,
@@ -39,8 +40,6 @@ class _NetworkDiscoverer:
                 "created": 0
             }
         }
-        # Keep track of reachable routers
-        self.reachable_routers = set()
     
     def initialize(self):
         if self.initialized:
@@ -77,7 +76,8 @@ class _NetworkDiscoverer:
                 "total": 0,
                 "provider_core": 0,
                 "provider_edge": 0,
-                "customer_edge": 0
+                "customer_edge": 0,
+                "reachable": 0
             },
             "vrfs": {
                 "created": 0,
@@ -93,7 +93,9 @@ class _NetworkDiscoverer:
                 "created": 0
             }
         }
-        self.reachable_routers = set()
+        
+        # Reset reachability status for all routers
+        Router.objects.all().update(reachable=False)
         
         # Get all active DHCP leases
         active_leases = DHCPLease.objects.filter(expiry_time__gt=timezone.now())
@@ -117,29 +119,33 @@ class _NetworkDiscoverer:
         self.update_interface_connections()
         
         # Update router role counts
-        self.stats["routers"]["total"] = len(self.reachable_routers)
-        for router in self.reachable_routers:
-            if router.role == 'P':
-                self.stats["routers"]["provider_core"] += 1
-            elif router.role == 'PE':
-                self.stats["routers"]["provider_edge"] += 1
-            elif router.role == 'CE':
-                self.stats["routers"]["customer_edge"] += 1
+        routers = Router.objects.filter(reachable=True)
+        self.stats["routers"]["total"] = routers.count()
+        self.stats["routers"]["reachable"] = routers.count()
+        self.stats["routers"]["provider_core"] = routers.filter(role='P').count()
+        self.stats["routers"]["provider_edge"] = routers.filter(role='PE').count()
+        self.stats["routers"]["customer_edge"] = routers.filter(role='CE').count()
         
         return self.stats
     
     def discover_single_device(self, ip_address):
         self.logger.info(f"Starting single device discovery for {ip_address}")
         
+        # Initialize if needed
         if not self.initialized:
             self.initialize()
         
-        # Reset statistics for this run
-        device_stats = {
-            "discovered": False,
+        # Reset statistics for this discovery
+        self.stats = {
+            "discovered_devices": 0,
             "routers": {
                 "created": 0,
-                "updated": 0
+                "updated": 0,
+                "total": 0,
+                "provider_core": 0,
+                "provider_edge": 0,
+                "customer_edge": 0,
+                "reachable": 0
             },
             "vrfs": {
                 "created": 0,
@@ -156,53 +162,43 @@ class _NetworkDiscoverer:
             }
         }
         
-        # Clear the reachable_routers set for this specific discovery
-        self.reachable_routers = set()
-        
+        # Discover the device
         try:
-            # Discover the device
             device_data = self.discover_ip(ip_address)
-            if not device_data:
+            if device_data:
+                self.stats["discovered_devices"] += 1
+                
+                # Update connections for this device
+                router = Router.objects.get(chassis_id=device_data["chassis_id"])
+                self.process_router_connections(router)
+                
+                # Update router role counts for reachable routers
+                reachable_routers = Router.objects.filter(reachable=True)
+                self.stats["routers"]["total"] = reachable_routers.count()
+                self.stats["routers"]["reachable"] = reachable_routers.count()
+                self.stats["routers"]["provider_core"] = reachable_routers.filter(role='P').count()
+                self.stats["routers"]["provider_edge"] = reachable_routers.filter(role='PE').count()
+                self.stats["routers"]["customer_edge"] = reachable_routers.filter(role='CE').count()
+                
+                return {
+                    "success": True,
+                    "device": device_data,
+                    "stats": self.stats
+                }
+            else:
                 self.logger.warning(f"Failed to discover device at {ip_address}")
-                return device_stats
-            
-            device_stats["discovered"] = True
-            device_stats["hostname"] = device_data["hostname"]
-            device_stats["role"] = device_data["role"]
-            
-            # Get the router object
-            router = self.router_cache.get(device_data["hostname"])
-            if not router:
-                self.logger.warning(f"Router object not found in cache for {device_data['hostname']}")
-                try:
-                    router = Router.objects.get(chassis_id=device_data["chassis_id"])
-                except Router.DoesNotExist:
-                    self.logger.error(f"Router with chassis ID {device_data['chassis_id']} not found in database")
-                    return device_stats
-            
-            # Update router connection information
-            self.logger.info(f"Updating connections for {router.hostname}")
-            self.process_router_connections(router)
-            
-            # Update device statistics from the overall stats
-            device_stats["routers"]["created"] = self.stats["routers"]["created"]
-            device_stats["routers"]["updated"] = self.stats["routers"]["updated"]
-            device_stats["vrfs"]["created"] = self.stats["vrfs"]["created"]
-            device_stats["vrfs"]["updated"] = self.stats["vrfs"]["updated"]
-            device_stats["vrfs"]["removed"] = self.stats["vrfs"]["removed"]
-            device_stats["interfaces"]["created"] = self.stats["interfaces"]["created"]
-            device_stats["interfaces"]["updated"] = self.stats["interfaces"]["updated"]
-            device_stats["interfaces"]["removed"] = self.stats["interfaces"]["removed"]
-            device_stats["connections"]["created"] = self.stats["connections"]["created"]
-            
-            self.logger.info(f"Single device discovery completed for {ip_address}")
-            return device_stats
-        
+                return {
+                    "success": False,
+                    "error": "Device discovery failed - could not retrieve device data",
+                    "stats": self.stats
+                }
         except Exception as e:
-            self.logger.error(f"Error during single device discovery for {ip_address}: {str(e)}")
-            import traceback
-            self.logger.error(traceback.format_exc())
-            return device_stats
+            self.logger.error(f"Error discovering device at {ip_address}: {str(e)}")
+            return {
+                "success": False,
+                "error": f"Device discovery error: {str(e)}",
+                "stats": self.stats
+            }
 
     def discover_ip(self, ip_address):
         try:
@@ -228,8 +224,10 @@ class _NetworkDiscoverer:
             # Create or update router
             router = self.create_or_update_router(chassis_id, ip_address, hostname, role)
             
-            # Add to reachable routers set
-            self.reachable_routers.add(router)
+            # Mark router as reachable
+            router.reachable = True
+            router.save()
+            self.stats["routers"]["reachable"] += 1
             
             # Store router in cache
             self.router_cache[hostname] = router
@@ -621,12 +619,12 @@ class _NetworkDiscoverer:
         self.logger.info("Starting interface connection update")
         
         # Only process connections for routers that were reachable
-        routers = list(self.reachable_routers)
+        reachable_routers = Router.objects.filter(reachable=True)
         
         # Process connections in parallel
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             futures = {executor.submit(self.process_router_connections, router): router 
-                      for router in routers}
+                    for router in reachable_routers}
             
             for future in as_completed(futures):
                 router = futures[future]
@@ -651,7 +649,7 @@ class _NetworkDiscoverer:
             router_interfaces = {interface.name: interface for interface in Interface.objects.filter(router=router)}
             
             # Get routers by chassis ID for faster lookup (only use reachable routers)
-            routers_by_chassis = {r.chassis_id: r for r in self.reachable_routers}
+            routers_by_chassis = {r.chassis_id: r for r in Router.objects.filter(reachable=True)}
             
             # Process LLDP interface details
             for intf_detail in lldp_intf_details:

@@ -2,6 +2,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from core.modules.controller import NetworkController
+from core.modules.discovery import NetworkDiscoverer
 from core.models import *
 
 @csrf_exempt
@@ -11,7 +12,7 @@ def test_view(request):
 
         interface = Interface.objects.get(pk=33)
 
-        data = NetworkController.enable_interface(interface)
+        data = NetworkDiscoverer.discover_single_device("172.0.0.6")
 
         return JsonResponse(data, safe=False)
 
