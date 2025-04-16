@@ -1,5 +1,4 @@
 <template>
-
   <div class="col-span-12">
     <div class="card mb-3">
       <div class="flex justify-between mb-4">
@@ -155,12 +154,6 @@ import { VNetworkGraph, VEdgeLabel } from 'v-network-graph'
 import 'v-network-graph/lib/style.css'
 import { MappingService } from '@/service/MappingService.js'
 import Button from 'primevue/button'
-
-const STORAGE_KEYS = {
-  NODES: 'network-graph-nodes',
-  LAYOUTS: 'network-graph-layouts',
-  FETCHED_NODES: 'network-graph-fetched-nodes',
-}
 
 const STORAGE_KEYS = {
   NODES: 'network-graph-nodes',
@@ -393,7 +386,6 @@ export default {
 
       this.layouts = { nodes: layouts }
       this.persistData()
-
     },
 
     saveLayout() {
@@ -415,7 +407,6 @@ export default {
       const node = this.graphData.nodes[nodeId]
       return node.label
     },
-
 
     zoomIn() {
       this.$refs.graph.zoomIn()
