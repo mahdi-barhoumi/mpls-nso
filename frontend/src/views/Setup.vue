@@ -121,7 +121,7 @@
                 <SetupNetwork @prev="() => activateCallback(2)" @next="() => activateCallback(4)" />
               </StepPanel>
               <StepPanel :value="4">
-                <SetupComplete @complete="goToDashboard" />
+                <SetupComplete @complete="goToLogin" />
               </StepPanel>
             </StepPanels>
           </Stepper>
@@ -149,8 +149,8 @@ import Divider from 'primevue/divider'
 const router = useRouter()
 const activeStep = ref(1)
 
-const goToDashboard = () => {
-  router.push('/dashboard')
+const goToLogin = () => {
+  router.push('/auth/login')
 }
 </script>
 

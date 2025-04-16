@@ -61,8 +61,8 @@
       </div>
 
       <Button
-        label="Go to Dashboard"
-        icon="pi pi-home"
+        label="Login to Dashboard"
+        icon="pi pi-sign-in"
         size="large"
         @click="$emit('complete')"
         class="w-full"

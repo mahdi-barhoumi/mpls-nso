@@ -17,7 +17,7 @@ export default {
       throw error
     }
   },
-
+  //TODO: filter interface that are managment or loopback
   async createSite(site) {
     try {
       const response = await axios.post(API_URL, site)
