@@ -67,6 +67,21 @@
           </template>
         </Column>
         <Column field="dhcp_scope" header="DHCP Scope" sortable style="min-width: 16rem"></Column>
+        <Column field="routing_enabled" header="Routing" style="min-width: 10rem">
+          <template #body="slotProps">
+            <span v-if="slotProps.data.routing_enabled" class="text-green-600 font-semibold"
+              >Enabled</span
+            >
+            <Button
+              v-else
+              label="Enable"
+              icon="pi pi-power-off"
+              size="small"
+              @click="enableRouting(slotProps.data)"
+              :loading="routingLoadingId === slotProps.data.id"
+            />
+          </template>
+        </Column>
         <Column :exportable="false" style="min-width: 12rem">
           <template #body="slotProps">
             <Button
@@ -222,6 +237,7 @@ const isEditing = ref(false)
 const filters = ref({
   global: { value: null, matchMode: FilterMatchMode.CONTAINS },
 })
+const routingLoadingId = ref(null)
 
 // Toast
 const toast = useToast()
@@ -418,6 +434,28 @@ const saveSite = async () => {
       detail: 'Failed to save site',
       life: 3000,
     })
+  }
+}
+const enableRouting = async (site) => {
+  routingLoadingId.value = site.id
+  try {
+    await SiteService.enableRouting(site.id)
+    toast.add({
+      severity: 'success',
+      summary: 'Success',
+      detail: `Routing enabled for ${site.name}`,
+      life: 3000,
+    })
+    fetchSites()
+  } catch (error) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'Failed to enable routing',
+      life: 3000,
+    })
+  } finally {
+    routingLoadingId.value = null
   }
 }
 const closeDialog = () => {

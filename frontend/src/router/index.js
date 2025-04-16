@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import AppLayout from '@/layout/AppLayout.vue'
 import axios from 'axios'
+import AuthService from '@/service/AuthService'
 
 // Setup route guard
 const requiresSetup = async (to, from, next) => {
@@ -98,6 +99,35 @@ const router = createRouter({
       component: () => import('@/views/pages/NotFound.vue'),
     },
   ],
+})
+
+// Authentication and error handling
+router.beforeEach(async (to, from, next) => {
+  const publicPages = [
+    'login',
+    'error',
+    'accessDenied',
+    'notfound',
+    'not-found',
+    'landing',
+    'setup',
+  ]
+  const authService = new AuthService()
+  const isPublic = publicPages.includes(to.name)
+  try {
+    if (!isPublic) {
+      if (!authService.isAuthenticated()) {
+        return next({ name: 'login', query: { redirect: to.fullPath } })
+      }
+      // Optionally, check for permissions here
+      // Example: if (to.meta && to.meta.requiredRole && !userHasRole(to.meta.requiredRole)) { ... }
+      // If you want to restrict access based on user roles, add logic here and redirect to 'accessDenied'
+    }
+    next()
+  } catch (err) {
+    console.error('Route error:', err)
+    next({ name: 'error' })
+  }
 })
 
 export default router

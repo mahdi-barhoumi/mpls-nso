@@ -8,8 +8,13 @@ from core.views.vpns import VPNView, VPNSiteView
 from core.views.setup import SetupStatusView, AdminSetupView, SettingsSetupView
 from core.views.test import test_view
 from core.views.logs import LogsView
+from core.views.auth import AuthView
 
 urlpatterns = [
+    # Auth endpoints
+    path('auth/login/', AuthView.as_view(), name='login'),
+    path('auth/logout/', AuthView.as_view(), name='logout'),
+
     # Test endpoint
     path('test/', test_view, name='test'),
 
