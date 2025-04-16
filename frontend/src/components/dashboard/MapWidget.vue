@@ -10,7 +10,7 @@
                 class="flex items-center justify-center bg-blue-100 dark:bg-blue-400/10 rounded-border"
                 style="width: 1.5rem; height: 1.5rem"
               >
-                <i class="pi pi-circle-fill text-blue-500 text-xs"></i>
+                <img src="/demo/images/routers/router_black.svg" class="w-4 h-4" alt="P Router" />
               </div>
               <span class="text-sm">P Router</span>
             </div>
@@ -19,9 +19,22 @@
                 class="flex items-center justify-center bg-orange-100 dark:bg-orange-400/10 rounded-border"
                 style="width: 1.5rem; height: 1.5rem"
               >
-                <i class="pi pi-circle-fill text-orange-500 text-xs"></i>
+                <img src="/demo/images/routers/router_blue.svg" class="w-4 h-4" alt="PE Router" />
               </div>
               <span class="text-sm">PE Router</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <div
+                class="flex items-center justify-center bg-green-100 dark:bg-green-400/10 rounded-border"
+                style="width: 1.5rem; height: 1.5rem"
+              >
+                <img
+                  src="/demo/images/routers/router-in-building.svg"
+                  class="w-4 h-4"
+                  alt="CE Router"
+                />
+              </div>
+              <span class="text-sm">CE Router</span>
             </div>
           </div>
         </div>
