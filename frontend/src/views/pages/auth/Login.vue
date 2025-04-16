@@ -7,14 +7,14 @@ import { useToast } from 'primevue/usetoast'
 
 const router = useRouter()
 const toast = useToast()
-const email = ref('')
+const username = ref('')
 const password = ref('')
 const checked = ref(false)
 
 const handleLogin = async () => {
   try {
     const auth = new AuthService()
-    await auth.login(email.value, password.value)
+    await auth.login(username.value, password.value)
     router.push('/')
   } catch (error) {
     toast.add({
@@ -54,26 +54,26 @@ const handleLogin = async () => {
           <form @submit.prevent="handleLogin">
             <div>
               <label
-                for="email1"
+                for="username"
                 class="block text-surface-900 dark:text-surface-0 text-xl font-medium mb-2"
                 >Username</label
               >
               <InputText
-                id="email1"
+                id="username"
                 type="text"
                 placeholder="Username"
                 class="w-full md:w-[30rem] mb-8"
-                v-model="email"
+                v-model="username"
                 required
               />
 
               <label
-                for="password1"
+                for="password"
                 class="block text-surface-900 dark:text-surface-0 font-medium text-xl mb-2"
                 >Password</label
               >
               <Password
-                id="password1"
+                id="password"
                 v-model="password"
                 placeholder="Password"
                 :toggleMask="true"

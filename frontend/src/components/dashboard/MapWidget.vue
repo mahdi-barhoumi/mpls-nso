@@ -125,6 +125,7 @@ export default {
   },
   data() {
     return {
+      pollingInterval: null,
       graphData: {
         nodes: {},
         edges: {},
@@ -168,8 +169,19 @@ export default {
       selectedElement: null,
     }
   },
-  async created() {
-    await this.fetchNetworkData()
+  created() {
+    // Initial fetch
+    this.fetchNetworkData()
+    // Set up polling every 30 seconds
+    this.pollingInterval = setInterval(() => {
+      this.fetchNetworkData()
+    }, 30000)
+  },
+  beforeUnmount() {
+    // Clean up polling interval when component is destroyed
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval)
+    }
   },
   methods: {
     async fetchNetworkData() {
