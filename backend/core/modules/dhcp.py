@@ -67,7 +67,17 @@ class _DHCPServer:
         # First, check if client already has a lease
         existing_lease = self.get_lease_by_mac(client_mac)
         if existing_lease:
-            return existing_lease.ip_address
+            # Find the scope this IP belongs to
+            ip_obj = ipaddress.ip_address(existing_lease.ip_address)
+            
+            # Check secondary scopes first
+            for scope in DHCPScope.objects.all():
+                network = ipaddress.IPv4Network(f"{scope.network}/{scope.subnet_mask}", strict=False)
+                if ip_obj in network:
+                    return existing_lease.ip_address, scope.subnet_mask
+            
+            # If not in any secondary scope, must be in main scope
+            return existing_lease.ip_address, self.main_scope_subnet_mask
         
         # Get all active leases
         active_leases = set(lease.ip_address for lease in self.get_active_leases_from_db())
@@ -85,9 +95,9 @@ class _DHCPServer:
                     ip_str in active_leases):
                     continue
                 
-                return ip_str
+                return ip_str, self.main_scope_subnet_mask
             
-            return None
+            return None, None
         
         # If relay agent is involved, find the matching secondary scope
         secondary_scopes = DHCPScope.objects.all()
@@ -105,13 +115,13 @@ class _DHCPServer:
                 
                 # Check if last host is available
                 if last_host not in active_leases:
-                    return last_host
+                    return last_host, scope.subnet_mask
                 
                 # If last host is not available, return None
-                return None
+                return None, None
         
         # If no matching scope found for relay IP
-        return None
+        return None, None
     
     def create_or_update_lease(self, mac_address, ip_address, hostname=None, lease_time_seconds=None):
         expiry_time = timezone.now() + timedelta(seconds=lease_time_seconds or self.lease_time)
@@ -135,10 +145,14 @@ class _DHCPServer:
     def delete_lease(self, mac_address):
         DHCPLease.objects.filter(mac_address=mac_address).delete()
     
-    def create_dhcp_packet(self, client_packet, message_type, yiaddr='0.0.0.0'):
+    def create_dhcp_packet(self, client_packet, message_type, yiaddr='0.0.0.0', subnet_mask=None):
         xid = client_packet[4:8]
         client_mac = client_packet[28:34]
         giaddr = client_packet[24:28]
+        
+        # If no specific subnet mask is provided, use the main one
+        if subnet_mask is None:
+            subnet_mask = self.main_scope_subnet_mask
         
         packet = b''
         packet += b'\x02'
@@ -161,7 +175,7 @@ class _DHCPServer:
         packet += struct.pack('!BBB', DHCP_MESSAGE_TYPE, 1, message_type)
         packet += struct.pack('!BB4s', DHCP_SERVER_ID, 4, socket.inet_aton(self.server_ip))
         packet += struct.pack('!BBI', DHCP_LEASE_TIME, 4, self.lease_time)
-        packet += struct.pack('!BB4s', DHCP_SUBNET_MASK, 4, socket.inet_aton(self.main_scope_subnet_mask))
+        packet += struct.pack('!BB4s', DHCP_SUBNET_MASK, 4, socket.inet_aton(subnet_mask))
         packet += struct.pack('!BB4s', DHCP_ROUTER, 4, socket.inet_aton(self.server_ip))
         packet += struct.pack('!BB4s', DHCP_DNS, 4, socket.inet_aton(self.server_ip))
         packet += struct.pack('!BB4s', DHCP_TFTP_SERVER_IP, 4, socket.inet_aton(self.tftp_server_ip))
@@ -219,15 +233,15 @@ class _DHCPServer:
                 i += 2 + length
         
         # If a relay agent is involved, pass its IP
-        ip_to_offer = self.get_available_ip(client_mac, relay_ip=giaddr if giaddr != '0.0.0.0' else None)
+        ip_to_offer, subnet_mask = self.get_available_ip(client_mac, relay_ip=giaddr if giaddr != '0.0.0.0' else None)
         
         if not ip_to_offer:
             self.logger.warning(f'No available IP addresses for client {client_mac} (Hostname: {hostname})')
             return
         
-        self.logger.info(f'Offering IP {ip_to_offer} to client {client_mac} (Hostname: {hostname})')
+        self.logger.info(f'Offering IP {ip_to_offer}/{subnet_mask} to client {client_mac} (Hostname: {hostname})')
         
-        offer_packet = self.create_dhcp_packet(data, DHCP_OFFER, ip_to_offer)
+        offer_packet = self.create_dhcp_packet(data, DHCP_OFFER, ip_to_offer, subnet_mask)
         
         if giaddr != '0.0.0.0':
             self.logger.info(f'Sending offer via relay agent at {giaddr}')
@@ -263,7 +277,7 @@ class _DHCPServer:
                 i += 2 + length
         
         # If a relay agent is involved, pass its IP
-        available_ip = self.get_available_ip(
+        available_ip, subnet_mask = self.get_available_ip(
             client_mac, 
             relay_ip=giaddr if giaddr != '0.0.0.0' else None
         )
@@ -271,7 +285,11 @@ class _DHCPServer:
         if available_ip and (not requested_ip or available_ip == requested_ip):
             # Check if this is the first time this MAC has received a lease
             is_first_time = not self.get_lease_by_mac(client_mac)
+<<<<<<< HEAD
             
+=======
+
+>>>>>>> origin/28-fix-site-deletion-and-interface-connection
             self.create_or_update_lease(
                 mac_address=client_mac,
                 ip_address=available_ip,
@@ -279,12 +297,12 @@ class _DHCPServer:
                 lease_time_seconds=self.lease_time
             )
             
-            self.logger.info(f'Acknowledging IP {available_ip} to client {client_mac} (Hostname: {hostname})')
+            self.logger.info(f'Acknowledging IP {available_ip}/{subnet_mask} to client {client_mac} (Hostname: {hostname})')
             
             # Schedule discovery with is_first_time flag
             DiscoveryScheduler.schedule_discovery(available_ip, is_first_time=is_first_time)
             
-            ack_packet = self.create_dhcp_packet(data, DHCP_ACK, available_ip)
+            ack_packet = self.create_dhcp_packet(data, DHCP_ACK, available_ip, subnet_mask)
             
             if giaddr != '0.0.0.0':
                 self.sock.sendto(ack_packet, (giaddr, 67))

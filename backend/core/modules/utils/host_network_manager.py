@@ -52,6 +52,13 @@ class _HostNetworkManager:
         return routes
     
     def add_route(self, prefix: str, gateway: str, interface: Union[int, str]) -> bool:
+        # Check if route exists and delete it
+        existing_routes = self.list_routes()
+        for route in existing_routes:
+            if route['prefix'] == prefix:
+                self.delete_route(prefix, interface)
+                break
+
         cmd = [
             'netsh', 'interface', 'ipv4', 'add', 'route', f'prefix={prefix}', f'nexthop={gateway}', f'interface={interface}'
         ]

@@ -101,6 +101,7 @@ const router = createRouter({
   ],
 })
 
+<<<<<<< HEAD
 // Authentication and error handling
 router.beforeEach(async (to, from, next) => {
   const publicPages = [
@@ -130,4 +131,6 @@ router.beforeEach(async (to, from, next) => {
   }
 })
 
+=======
+>>>>>>> origin/28-fix-site-deletion-and-interface-connection
 export default router

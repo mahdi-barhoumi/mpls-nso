@@ -23,7 +23,8 @@ class _NetworkDiscoverer:
                 "total": 0,
                 "provider_core": 0,
                 "provider_edge": 0,
-                "customer_edge": 0
+                "customer_edge": 0,
+                "reachable": 0
             },
             "vrfs": {
                 "created": 0,
@@ -39,8 +40,6 @@ class _NetworkDiscoverer:
                 "created": 0
             }
         }
-        # Keep track of reachable routers
-        self.reachable_routers = set()
     
     def initialize(self):
         if self.initialized:
@@ -77,7 +76,8 @@ class _NetworkDiscoverer:
                 "total": 0,
                 "provider_core": 0,
                 "provider_edge": 0,
-                "customer_edge": 0
+                "customer_edge": 0,
+                "reachable": 0
             },
             "vrfs": {
                 "created": 0,
@@ -93,7 +93,9 @@ class _NetworkDiscoverer:
                 "created": 0
             }
         }
-        self.reachable_routers = set()
+        
+        # Reset reachability status for all routers
+        Router.objects.all().update(reachable=False)
         
         # Get all active DHCP leases
         active_leases = DHCPLease.objects.filter(expiry_time__gt=timezone.now())
@@ -117,17 +119,87 @@ class _NetworkDiscoverer:
         self.update_interface_connections()
         
         # Update router role counts
-        self.stats["routers"]["total"] = len(self.reachable_routers)
-        for router in self.reachable_routers:
-            if router.role == 'P':
-                self.stats["routers"]["provider_core"] += 1
-            elif router.role == 'PE':
-                self.stats["routers"]["provider_edge"] += 1
-            elif router.role == 'CE':
-                self.stats["routers"]["customer_edge"] += 1
+        routers = Router.objects.filter(reachable=True)
+        self.stats["routers"]["total"] = routers.count()
+        self.stats["routers"]["reachable"] = routers.count()
+        self.stats["routers"]["provider_core"] = routers.filter(role='P').count()
+        self.stats["routers"]["provider_edge"] = routers.filter(role='PE').count()
+        self.stats["routers"]["customer_edge"] = routers.filter(role='CE').count()
         
         return self.stats
     
+    def discover_single_device(self, ip_address):
+        self.logger.info(f"Starting single device discovery for {ip_address}")
+        
+        # Initialize if needed
+        if not self.initialized:
+            self.initialize()
+        
+        # Reset statistics for this discovery
+        self.stats = {
+            "discovered_devices": 0,
+            "routers": {
+                "created": 0,
+                "updated": 0,
+                "total": 0,
+                "provider_core": 0,
+                "provider_edge": 0,
+                "customer_edge": 0,
+                "reachable": 0
+            },
+            "vrfs": {
+                "created": 0,
+                "updated": 0,
+                "removed": 0
+            },
+            "interfaces": {
+                "created": 0,
+                "updated": 0,
+                "removed": 0
+            },
+            "connections": {
+                "created": 0
+            }
+        }
+        
+        # Discover the device
+        try:
+            device_data = self.discover_ip(ip_address)
+            if device_data:
+                self.stats["discovered_devices"] += 1
+                
+                # Update connections for this device
+                router = Router.objects.get(chassis_id=device_data["chassis_id"])
+                self.process_router_connections(router)
+                
+                # Update router role counts for reachable routers
+                reachable_routers = Router.objects.filter(reachable=True)
+                self.stats["routers"]["total"] = reachable_routers.count()
+                self.stats["routers"]["reachable"] = reachable_routers.count()
+                self.stats["routers"]["provider_core"] = reachable_routers.filter(role='P').count()
+                self.stats["routers"]["provider_edge"] = reachable_routers.filter(role='PE').count()
+                self.stats["routers"]["customer_edge"] = reachable_routers.filter(role='CE').count()
+                
+                return {
+                    "success": True,
+                    "device": device_data,
+                    "stats": self.stats
+                }
+            else:
+                self.logger.warning(f"Failed to discover device at {ip_address}")
+                return {
+                    "success": False,
+                    "error": "Device discovery failed - could not retrieve device data",
+                    "stats": self.stats
+                }
+        except Exception as e:
+            self.logger.error(f"Error discovering device at {ip_address}: {str(e)}")
+            return {
+                "success": False,
+                "error": f"Device discovery error: {str(e)}",
+                "stats": self.stats
+            }
+
     def discover_ip(self, ip_address):
         try:
             self.logger.info(f"Processing device at {ip_address}")
@@ -152,8 +224,10 @@ class _NetworkDiscoverer:
             # Create or update router
             router = self.create_or_update_router(chassis_id, ip_address, hostname, role)
             
-            # Add to reachable routers set
-            self.reachable_routers.add(router)
+            # Mark router as reachable
+            router.reachable = True
+            router.save()
+            self.stats["routers"]["reachable"] += 1
             
             # Store router in cache
             self.router_cache[hostname] = router
@@ -545,12 +619,12 @@ class _NetworkDiscoverer:
         self.logger.info("Starting interface connection update")
         
         # Only process connections for routers that were reachable
-        routers = list(self.reachable_routers)
+        reachable_routers = Router.objects.filter(reachable=True)
         
         # Process connections in parallel
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             futures = {executor.submit(self.process_router_connections, router): router 
-                      for router in routers}
+                    for router in reachable_routers}
             
             for future in as_completed(futures):
                 router = futures[future]
@@ -575,7 +649,7 @@ class _NetworkDiscoverer:
             router_interfaces = {interface.name: interface for interface in Interface.objects.filter(router=router)}
             
             # Get routers by chassis ID for faster lookup (only use reachable routers)
-            routers_by_chassis = {r.chassis_id: r for r in self.reachable_routers}
+            routers_by_chassis = {r.chassis_id: r for r in Router.objects.filter(reachable=True)}
             
             # Process LLDP interface details
             for intf_detail in lldp_intf_details:
@@ -626,11 +700,63 @@ class _NetworkDiscoverer:
             self.logger.warning(f"Remote interface {remote_system_name}:{remote_interface_name} not found")
             return
         
+        # Check if either interface is a subinterface
+        local_is_subinterface = '.' in local_interface.name
+        remote_is_subinterface = '.' in remote_interface.name
+        
+        # If one is a subinterface and the other is physical, look for matching subinterface
+        if local_is_subinterface != remote_is_subinterface:
+            if local_is_subinterface:
+                # Local is subinterface, remote is physical, find matching remote subinterface
+                matching_remote = self.find_matching_subinterface(local_interface, remote_interface)
+                if matching_remote:
+                    remote_interface = matching_remote
+                else:
+                    self.logger.debug(f"No matching subinterface found for {local_interface} on remote router")
+                    return
+            else:
+                # Remote is subinterface, local is physical, find matching local subinterface
+                matching_local = self.find_matching_subinterface(remote_interface, local_interface)
+                if matching_local:
+                    local_interface = matching_local
+                else:
+                    self.logger.debug(f"No matching subinterface found for {remote_interface} on local router")
+                    return
+        
         # Create the connection
         with transaction.atomic():
             local_interface.connected_interfaces.add(remote_interface)
             self.logger.debug(f"Connected {local_interface} to {remote_interface}")
             self.stats["connections"]["created"] += 1
+
+    def find_matching_subinterface(self, subinterface, physical_interface):
+        if not subinterface.vlan:
+            self.logger.warning(f"Subinterface {subinterface} has no VLAN assigned")
+            return None
+        
+        # Extract base physical interface name from physical_interface
+        base_name = physical_interface.name
+        
+        # Find all subinterfaces of the physical interface with the same VLAN
+        try:
+            matching_subinterface = Interface.objects.get(
+                router=physical_interface.router,
+                name__startswith=f"{base_name}.",
+                vlan=subinterface.vlan
+            )
+            self.logger.debug(f"Found matching subinterface {matching_subinterface} with VLAN {subinterface.vlan}")
+            return matching_subinterface
+        except Interface.DoesNotExist:
+            self.logger.debug(f"No matching subinterface with VLAN {subinterface.vlan} found on {physical_interface.router}")
+            return None
+        except Interface.MultipleObjectsReturned:
+            self.logger.warning(f"Multiple matching subinterfaces with VLAN {subinterface.vlan} found on {physical_interface.router}")
+            # Get the first one in this case
+            return Interface.objects.filter(
+                router=physical_interface.router,
+                name__startswith=f"{base_name}.",
+                vlan=subinterface.vlan
+            ).first()
     
     def normalize_interface_name(self, port_id):
         # Common interface abbreviation mappings
