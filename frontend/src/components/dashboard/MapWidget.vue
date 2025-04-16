@@ -23,9 +23,8 @@
         :edges="graphData.edges"
         :layouts="layouts"
         :configs="configs"
+        :event-handlers="eventHandlers"
         @mouseup="saveLayout"
-        @node-click="onNodeClick"
-        @edge-click="onEdgeClick"
         @layout-updated="onLayoutUpdated"
         class="h-full w-full"
       >
@@ -89,30 +88,6 @@
         </template>
       </v-network-graph>
     </div>
-
-    <!-- Details Dialog -->
-    <Dialog
-      v-if="selectedElement"
-      :visible="true"
-      :header="selectedElement.type === 'node' ? 'Node Details' : 'Link Details'"
-      modal
-      class="w-11 sm:w-6"
-      @hide="closeDetails"
-    >
-      <template v-if="selectedElement.type === 'node'">
-        <div v-for="(value, key) in selectedElement.data" :key="key" class="mb-2">
-          <span class="font-bold capitalize">{{ key.replace(/_/g, ' ') }}:</span>
-          <span>{{ value }}</span>
-        </div>
-      </template>
-
-      <template v-else-if="selectedElement.type === 'link'">
-        <div v-for="(value, key) in selectedElement.data" :key="key" class="mb-2">
-          <span class="font-bold capitalize">{{ key.replace(/_/g, ' ') }}:</span>
-          <span>{{ value }}</span>
-        </div>
-      </template>
-    </Dialog>
   </div>
 </template>
 
@@ -121,7 +96,6 @@ import { VNetworkGraph, VEdgeLabel } from 'v-network-graph'
 import 'v-network-graph/lib/style.css'
 import { MappingService } from '@/service/MappingService.js'
 import Button from 'primevue/button'
-import Dialog from 'primevue/dialog'
 
 const STORAGE_KEYS = {
   NODES: 'network-graph-nodes',
@@ -135,7 +109,6 @@ export default {
     VNetworkGraph,
     VEdgeLabel,
     Button,
-    Dialog,
   },
   data() {
     return {
@@ -182,8 +155,18 @@ export default {
           },
         },
       },
-      selectedElement: null,
       saveDebounce: null,
+      eventHandlers: {
+        'node:click': ({ node }) => {
+          const nodeData = this.graphData.nodes[node]
+          if (nodeData) {
+            this.$emit('node-selected', node) // Just emit the node ID
+          }
+        },
+        'edge:click': ({ edge }) => {
+          // Optionally handle edge clicks if needed
+        },
+      },
     }
   },
   created() {
@@ -364,32 +347,6 @@ export default {
     getNodeName(nodeId) {
       const node = this.graphData.nodes[nodeId]
       return node.label
-    },
-
-    onNodeClick(event) {
-      const nodeId = event.node
-      const node = this.graphData.nodes[nodeId]
-      if (node) {
-        this.selectedElement = {
-          type: 'node',
-          data: node,
-        }
-      }
-    },
-
-    onEdgeClick(event) {
-      const edgeId = event.edge
-      const edge = this.graphData.edges[edgeId]
-      if (edge) {
-        this.selectedElement = {
-          type: 'link',
-          data: edge,
-        }
-      }
-    },
-
-    closeDetails() {
-      this.selectedElement = null
     },
 
     zoomIn() {
