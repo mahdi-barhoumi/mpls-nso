@@ -113,9 +113,6 @@ class _NetworkDiscoverer:
                 except Exception as e:
                     self.logger.error(f"Error processing device at {ip_address}: {str(e)}")
         
-        # Update connections between interfaces after discovery
-        self.update_interface_connections()
-        
         # Update router role counts
         self.stats["routers"]["total"] = len(self.reachable_routers)
         for router in self.reachable_routers:
@@ -172,6 +169,9 @@ class _NetworkDiscoverer:
             # Process interfaces
             if device_data.get('native_interfaces'):
                 self.process_interfaces(router, device_data['native_interfaces'], device_data['oper_interfaces'])
+            
+            # Process connections for this router immediately
+            self.process_router_connections(router)
             
             return {
                 "hostname": hostname,
