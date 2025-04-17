@@ -346,7 +346,7 @@ class _DHCPServer:
     
     def server_loop(self):
         self.logger.info(f'DHCP server running on {self.server_ip}')
-        self.logger.info(f'Main scope: {self.main_scope_address}/{self.main_scope_subnet_mask}')
+        self.logger.info(f'Main scope: {str(ipaddress.IPv4Network(f"{self.main_scope_address}/{self.main_scope_subnet_mask}", strict=False))}')
         
         try:
             self.sock.settimeout(1)
@@ -436,8 +436,7 @@ class _DHCPServer:
             "running": self.running,
             "config": {
                 "server_ip": self.server_ip,
-                "main_scope": f"{self.main_scope_address}/{self.main_scope_subnet_mask}",
-                "lease_time": self.lease_time,
+                "main_scope": str(ipaddress.IPv4Network(f"{self.main_scope_address}/{self.main_scope_subnet_mask}", strict=False)),
                 "tftp_server_ip": self.tftp_server_ip
             } if self.running else None
         }
