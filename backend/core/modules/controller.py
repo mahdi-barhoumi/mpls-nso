@@ -2,6 +2,7 @@ import logging
 import ipaddress
 from typing import List
 from core.modules.utils.host_network_manager import HostNetworkManager
+from core.modules.discovery import NetworkDiscoverer
 from core.modules.utils.restconf import RestconfWrapper
 from core.models import Interface, Site, Router, VRF, RouteTarget
 from core.settings import get_settings
@@ -110,7 +111,6 @@ class _NetworkController:
             # Build payload based on interface attributes
             payload = {
                 "name": interface.index,
-                "vrf": {"forwarding": interface.vrf.name} if interface.vrf else {},
                 "ip": {
                     "helper-address": [
                         {
@@ -123,6 +123,12 @@ class _NetworkController:
             # Add description if available
             if interface.description:
                 payload["description"] = interface.description
+
+            # Add VRF configuration if available
+            if interface.vrf:
+                payload["vrf"] = {
+                    "forwarding": interface.vrf.name
+                }
 
             # Add VLAN configuration for subinterfaces
             if interface.category == 'logical' and interface.vlan:
@@ -166,6 +172,8 @@ class _NetworkController:
                     self.enable_interface(interface)
                 else:
                     self.disable_interface(interface)
+                if not interface.vrf:
+                    self.unassign_vrf(interface)
                 # Update the database
                 interface.save()
                 self.logger.info(f"Successfully updated interface {interface.name} on {interface.router}")
@@ -218,7 +226,7 @@ class _NetworkController:
                 path=f"Cisco-IOS-XE-native:native/interface/{interface.type}={interface.index}"
             )
             
-            if result is not None:
+            if result:
                 # Delete the interface from the database
                 interface.delete()
                 self.logger.info(f"Successfully deleted interface {interface.name} from {interface.router}")
@@ -246,7 +254,7 @@ class _NetworkController:
                 path=f"Cisco-IOS-XE-native:native/interface/{interface.type}={interface.index}/vrf/"
             )
             
-            if result is not None:
+            if result:
                 interface.vrf = None
                 interface.save()
                 self.logger.info(f"Successfully unassigned VRF {interface.name} on {interface.router}")
@@ -333,7 +341,7 @@ class _NetworkController:
                 path=f"Cisco-IOS-XE-native:native/vrf/definition={vrf.name}"
             )
             
-            if result is not None:
+            if result:
                 vrf.delete()
                 self.logger.info(f"Successfully deleted VRF {vrf.name} from {vrf.router}")
                 return True
@@ -425,49 +433,51 @@ class _NetworkController:
             self.logger.error(f"Error assigning interface to site: {str(exception)}")
             return False
 
-    def unassign_interface(self, interface: Interface, site: Site) -> bool:
-        # Validate inputs
-        if not interface or not site:
-            self.logger.error("Invalid interface or site")
+    def unassign_interface(self, site: Site) -> bool:
+        if not site.assigned_interface:
+            self.logger.warning("Site doesn't have an assigned interface")
             return False
-
-        if site.assigned_interface != interface:
-            self.logger.warning("Interface is not assigned to this site")
-            return False
-
-        # Get system settings
-        settings = get_settings()
-        if not settings:
-            self.logger.error("Cannot unassign interface: No system settings found")
-            return False
-
-        dhcp_scope = ipaddress.IPv4Network(
-            f'{site.dhcp_scope.network}/{site.dhcp_scope.subnet_mask}', 
-            strict=False
-        )
 
         try:
-            
-            subinterface = self.get_or_create_subinterface(interface, 10)
+            dhcp_scope = ipaddress.IPv4Network(
+                f'{site.dhcp_scope.network}/{site.dhcp_scope.subnet_mask}', 
+                strict=False
+            )
 
+            interface = site.assigned_interface
+
+            try:
+                subinterface = Interface.objects.get(router=interface.router, vlan=10, name=interface.name + '.10')
+                if not self.delete_interface(subinterface):
+                    self.logger.error(f"Failed to delete subinterface {subinterface}")
+                    return False
+            except Interface.DoesNotExist:
+                pass
+
+            # Store router reference to ensure it exists when saving interface
+            router = interface.router
+            
+            # Update interface fields
             interface.addressing = "static"
             interface.ip_address = None
             interface.subnet_mask = None
             interface.dhcp_helper_address = None
+            interface.vrf = None
             interface.enabled = False
+            interface.router = router  # Re-assign router to ensure relationship
 
-            if not self.create_or_update_interface(interface) or not self.delete_interface(subinterface):
-                self.logger.error(f"Failed to clear interface {interface.name} configuration via RESTCONF")
+            if not self.create_or_update_interface(interface):
+                self.logger.error(f"Failed to clear interface {interface}")
                 return False
 
             # Remove route to site's DHCP scope
-            HostNetworkManager.delete_route(str(dhcp_scope), settings.host_interface_id)
-
-            # Deactivate DHCP scope
-            site.dhcp_scope.is_active = False
-            site.dhcp_scope.save()
+            HostNetworkManager.delete_route(str(dhcp_scope))
 
             # Update site in database
+            site.dhcp_scope.is_active = False
+            site.dhcp_scope.save()
+            
+            # Clear assigned interface last
             site.assigned_interface = None
             site.save()
 
@@ -577,9 +587,15 @@ class _NetworkController:
         )
         
         # Verify required ojbects
-        if None in [pe_router, ce_router, pe_interface, ce_interface]:
-            print([pe_router, ce_router, pe_interface, ce_interface])
-            self.logger.error(f"A required object is missing")
+        missing_objects = [obj_name for obj_name, obj in {
+            "PE router": pe_router,
+            "CE router": ce_router,
+            "PE interface": pe_interface,
+            "CE interface": ce_interface
+        }.items() if obj is None]
+
+        if missing_objects:
+            self.logger.error(f"The following required objects are missing: {', '.join(missing_objects)}")
             return False
 
         # Verify router roles
@@ -709,9 +725,12 @@ class _NetworkController:
         # Only set has_routing to True if all configuration succeeded
         site.has_routing = True
         site.save()
+
+        # Finally run a discovery on PE to refresh the connections
+        NetworkDiscoverer.discover_single_device(pe_router.management_ip_address)
+
         return True
 
-    # TODO: Fix me
     def disable_routing(self, site):
         self.logger.info(f"Disabling routing for site {site}")
         
@@ -719,19 +738,9 @@ class _NetworkController:
         if not site.has_routing:
             self.logger.error(f"Site {site} does not have routing enabled")
             return False
-        
-        settings = get_settings()
-        if not settings:
-            self.logger.error("Cannot disable routing: No system settings found")
-            return False
 
-        pe_router = site.assigned_interface.router
-        ce_router = site.router
-        pe_interface = site.assigned_interface
-        ce_interface = site.assigned_interface.connected_interfaces.first()
-        
-        if None in [pe_router, ce_router, pe_interface, ce_interface]:
-            self.logger.error("Missing required objects to disable routing")
+        if not site.assigned_interface or not site.vrf or not site.ospf_process_id or not site.router:
+            self.logger.error(f"Site {site} is not properly configured for routing")
             return False
 
         try:
@@ -742,70 +751,38 @@ class _NetworkController:
 
             # Remove OSPF process from PE router
             result = self.restconf.delete(
-                pe_router.management_ip_address,
-                f"Cisco-IOS-XE-native:native/router/router-ospf/ospf/process-id-vrf={site.ospf_process_id}"
+                site.assigned_interface.router.management_ip_address,
+                f"Cisco-IOS-XE-native:native/router/router-ospf/ospf/process-id-vrf={site.ospf_process_id},{site.vrf.name}"
             )
             
-            if result is None:
+            if not result:
                 self.logger.error(f"Failed to remove OSPF process from PE router")
-                return False
-
-            # Remove OSPF process from CE router
-            result = self.restconf.delete(
-                ce_router.management_ip_address,
-                "Cisco-IOS-XE-native:native/router/router-ospf/ospf/process-id=1"
-            )
-
-            if result is None:
-                self.logger.error(f"Failed to remove OSPF process from CE router")
                 return False
 
             # Reset site routing fields
             site.ospf_process_id = None
             site.save()
 
-            # Reset PE interface to management VRF
-            pe_management_vrf = VRF.objects.get(router=pe_router, name=settings.management_vrf)
-            pe_interface.vrf = pe_management_vrf
-            
-            if not self.create_or_update_interface(pe_interface):
-                self.logger.error(f"Failed resetting PE interface {pe_interface}")
+            # Remove OSPF process from CE router
+            result = self.restconf.delete(
+                site.router.management_ip_address,
+                "Cisco-IOS-XE-native:native/router/router-ospf/ospf/process-id=1"
+            )
+
+            if not result:
+                self.logger.error(f"Failed to remove OSPF process from CE router")
                 return False
 
-            # Reset CE interface to default state
-            ce_interface.addressing = "dhcp"
-            ce_interface.ip_address = None
-            ce_interface.subnet_mask = None
-            ce_interface.vrf = None
-            ce_interface.dhcp_helper_address = None
-
-            if not self.create_or_update_interface(ce_interface):
-                self.logger.error(f"Failed resetting CE interface {ce_interface}")
-                return False
-
-            # Delete any subinterfaces
-            for interface in [pe_interface, ce_interface]:
-                subinterfaces = Interface.objects.filter(
-                    router=interface.router,
-                    name__startswith=f"{interface.name}."
-                )
-                for subinterface in subinterfaces:
-                    if not self.delete_interface(subinterface):
-                        self.logger.error(f"Failed to delete subinterface {subinterface}")
-                        return False
-
-            self.logger.info(f"Successfully disabled routing for site {site}")
-            
             # Only set has_routing to False if all removal succeeded
             site.has_routing = False
             site.save()
+            self.logger.info(f"Successfully disabled routing for site {site}")
             return True
 
         except Exception as exception:
             self.logger.error(f"Error disabling routing for site {site}: {str(exception)}")
             return False
 
-    # TODO: Fix me
     def disable_route_redistribution(self, site) -> bool:
         try:
             self.logger.info(f"Disabling route redistribution for site {site}")
@@ -824,20 +801,20 @@ class _NetworkController:
             # Remove BGP to OSPF redistribution
             result = self.restconf.delete(
                 site.assigned_interface.router.management_ip_address,
-                f"Cisco-IOS-XE-native:native/router/bgp={settings.bgp_as}/address-family/with-vrf/ipv4/vrf={site.vrf.name}/ipv4-unicast/redistribute-vrf/ospf={site.ospf_process_id}"
+                f"Cisco-IOS-XE-native:native/router/bgp={settings.bgp_as}/address-family/with-vrf/ipv4/unicast/vrf={site.vrf.name}"
             )
 
-            if result is None:
+            if not result:
                 self.logger.error(f"Failed removing BGP to OSPF redistribution for site {site}")
                 return False
 
             # Remove OSPF to BGP redistribution
             result = self.restconf.delete(
                 site.assigned_interface.router.management_ip_address,
-                f"Cisco-IOS-XE-native:native/router/router-ospf/ospf/process-id-vrf={site.ospf_process_id}/redistribute/bgp={settings.bgp_as}"
+                f"Cisco-IOS-XE-native:native/router/router-ospf/ospf/process-id-vrf={site.ospf_process_id},{site.vrf.name}/redistribute/"
             )
 
-            if result is None:
+            if not result:
                 self.logger.error(f"Failed removing OSPF to BGP redistribution for site {site}")
                 return False
 
@@ -1063,27 +1040,25 @@ class _NetworkController:
                 if not self.remove_site_from_vpn(site, vpn):
                     self.logger.error(f"Failed to remove site from VPN {vpn}")
                     return False
+            
+            if site.has_routing:
+                if not self.disable_routing(site):
+                    self.logger.error(f"Failed to remove site: Could not disable routing")
+                    return False
+
+            # Delete the CE router and all its interfaces if it exists
+            if site.router:
+                try:
+                    ce_interface = site.assigned_interface.connected_interfaces.first()
+                    ce_interface.addressing = 'dhcp'
+                    self.create_or_update_interface(ce_interface)
+                except:
+                    pass
 
             # Unassign the PE interface if assigned
             if site.assigned_interface:
-                # Delete any subinterfaces on the PE interface
-                for subinterface in Interface.objects.filter(
-                    router=site.assigned_interface.router,
-                    name__startswith=f"{site.assigned_interface.name}."
-                ):
-                    if not self.delete_interface(subinterface):
-                        self.logger.error(f"Failed to delete subinterface {subinterface}")
-                        return False
-
-                pe_interface = site.assigned_interface
-
-                if not self.unassign_interface(site.assigned_interface, site):
+                if not self.unassign_interface(site):
                     self.logger.error(f"Failed to unassign interface from site")
-                    return False
-
-                # Disable the PE interface
-                if not self.disable_interface(pe_interface):
-                    self.logger.error(f"Failed to disable PE interface")
                     return False
 
             # Delete the site's VRF and its route targets if it exists
@@ -1093,16 +1068,13 @@ class _NetworkController:
                     self.logger.error(f"Failed to delete site VRF")
                     return False
 
+            if site.router:
+                # Delete the CE router
+                site.router.delete()
+
             # Delete the DHCP scope if it exists
             if site.dhcp_scope:
                 site.dhcp_scope.delete()
-
-            # Delete the CE router and all its interfaces if it exists
-            if site.router:
-                # Delete all interfaces of the CE router first
-                Interface.objects.filter(router=site.router).delete()
-                # Then delete the router itself
-                site.router.delete()
 
             # Finally delete the site
             site.delete()

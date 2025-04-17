@@ -189,9 +189,12 @@ class RestconfWrapper:
                     timeout=self.timeout
                 )
                 
-                if response.status_code in [200, 204]:
+                if response.status_code in [200, 204, 404]:
                     # Success (no content expected for DELETE)
                     
+                    if response.status_code == 404:
+                        self.logger.warning("Request to delete a resource that doesn't exist, passing as successful")
+
                     # Auto-save if enabled
                     if self.auto_save:
                         self.save(ip_address)
