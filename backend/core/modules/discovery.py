@@ -98,7 +98,7 @@ class _NetworkDiscoverer:
         Router.objects.all().update(reachable=False)
         
         # Get all active DHCP leases
-        active_leases = DHCPLease.objects.filter(expiry_time__gt=timezone.now())
+        active_leases = DHCPLease.objects.filter(active=True)
         self.logger.info(f"Found {active_leases.count()} active DHCP leases")
         
         # Process devices in parallel with thread pool
