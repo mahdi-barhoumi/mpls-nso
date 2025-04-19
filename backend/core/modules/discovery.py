@@ -1,10 +1,9 @@
 import logging
 import ipaddress
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from django.utils import timezone
 from django.db import transaction
 from core.modules.utils.restconf import RestconfWrapper
-from core.models import DHCPLease, Router, VRF, RouteTarget, Interface, Site
+from core.models import DHCPLease, Router, VRF, RouteTarget, Interface, Site, Notification
 from core.settings import get_settings
 
 class _NetworkDiscoverer:
@@ -24,7 +23,8 @@ class _NetworkDiscoverer:
                 "provider_core": 0,
                 "provider_edge": 0,
                 "customer_edge": 0,
-                "reachable": 0
+                "reachable": 0,
+                "unreachable": 0
             },
             "vrfs": {
                 "created": 0,
@@ -77,7 +77,8 @@ class _NetworkDiscoverer:
                 "provider_core": 0,
                 "provider_edge": 0,
                 "customer_edge": 0,
-                "reachable": 0
+                "reachable": 0,
+                "unreachable": 0
             },
             "vrfs": {
                 "created": 0,
@@ -93,9 +94,6 @@ class _NetworkDiscoverer:
                 "created": 0
             }
         }
-        
-        # Reset reachability status for all routers
-        Router.objects.all().update(reachable=False)
         
         # Get all active DHCP leases
         active_leases = DHCPLease.objects.filter(active=True)
@@ -145,7 +143,8 @@ class _NetworkDiscoverer:
                 "provider_core": 0,
                 "provider_edge": 0,
                 "customer_edge": 0,
-                "reachable": 0
+                "reachable": 0,
+                "unreachable": 0
             },
             "vrfs": {
                 "created": 0,
@@ -203,6 +202,30 @@ class _NetworkDiscoverer:
     def discover_ip(self, ip_address):
         try:
             self.logger.info(f"Processing device at {ip_address}")
+            
+            # First check if device responds to RESTCONF
+            if not self.restconf.is_available(ip_address):
+                # Check if this IP was a known router that became unreachable
+                try:
+                    router = Router.objects.get(management_ip_address=ip_address)
+                    if router.reachable:  # Only notify if it was previously reachable
+                        router.reachable = False
+                        router.save()
+                        self.logger.warning(f"Router {router.hostname} ({ip_address}) became unreachable")
+                        
+                        # Create notification for router becoming unreachable
+                        notification = Notification.objects.create(
+                            router=router,
+                            title=f"Router {router.hostname} is unreachable",
+                            message=f"Lost connection to router {router.hostname} ({ip_address})",
+                            severity="critical",
+                            source="discovery"
+                        )
+                        self.stats["routers"]["unreachable"] += 1
+                except Router.DoesNotExist:
+                    # Not a known router, just skip
+                    self.logger.debug(f"Device at {ip_address} is not RESTCONF capable")
+                return None
             
             # Get LLDP information
             lldp_data = self.get_device_data(ip_address, "Cisco-IOS-XE-lldp-oper:lldp-entries")
@@ -345,6 +368,17 @@ class _NetworkDiscoverer:
         else:
             self.logger.info(f"Updated existing router: {hostname} (Role: {role})")
             self.stats["routers"]["updated"] += 1
+            
+            # Check if router became reachable
+            if not router.reachable:  # It was unreachable before
+                self.logger.info(f"Router {hostname} is now reachable")
+                Notification.objects.create(
+                    router=router,
+                    title=f"Router {hostname} is now reachable",
+                    message=f"Restored connection to router {hostname} ({ip_address})",
+                    severity="info",
+                    source="discovery"
+                )
             
         return router
     

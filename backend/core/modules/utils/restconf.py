@@ -304,3 +304,24 @@ class RestconfWrapper:
         except Exception as e:
             self.logger.error(f"Error saving configuration to startup: {str(e)}")
             return False
+
+    def is_available(self, ip_address):
+        url = f"https://{ip_address}/restconf/"
+        
+        try:
+            response = requests.get(
+                url,
+                headers=self.headers,
+                auth=self.auth,
+                verify=self.verify_ssl,
+                timeout=self.timeout
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                return 'ietf-restconf:restconf' in data
+            return False
+            
+        except Exception as e:
+            self.logger.debug(f"RESTCONF not available at {ip_address}: {str(e)}")
+            return False

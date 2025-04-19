@@ -368,3 +368,95 @@ class VPN(models.Model):
         if self.pk:
             self.validate()
         super().save(*args, **kwargs)
+
+class Notification(models.Model):
+    SEVERITY_LEVELS = [
+        ('info', 'Information'),
+        ('warning', 'Warning'),
+        ('critical', 'Critical'),
+    ]
+    
+    SOURCES = [
+        ('monitoring', 'System Monitoring'),
+        ('provisioning', 'System Provisioning'),
+        ('security', 'Security'),
+        ('network', 'Network'),
+        ('other', 'Other')
+    ]
+    
+    title = models.CharField(max_length=255, help_text="Short notification title")
+    message = models.TextField(help_text="Detailed notification message")
+    severity = models.CharField(max_length=10, choices=SEVERITY_LEVELS, help_text="Notification severity level")
+    source = models.CharField(max_length=20, choices=SOURCES, help_text="Source of the notification")
+    router = models.ForeignKey('Router', on_delete=models.CASCADE, null=True, blank=True, related_name='notifications')
+    interface = models.ForeignKey('Interface', on_delete=models.CASCADE, null=True, blank=True, related_name='notifications')
+    acknowledged = models.BooleanField(default=False, help_text="Whether this notification has been acknowledged")
+    acknowledged_by = models.CharField(max_length=255, blank=True, null=True, help_text="Who acknowledged this notification")
+    acknowledged_at = models.DateTimeField(null=True, blank=True, help_text="When this notification was acknowledged")
+    created_at = models.DateTimeField(auto_now_add=True, help_text="When this notification was created")
+    updated_at = models.DateTimeField(auto_now=True, help_text="When this notification was last updated")
+    hash_key = models.CharField(max_length=64, blank=True, null=True, help_text="Unique hash to prevent duplicate notifications")
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['hash_key']),
+            models.Index(fields=['acknowledged', 'created_at']),
+            models.Index(fields=['router', 'severity', 'created_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.get_severity_display()}: {self.title}"
+    
+    def acknowledge(self, user):
+        self.acknowledged = True
+        self.acknowledged_by = user
+        self.acknowledged_at = timezone.now()
+        self.save()
+
+# Monitoring Models
+class RouterMetric(models.Model):
+    router = models.ForeignKey('Router', on_delete=models.CASCADE, related_name='metrics')
+    cpu_usage_5s = models.FloatField(help_text="5-second CPU usage percentage")
+    cpu_usage_1m = models.FloatField(help_text="1-minute CPU usage percentage")
+    cpu_usage_5m = models.FloatField(help_text="5-minute CPU usage percentage")
+    mem_used_percent = models.FloatField(help_text="Memory usage percentage")
+    mem_total = models.BigIntegerField(help_text="Total memory in KB")
+    mem_used = models.BigIntegerField(help_text="Used memory in KB")
+    mem_free = models.BigIntegerField(help_text="Free memory in KB")
+    storage_used_percent = models.FloatField(help_text="Storage usage percentage")
+    storage_total = models.BigIntegerField(help_text="Total storage in KB")
+    storage_used = models.BigIntegerField(help_text="Used storage in KB")
+    storage_free = models.BigIntegerField(help_text="Free storage in KB")
+    timestamp = models.DateTimeField(default=timezone.now, help_text="When this metric was collected")
+    
+    class Meta:
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['router', 'timestamp']),
+        ]
+    
+    def __str__(self):
+        return f"{self.router.hostname} - {self.timestamp}"
+
+class InterfaceMetric(models.Model):
+    interface = models.ForeignKey('Interface', on_delete=models.CASCADE, related_name='metrics')
+    operational_status = models.CharField(max_length=50, help_text="Operational status of the interface")
+    in_octets = models.BigIntegerField(help_text="Input octets")
+    out_octets = models.BigIntegerField(help_text="Output octets")
+    in_errors = models.IntegerField(help_text="Input errors")
+    out_errors = models.IntegerField(help_text="Output errors")
+    in_discards = models.IntegerField(help_text="Input discards")
+    out_discards = models.IntegerField(help_text="Output discards")
+    bps_in = models.BigIntegerField(help_text="Bits per second in")
+    bps_out = models.BigIntegerField(help_text="Bits per second out")
+    timestamp = models.DateTimeField(default=timezone.now, help_text="When this metric was collected")
+    
+    class Meta:
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['interface', 'timestamp']),
+        ]
+    
+    def __str__(self):
+        return f"{self.interface} - {self.timestamp}"
