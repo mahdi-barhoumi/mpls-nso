@@ -388,8 +388,6 @@ class Notification(models.Model):
     message = models.TextField(help_text="Detailed notification message")
     severity = models.CharField(max_length=10, choices=SEVERITY_LEVELS, help_text="Notification severity level")
     source = models.CharField(max_length=20, choices=SOURCES, help_text="Source of the notification")
-    router = models.ForeignKey('Router', on_delete=models.CASCADE, null=True, blank=True, related_name='notifications')
-    interface = models.ForeignKey('Interface', on_delete=models.CASCADE, null=True, blank=True, related_name='notifications')
     acknowledged = models.BooleanField(default=False, help_text="Whether this notification has been acknowledged")
     acknowledged_by = models.CharField(max_length=255, blank=True, null=True, help_text="Who acknowledged this notification")
     acknowledged_at = models.DateTimeField(null=True, blank=True, help_text="When this notification was acknowledged")
@@ -402,7 +400,7 @@ class Notification(models.Model):
         indexes = [
             models.Index(fields=['hash_key']),
             models.Index(fields=['acknowledged', 'created_at']),
-            models.Index(fields=['router', 'severity', 'created_at']),
+            models.Index(fields=['severity', 'created_at']),
         ]
     
     def __str__(self):

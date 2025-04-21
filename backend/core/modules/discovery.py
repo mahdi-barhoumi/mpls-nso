@@ -215,7 +215,6 @@ class _NetworkDiscoverer:
                         
                         # Create notification for router becoming unreachable
                         notification = Notification.objects.create(
-                            router=router,
                             title=f"Router {router.hostname} is unreachable",
                             message=f"Lost connection to router {router.hostname} ({ip_address})",
                             severity="critical",
@@ -373,7 +372,6 @@ class _NetworkDiscoverer:
             if not router.reachable:  # It was unreachable before
                 self.logger.info(f"Router {hostname} is now reachable")
                 Notification.objects.create(
-                    router=router,
                     title=f"Router {hostname} is now reachable",
                     message=f"Restored connection to router {hostname} ({ip_address})",
                     severity="info",

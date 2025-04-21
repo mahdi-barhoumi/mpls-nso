@@ -100,7 +100,6 @@ class _NetworkMonitor:
                 router.save()
                 self.logger.info(f"Marked router {router.hostname} as unreachable")
                 self._create_notification(
-                    router=router,
                     title=f"Router {router.hostname} is unreachable",
                     message=f"Lost connection to router {router.hostname} ({router.management_ip_address})",
                     severity="critical",
@@ -114,7 +113,6 @@ class _NetworkMonitor:
             router.save()
             self.logger.info(f"Marked router {router.hostname} as reachable")
             self._create_notification(
-                router=router,
                 title=f"Router {router.hostname} is now reachable",
                 message=f"Restored connection to router {router.hostname} ({router.management_ip_address})",
                 severity="info",
@@ -285,7 +283,6 @@ class _NetworkMonitor:
     def _check_cpu_thresholds(self, router, cpu_usage):
         if cpu_usage >= self.thresholds['cpu_critical']:
             self._create_notification(
-                router=router,
                 title=f"Critical CPU usage on {router.hostname}",
                 message=f"CPU usage is {cpu_usage:.1f}%, which exceeds the critical threshold of {self.thresholds['cpu_critical']}%",
                 severity="critical",
@@ -293,7 +290,6 @@ class _NetworkMonitor:
             )
         elif cpu_usage >= self.thresholds['cpu_warning']:
             self._create_notification(
-                router=router,
                 title=f"High CPU usage on {router.hostname}",
                 message=f"CPU usage is {cpu_usage:.1f}%, which exceeds the warning threshold of {self.thresholds['cpu_warning']}%",
                 severity="warning",
@@ -303,7 +299,6 @@ class _NetworkMonitor:
     def _check_memory_thresholds(self, router, memory_usage):
         if memory_usage >= self.thresholds['memory_critical']:
             self._create_notification(
-                router=router,
                 title=f"Critical memory usage on {router.hostname}",
                 message=f"Memory usage is {memory_usage:.1f}%, which exceeds the critical threshold of {self.thresholds['memory_critical']}%",
                 severity="critical",
@@ -311,7 +306,6 @@ class _NetworkMonitor:
             )
         elif memory_usage >= self.thresholds['memory_warning']:
             self._create_notification(
-                router=router,
                 title=f"High memory usage on {router.hostname}",
                 message=f"Memory usage is {memory_usage:.1f}%, which exceeds the warning threshold of {self.thresholds['memory_warning']}%",
                 severity="warning",
@@ -321,7 +315,6 @@ class _NetworkMonitor:
     def _check_storage_thresholds(self, router, storage_usage):
         if storage_usage >= self.thresholds['storage_critical']:
             self._create_notification(
-                router=router,
                 title=f"Critical storage usage on {router.hostname}",
                 message=f"Storage usage is {storage_usage:.1f}%, which exceeds the critical threshold of {self.thresholds['storage_critical']}%",
                 severity="critical",
@@ -329,7 +322,6 @@ class _NetworkMonitor:
             )
         elif storage_usage >= self.thresholds['storage_warning']:
             self._create_notification(
-                router=router,
                 title=f"High storage usage on {router.hostname}",
                 message=f"Storage usage is {storage_usage:.1f}%, which exceeds the warning threshold of {self.thresholds['storage_warning']}%",
                 severity="warning",
@@ -340,8 +332,6 @@ class _NetworkMonitor:
         if interface.enabled and operational_status != 'ready':
             self.logger.info(f"Interface {interface.name} on {interface.router.hostname} is down")
             self._create_notification(
-                router=interface.router,
-                interface=interface,
                 title=f"Interface {interface.name} down on {interface.router.hostname}",
                 message=f"Interface {interface.name} is administratively up but operationally down",
                 severity="warning",
@@ -359,8 +349,6 @@ class _NetworkMonitor:
             
             if in_errors > prev_in_errors:
                 self._create_notification(
-                    router=interface.router,
-                    interface=interface,
                     title=f"Increasing input errors on {interface.name}",
                     message=f"Input errors on interface {interface.name} increased from {prev_in_errors} to {in_errors}",
                     severity="warning",
@@ -369,8 +357,6 @@ class _NetworkMonitor:
             
             if out_errors > prev_out_errors:
                 self._create_notification(
-                    router=interface.router,
-                    interface=interface,
                     title=f"Increasing output errors on {interface.name}",
                     message=f"Output errors on interface {interface.name} increased from {prev_out_errors} to {out_errors}",
                     severity="warning",
@@ -381,11 +367,6 @@ class _NetworkMonitor:
         import hashlib
         
         hash_components = [title, severity, source]
-        if router:
-            hash_components.append(str(router.id))
-        if interface:
-            hash_components.append(str(interface.id))
-        
         hash_key = hashlib.sha256('|'.join(hash_components).encode()).hexdigest()
         
         current_time = timezone.now()
@@ -400,8 +381,6 @@ class _NetworkMonitor:
             message=message,
             severity=severity,
             source=source,
-            router=router,
-            interface=interface,
             hash_key=hash_key
         )
         notification.save()
