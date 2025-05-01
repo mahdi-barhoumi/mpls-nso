@@ -412,7 +412,6 @@ class Notification(models.Model):
         self.acknowledged_at = timezone.now()
         self.save()
 
-# Monitoring Models
 class RouterMetric(models.Model):
     router = models.ForeignKey('Router', on_delete=models.CASCADE, related_name='metrics')
     cpu_usage_5s = models.FloatField(help_text="5-second CPU usage percentage")

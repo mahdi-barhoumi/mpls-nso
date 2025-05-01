@@ -3,10 +3,9 @@ import struct
 import logging
 import ipaddress
 from threading import Thread, Event
-from datetime import timedelta
 from django.utils import timezone
 from core.models import DHCPLease, DHCPScope
-from core.modules.discovery_scheduler import DiscoveryScheduler
+from core.modules.scheduler import DiscoveryScheduler
 from core.settings import get_settings
 
 # DHCP Message Type Options
