@@ -5,7 +5,7 @@ import ipaddress
 from threading import Thread, Event
 from django.utils import timezone
 from core.models import DHCPLease, DHCPScope
-from core.modules.scheduler import DiscoveryScheduler
+from core.modules.scheduler import Scheduler
 from core.settings import get_settings
 
 # DHCP Message Type Options
@@ -292,7 +292,7 @@ class _DHCPServer:
             self.logger.info(f'Acknowledging IP {available_ip}/{subnet_mask} to client {client_mac} (Hostname: {hostname})')
             
             # Schedule discovery with is_first_time flag
-            DiscoveryScheduler.schedule_discovery(available_ip, is_first_time=is_first_time)
+            Scheduler.schedule_discovery(available_ip, is_first_time=is_first_time)
             
             ack_packet = self.create_dhcp_packet(data, DHCP_ACK, available_ip, subnet_mask)
             

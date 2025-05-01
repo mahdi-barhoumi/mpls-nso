@@ -1,6 +1,4 @@
 import logging
-import threading
-import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from django.utils import timezone
@@ -24,7 +22,6 @@ class _NetworkMonitor:
             'storage_critical': 90.0
         }
         self.last_notification_hashes = {}
-        self.monitor_thread = None
         self.is_running = False
         self.monitor_interval = 30  # seconds
         self.max_workers = 5  # Default number of worker threads
@@ -41,38 +38,6 @@ class _NetworkMonitor:
         self.restconf = RestconfWrapper()
         self.initialized = True
         
-        # Start monitoring thread
-        self.start_monitoring()
-
-    def start_monitoring(self):
-        if self.is_running:
-            self.logger.warning("Network monitoring is already running")
-            return
-            
-        self.is_running = True
-        self.monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
-        self.monitor_thread.start()
-        self.logger.info("Started network monitoring")
-        
-    def stop_monitoring(self):
-        if not self.is_running:
-            self.logger.warning("Network monitoring is not running")
-            return
-            
-        self.is_running = False
-        if self.monitor_thread:
-            self.monitor_thread.join(timeout=5)
-            self.monitor_thread = None
-        self.logger.info("Stopped network monitoring")
-        
-    def _monitor_loop(self):
-        while self.is_running:
-            try:
-                self.monitor_all_routers()
-            except Exception as e:
-                self.logger.error(f"Error in monitoring loop: {str(e)}")
-            time.sleep(self.monitor_interval)
-
     def monitor_all_routers(self):
         routers = Router.objects.all()  # Monitor all routers, not just reachable ones
         self.logger.info(f"Starting network-wide monitoring cycle for {routers.count()} routers")

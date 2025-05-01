@@ -11,7 +11,7 @@ from core.settings import Settings, get_settings
 from core.modules.controller import NetworkController
 from core.modules.discovery import NetworkDiscoverer
 from core.modules.monitor import NetworkMonitor
-from core.modules.scheduler import DiscoveryScheduler
+from core.modules.scheduler import Scheduler
 from core.modules.dhcp import DHCPServer
 from core.modules.tftp import TFTPServer
 
@@ -144,7 +144,7 @@ class SettingsSetupView(View):
             NetworkController.initialize()
             NetworkDiscoverer.initialize()
             NetworkMonitor.initialize()
-            DiscoveryScheduler.start_periodic_discovery()
+            Scheduler.start_periodic_tasks()
             DHCPServer.start()
             TFTPServer.start()
             

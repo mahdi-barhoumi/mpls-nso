@@ -117,22 +117,6 @@ class Router(models.Model):
         DHCPLease.objects.filter(ip_address=self.management_ip_address).delete()
         super().delete(*args, **kwargs)
 
-class Customer(models.Model):
-    name = models.CharField(max_length=255, unique=True, help_text="Customer name")
-    description = models.TextField(blank=True, help_text="Customer description")
-    email = models.EmailField(blank=True, help_text="Customer email")
-    phone_number = models.CharField(max_length=20, blank=True, help_text="Customer phone number")
-    created_at = models.DateTimeField(auto_now_add=True, help_text="When this customer was created")
-    updated_at = models.DateTimeField(auto_now=True, help_text="When this customer was updated")
-    
-    class Meta:
-        verbose_name = "Customer"
-        verbose_name_plural = "Customers"
-        ordering = ["name"]
-
-    def __str__(self):
-        return self.name
-
 class VRF(ImmutableFieldMixin, models.Model):
     objects = DefaultManager()
     immutable_fields = ['router', 'name', 'route_distinguisher']
@@ -237,6 +221,45 @@ class Interface(ImmutableFieldMixin, models.Model):
     @property
     def is_management_interface(self):
         return self.ip_address == self.router.management_ip_address
+
+class OSPFProcess(models.Model):
+    objects = DefaultManager()
+
+    router = models.ForeignKey(Router, on_delete=models.CASCADE, related_name='processes', help_text="Router this OSPF process belongs to")
+    vrf = models.ForeignKey(VRF, null=True, on_delete=models.SET_NULL, related_name='processes')
+    process_id = models.PositiveIntegerField(null=False, validators=[MinValueValidator(1), MaxValueValidator(65535)], help_text="Process ID for the OSPF process on the router")
+    ospf_router_id = models.GenericIPAddressField(null=True, protocol='ipv4', help_text="OSPF router ID")
+    priority = models.IntegerField(null=True, validators=[MinValueValidator(0), MaxValueValidator(127)], help_text="OSPF priority")
+
+    def __str__(self):
+        return f"OSPFProcess ({self.process_id}) on {self.router}"
+
+class OSPFNetwork(models.Model):
+    objects = DefaultManager()
+
+    process = models.ForeignKey(OSPFProcess, on_delete=models.CASCADE, related_name='networks', help_text="OSPF process this advertised network belongs to")
+    area = models.IntegerField(null=False, help_text="OSPF network area")
+    network = models.GenericIPAddressField(null=False, protocol='ipv4', help_text="OSPF network advertised")
+    subnet_mask = models.GenericIPAddressField(null=False, protocol='ipv4', help_text="OSPF network subnet mask advertised")
+
+    def __str__(self):
+        return f"OSPFNetwork ({str(ipaddress.IPv4Network(f'{self.network}/{self.subnet_mask}', strict=False))})"
+
+class Customer(models.Model):
+    name = models.CharField(max_length=255, unique=True, help_text="Customer name")
+    description = models.TextField(blank=True, help_text="Customer description")
+    email = models.EmailField(blank=True, help_text="Customer email")
+    phone_number = models.CharField(max_length=20, blank=True, help_text="Customer phone number")
+    created_at = models.DateTimeField(auto_now_add=True, help_text="When this customer was created")
+    updated_at = models.DateTimeField(auto_now=True, help_text="When this customer was updated")
+    
+    class Meta:
+        verbose_name = "Customer"
+        verbose_name_plural = "Customers"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
 
 class Site(models.Model):
     name = models.CharField(max_length=255, help_text="Site name")
