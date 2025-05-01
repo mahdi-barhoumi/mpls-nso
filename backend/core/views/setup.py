@@ -1,5 +1,4 @@
 import json
-import ipaddress
 from django.http import JsonResponse
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
@@ -8,7 +7,7 @@ from django.contrib.auth.models import User
 from django.apps import apps
 from django.core.exceptions import ValidationError
 from core.settings import Settings, get_settings
-from core.modules.controller import NetworkController
+from core.modules.network_controller import NetworkController
 from core.modules.discovery import NetworkDiscoverer
 from core.modules.monitor import NetworkMonitor
 from core.modules.scheduler import Scheduler

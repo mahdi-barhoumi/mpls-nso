@@ -4,7 +4,7 @@ from typing import List
 from core.modules.utils.host_network_manager import HostNetworkManager
 from core.modules.discovery import NetworkDiscoverer
 from core.modules.utils.restconf import RestconfWrapper
-from core.models import Interface, Site, Router, VRF, RouteTarget
+from core.models import Interface, Site, Router, VRF, RouteTarget, Customer, DHCPScope
 from core.settings import get_settings
 
 class _NetworkController:
@@ -22,7 +22,7 @@ class _NetworkController:
             self.logger.warning("Cannot initialize controller: No system settings found")
             return
 
-        self.restconf = RestconfWrapper()
+        self.restconf = RestconfWrapper(max_retries=4)
         self.initialized = True
 
     def set_router_hostname(self, router: Router, hostname: str) -> bool:
@@ -1085,6 +1085,68 @@ class _NetworkController:
         except Exception as exception:
             self.logger.error(f"Error deleting site: {str(exception)}")
             return False
+
+    def create_site(self, name: str, customer: Customer, interface: Interface, description: str = '', location: str = '') -> tuple[Site, bool]:
+        try:
+            self.logger.info(f"Creating new site {name}")
+
+            # Get settings
+            settings = get_settings()
+            if not settings:
+                raise Exception("No system settings found")
+
+            # Parse the DHCP sites network from settings
+            dhcp_sites_network = ipaddress.IPv4Network(
+                f"{settings.dhcp_sites_network_address}/{settings.dhcp_sites_network_subnet_mask}", 
+                strict=False
+            )
+
+            # Get all existing site DHCP scopes
+            existing_scopes = DHCPScope.objects.all()
+            used_scopes = {
+                ipaddress.IPv4Network(f"{scope.network}/30", strict=False) 
+                for scope in existing_scopes
+            }
+
+            # Find first available /30 subnet
+            dhcp_scope_network = None
+            for network in dhcp_sites_network.subnets(new_prefix=30):
+                if not any(network.overlaps(used_scope) for used_scope in used_scopes):
+                    dhcp_scope_network = str(network[0])
+                    break
+
+            if not dhcp_scope_network:
+                raise Exception('No available DHCP scope found')
+
+            # Create DHCP Scope
+            dhcp_scope = DHCPScope.objects.create(
+                is_active=False,
+                network=dhcp_scope_network,
+                subnet_mask='255.255.255.252'
+            )
+
+            # Create site
+            site = Site.objects.create(
+                name=name,
+                customer=customer,
+                description=description,
+                location=location,
+                dhcp_scope=dhcp_scope,
+            )
+
+            # Assign interface
+            if not self.assign_interface(interface, site):
+                # Clean up if interface assignment fails
+                dhcp_scope.delete()
+                site.delete()
+                raise Exception('Failed to assign interface to site')
+
+            self.logger.info(f"Successfully created site {site}")
+            return site, True
+
+        except Exception as e:
+            self.logger.error(f"Error creating site: {str(e)}")
+            return None, False
 
 NetworkController = _NetworkController()
 NetworkController.initialize()

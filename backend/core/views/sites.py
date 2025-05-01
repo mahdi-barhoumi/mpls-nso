@@ -4,11 +4,9 @@ from django.http import JsonResponse
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
-from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
-from core.settings import get_settings
-from core.models import Site, Customer, Router, Interface, DHCPScope
-from core.modules.controller import NetworkController
+from core.models import Site, Customer, Interface
+from core.modules.network_controller import NetworkController
 
 @method_decorator(csrf_exempt, name='dispatch')
 class SiteView(View):
@@ -88,7 +86,7 @@ class SiteView(View):
             # Parse JSON data
             data = json.loads(request.body)
             
-            # Validate required fields for site creation
+            # Validate required fields
             required_fields = ['name', 'customer_id', 'assigned_interface_id']
             for field in required_fields:
                 if field not in data:
@@ -96,79 +94,35 @@ class SiteView(View):
                         'message': f'Missing required field: {field}'
                     }, status=400)
             
-            # Get customer
-            customer = get_object_or_404(Customer, id=data['customer_id'])
-            
-            # Get and validate assigned interface
             if data['assigned_interface_id'] is None:
                 return JsonResponse({
                     'message': 'assigned_interface_id cannot be null'
                 }, status=400)
-                
-            assigned_interface = get_object_or_404(Interface, id=data['assigned_interface_id'])
-            
-            # Get settings
-            settings = get_settings()
-            
-            # Parse the DHCP sites network from settings
-            dhcp_sites_network = ipaddress.IPv4Network(
-                f"{settings.dhcp_sites_network_address}/{settings.dhcp_sites_network_subnet_mask}", 
-                strict=False
-            )
-            
-            # If a DHCP scope is not provided, find an available /30 subnet
-            if 'dhcp_scope' not in data:
-                # Get all existing site DHCP scopes
-                existing_scopes = DHCPScope.objects.all()
-                used_scopes = {
-                    ipaddress.IPv4Network(f"{scope.network}/30", strict=False) 
-                    for scope in existing_scopes
-                }
-                
-                # Find the first available /30 subnet
-                for network in dhcp_sites_network.subnets(new_prefix=30):
-                    if not any(network.overlaps(used_scope) for used_scope in used_scopes):
-                        dhcp_scope_network = str(network[0])
-                        break
-                else:
-                    return JsonResponse({
-                        'message': 'No available DHCP scope found'
-                    }, status=400)
-            else:
-                dhcp_scope_network = data['dhcp_scope']
-            
-            # Create DHCP Scope
-            dhcp_scope = DHCPScope(
-                is_active=False,
-                network=dhcp_scope_network,
-                subnet_mask='255.255.255.252' 
-            )
 
-            # Validate the DHCP scope
-            dhcp_scope.save()
-            
-            # Create site with assigned interface
-            site = Site(
+            # Get required objects
+            try:
+                customer = get_object_or_404(Customer, id=data['customer_id'])
+                interface = get_object_or_404(Interface, id=data['assigned_interface_id'])
+            except:
+                return JsonResponse({
+                    'message': 'Invalid customer_id or assigned_interface_id'
+                }, status=400)
+
+            # Create site using NetworkController
+            site, success = NetworkController.create_site(
                 name=data['name'],
                 customer=customer,
+                interface=interface,
                 description=data.get('description', ''),
-                location=data.get('location', ''),
-                dhcp_scope=dhcp_scope,
+                location=data.get('location', '')
             )
-            
-            site.save()
 
-            # Assign interface using NetworkController
-            success = NetworkController.assign_interface(assigned_interface, site)
             if not success:
-                # Clean up the created DHCP scope if interface assignment fails
-                dhcp_scope.delete()
-                site.delete()
                 return JsonResponse({
-                    'message': 'Failed to assign interface to site'
+                    'message': 'Failed to create site'
                 }, status=500)
-            
-            # Include full information in the response
+
+            # Return site data
             return JsonResponse({
                 'id': site.id,
                 'name': site.name,
@@ -183,11 +137,6 @@ class SiteView(View):
         except json.JSONDecodeError:
             return JsonResponse({
                 'message': 'Invalid JSON'
-            }, status=400)
-        
-        except (ValidationError, ValueError) as e:
-            return JsonResponse({
-                'message': str(e)
             }, status=400)
         
         except Exception as e:
