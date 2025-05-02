@@ -1,5 +1,4 @@
 import json
-import ipaddress
 from django.http import JsonResponse
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
@@ -8,9 +7,10 @@ from django.contrib.auth.models import User
 from django.apps import apps
 from django.core.exceptions import ValidationError
 from core.settings import Settings, get_settings
-from core.modules.controller import NetworkController
+from core.modules.network_controller import NetworkController
 from core.modules.discovery import NetworkDiscoverer
-from core.modules.discovery_scheduler import DiscoveryScheduler
+from core.modules.monitor import NetworkMonitor
+from core.modules.scheduler import Scheduler
 from core.modules.dhcp import DHCPServer
 from core.modules.tftp import TFTPServer
 
@@ -40,7 +40,6 @@ class SetupStatusView(View):
             'dhcp_provider_network_subnet_mask': settings.dhcp_provider_network_subnet_mask,
             'dhcp_sites_network_address': settings.dhcp_sites_network_address,
             'dhcp_sites_network_subnet_mask': settings.dhcp_sites_network_subnet_mask,
-            'dhcp_lease_time': settings.dhcp_lease_time,
             'management_vrf': settings.management_vrf,
             'bgp_as': settings.bgp_as
         }
@@ -101,8 +100,7 @@ class SettingsSetupView(View):
             required_fields = [
                 'restconf_username', 'restconf_password', 'host_interface_id', 
                 'host_address', 'host_subnet_mask', 'dhcp_sites_network_address', 
-                'dhcp_sites_network_subnet_mask', 'dhcp_lease_time', 
-                'management_vrf', 'bgp_as'
+                'dhcp_sites_network_subnet_mask', 'management_vrf', 'bgp_as'
             ]
             
             # Check for missing or empty fields
@@ -129,12 +127,11 @@ class SettingsSetupView(View):
                 restconf_password=data['restconf_password'],
                 host_interface_id=data['host_interface_id'],
                 host_address=data['host_address'],
-                host_subnet_mask=str(ipaddress.IPv4Network(f"{data['host_address']}/{data['host_subnet_mask']}", strict=False)),
+                host_subnet_mask=data['host_subnet_mask'],
                 dhcp_provider_network_address=data['host_address'],
                 dhcp_provider_network_subnet_mask=data['host_subnet_mask'],
                 dhcp_sites_network_address=data['dhcp_sites_network_address'],
                 dhcp_sites_network_subnet_mask=data['dhcp_sites_network_subnet_mask'],
-                dhcp_lease_time=data['dhcp_lease_time'],
                 management_vrf=data['management_vrf'],
                 bgp_as=data['bgp_as']
             )
@@ -145,7 +142,8 @@ class SettingsSetupView(View):
             # Initialize services
             NetworkController.initialize()
             NetworkDiscoverer.initialize()
-            DiscoveryScheduler.start_periodic_discovery()
+            NetworkMonitor.initialize()
+            Scheduler.start_periodic_tasks()
             DHCPServer.start()
             TFTPServer.start()
             

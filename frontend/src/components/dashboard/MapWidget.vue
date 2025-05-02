@@ -312,34 +312,61 @@ export default {
     async fetchNetworkData() {
       try {
         const data = await MappingService.fetchNetworkData()
-
-        // Convert arrays to objects for v-network-graph, maintaining previously fetched nodes
-        const nodesObj = { ...this.graphData.nodes }
+        
+        // Get current node IDs from backend
+        const currentNodeIds = new Set(data.nodes.map(node => node.id))
+        
+        // Create new nodes object while preserving existing node data
+        const nodesObj = {}
+        
+        // First, add all existing nodes that are still present in backend
+        Object.entries(this.graphData.nodes).forEach(([id, node]) => {
+          if (currentNodeIds.has(Number(id))) {
+            nodesObj[id] = node
+          }
+        })
+        
+        // Then add or update nodes from backend
         data.nodes.forEach((node) => {
-          nodesObj[node.id] = node
-          this.fetchedNodeIds.add(node.id)
+          if (nodesObj[node.id]) {
+            // Update existing node data while preserving other properties
+            nodesObj[node.id] = { ...nodesObj[node.id], ...node }
+          } else {
+            // Add new node
+            nodesObj[node.id] = node
+          }
         })
 
+        // Update edges
         const edgesObj = {}
         data.edges.forEach((edge) => {
           edgesObj[edge.id] = edge
         })
 
+        // Update graph data
         this.graphData = {
           nodes: nodesObj,
           edges: edgesObj,
         }
 
-        // Only generate circular layout for nodes that don't have saved positions
-        this.generateLayoutForNewNodes(Object.keys(nodesObj))
+        // Generate layout only for new nodes
+        const newNodes = data.nodes
+          .filter(node => !this.layouts.nodes[node.id])
+          .map(node => node.id)
+          
+        if (newNodes.length > 0) {
+          this.generateLayoutForNewNodes(newNodes)
+        }
 
         // Persist the updated data
         this.persistData()
 
-        // Ensure the graph is centered after data is loaded
-        this.$nextTick(() => {
-          this.$refs.graph.fitToContents()
-        })
+        // Only fit to contents if there are new nodes
+        if (newNodes.length > 0) {
+          this.$nextTick(() => {
+            this.$refs.graph.fitToContents()
+          })
+        }
       } catch (error) {
         console.error('Error fetching network data:', error)
       }

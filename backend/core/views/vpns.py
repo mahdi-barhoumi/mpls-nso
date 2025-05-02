@@ -4,7 +4,7 @@ from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from core.models import VPN, Site, Customer
-from core.modules.controller import NetworkController
+from core.modules.network_controller import NetworkController
 
 @method_decorator(csrf_exempt, name='dispatch')
 class VPNView(View):

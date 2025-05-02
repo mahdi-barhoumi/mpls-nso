@@ -3,10 +3,9 @@ import struct
 import logging
 import ipaddress
 from threading import Thread, Event
-from datetime import timedelta
 from django.utils import timezone
 from core.models import DHCPLease, DHCPScope
-from core.modules.discovery_scheduler import DiscoveryScheduler
+from core.modules.scheduler import Scheduler
 from core.settings import get_settings
 
 # DHCP Message Type Options
@@ -41,7 +40,7 @@ class _DHCPServer:
         self.main_scope_address = None
         self.main_scope_subnet_mask = None
         self.config_filename = None
-        self.lease_time = None
+        self.lease_time = 4294967295  # Maximum possible lease time (effectively permanent)
         self.running = False
         self.sock = None
         self.server_thread = None
@@ -55,11 +54,11 @@ class _DHCPServer:
         return socket.inet_ntoa(struct.pack('!I', ip_int))
     
     def get_active_leases_from_db(self):
-        return DHCPLease.objects.filter(expiry_time__gt=timezone.now())
+        return DHCPLease.objects.filter(active=True)
     
     def get_lease_by_mac(self, mac_address):
         try:
-            return DHCPLease.objects.get(mac_address=mac_address, expiry_time__gt=timezone.now())
+            return DHCPLease.objects.get(mac_address=mac_address)
         except DHCPLease.DoesNotExist:
             return None
     
@@ -123,13 +122,11 @@ class _DHCPServer:
         # If no matching scope found for relay IP
         return None, None
     
-    def create_or_update_lease(self, mac_address, ip_address, hostname=None, lease_time_seconds=None):
-        expiry_time = timezone.now() + timedelta(seconds=lease_time_seconds or self.lease_time)
-        
+    def create_or_update_lease(self, mac_address, ip_address, hostname=None):
         updated = DHCPLease.objects.filter(mac_address=mac_address).update(
             ip_address=ip_address,
             hostname=hostname or 'Unknown',
-            expiry_time=expiry_time,
+            active=True,
             last_updated=timezone.now()
         )
         
@@ -138,12 +135,13 @@ class _DHCPServer:
                 mac_address=mac_address,
                 ip_address=ip_address,
                 hostname=hostname or 'Unknown',
-                expiry_time=expiry_time,
+                active=True,
                 last_updated=timezone.now()
             )
     
     def delete_lease(self, mac_address):
-        DHCPLease.objects.filter(mac_address=mac_address).delete()
+        # Instead of deleting, mark as inactive
+        DHCPLease.objects.filter(mac_address=mac_address).update(active=False)
     
     def create_dhcp_packet(self, client_packet, message_type, yiaddr='0.0.0.0', subnet_mask=None):
         xid = client_packet[4:8]
@@ -288,14 +286,13 @@ class _DHCPServer:
             self.create_or_update_lease(
                 mac_address=client_mac,
                 ip_address=available_ip,
-                hostname=hostname,
-                lease_time_seconds=self.lease_time
+                hostname=hostname
             )
             
             self.logger.info(f'Acknowledging IP {available_ip}/{subnet_mask} to client {client_mac} (Hostname: {hostname})')
             
             # Schedule discovery with is_first_time flag
-            DiscoveryScheduler.schedule_discovery(available_ip, is_first_time=is_first_time)
+            Scheduler.schedule_discovery(available_ip, is_first_time=is_first_time)
             
             ack_packet = self.create_dhcp_packet(data, DHCP_ACK, available_ip, subnet_mask)
             
@@ -348,7 +345,7 @@ class _DHCPServer:
     
     def server_loop(self):
         self.logger.info(f'DHCP server running on {self.server_ip}')
-        self.logger.info(f'Main scope: {self.main_scope_address}/{self.main_scope_subnet_mask}')
+        self.logger.info(f'Main scope: {str(ipaddress.IPv4Network(f"{self.main_scope_address}/{self.main_scope_subnet_mask}", strict=False))}')
         
         try:
             self.sock.settimeout(1)
@@ -369,7 +366,7 @@ class _DHCPServer:
             self.running = False
             self.logger.info('DHCP server stopped')
     
-    def start(self, server_ip=None, tftp_server_ip=None, main_scope_address=None, main_scope_subnet_mask=None, lease_time=None, config_filename=CONFIG_FILENAME):
+    def start(self, server_ip=None, tftp_server_ip=None, main_scope_address=None, main_scope_subnet_mask=None, config_filename=CONFIG_FILENAME):
         if self.running:
             self.logger.warning("DHCP server is already running")
             return False
@@ -386,7 +383,6 @@ class _DHCPServer:
             self.tftp_server_ip = tftp_server_ip or settings.host_address
             self.main_scope_address = main_scope_address or settings.dhcp_provider_network_address
             self.main_scope_subnet_mask = main_scope_subnet_mask or settings.dhcp_provider_network_subnet_mask
-            self.lease_time = lease_time or settings.dhcp_lease_time
             self.config_filename = config_filename
             
             self.stop_event.clear()
@@ -439,8 +435,7 @@ class _DHCPServer:
             "running": self.running,
             "config": {
                 "server_ip": self.server_ip,
-                "main_scope": f"{self.main_scope_address}/{self.main_scope_subnet_mask}",
-                "lease_time": self.lease_time,
+                "main_scope": str(ipaddress.IPv4Network(f"{self.main_scope_address}/{self.main_scope_subnet_mask}", strict=False)),
                 "tftp_server_ip": self.tftp_server_ip
             } if self.running else None
         }
@@ -452,7 +447,7 @@ class _DHCPServer:
             leases[lease.mac_address] = {
                 'ip': lease.ip_address,
                 'hostname': lease.hostname,
-                'expiry': lease.expiry_time.timestamp()
+                'active': lease.is_active
             }
         return leases
 

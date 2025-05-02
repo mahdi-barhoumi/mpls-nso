@@ -2,14 +2,21 @@ import logging
 import threading
 from typing import Dict
 from core.modules.discovery import NetworkDiscoverer
+from core.modules.monitor import NetworkMonitor
 
-class _DiscoveryScheduler:
+class _Scheduler:
     def __init__(self):
-        self.logger = logging.getLogger('discovery-scheduler')
-        self.scheduled_tasks: Dict[str, threading.Timer] = {}
+        self.logger = logging.getLogger('scheduler')
+        self.scheduled_discoveries: Dict[str, threading.Timer] = {}
         self.lock = threading.Lock()
+        
+        # Timers for periodic tasks
         self.network_discovery_timer = None
-        self.network_discovery_interval = 300  # 5 minutes in seconds
+        self.network_monitor_timer = None
+        
+        # Intervals (in seconds)
+        self.network_discovery_interval = 300  # 5 minutes
+        self.network_monitor_interval = 30     # 30 seconds
         
     def schedule_discovery(self, ip_address: str, is_first_time: bool = True):
         with self.lock:
@@ -21,15 +28,15 @@ class _DiscoveryScheduler:
             
             self.logger.info(f"Scheduling discovery for {ip_address} in {delay} seconds")
             timer = threading.Timer(delay, self._execute_discovery, args=(ip_address,))
-            timer.daemon = False
+            timer.daemon = True
             timer.start()
             
-            self.scheduled_tasks[ip_address] = timer
+            self.scheduled_discoveries[ip_address] = timer
     
     def cancel_discovery(self, ip_address: str):
-        if ip_address in self.scheduled_tasks:
-            self.scheduled_tasks[ip_address].cancel()
-            del self.scheduled_tasks[ip_address]
+        if ip_address in self.scheduled_discoveries:
+            self.scheduled_discoveries[ip_address].cancel()
+            del self.scheduled_discoveries[ip_address]
     
     def _execute_discovery(self, ip_address: str):
         try:
@@ -37,31 +44,42 @@ class _DiscoveryScheduler:
             result = NetworkDiscoverer.discover_single_device(ip_address)
             
             if not result['success']:
-                # If discovery failed, reschedule
                 self.logger.warning(f"Discovery failed for {ip_address}, rescheduling...")
                 self.schedule_discovery(ip_address, is_first_time=False)
         
         except Exception as e:
             self.logger.error(f"Error during discovery of {ip_address}: {str(e)}")
-            # Reschedule on error
             self.schedule_discovery(ip_address, is_first_time=False)
     
-    def start_periodic_discovery(self):
+    def start_periodic_tasks(self):
         with self.lock:
-            if not NetworkDiscoverer.initialized:
+            if not NetworkDiscoverer.initialized or not NetworkMonitor.initialized:
+                self.logger.warning("Cannot start periodic tasks: services not initialized")
                 return
+                
+            # Start network discovery
             if self.network_discovery_timer:
                 self.network_discovery_timer.cancel()
-            
-            self.logger.info(f"Starting periodic network discovery every {self.network_discovery_interval} seconds")
             self._schedule_next_discovery()
+            
+            # Start network monitoring
+            if self.network_monitor_timer:
+                self.network_monitor_timer.cancel()
+            self._schedule_next_monitoring()
+            
+            self.logger.info(f"Started periodic tasks (Discovery: {self.network_discovery_interval}s, Monitoring: {self.network_monitor_interval}s)")
     
-    def stop_periodic_discovery(self):
+    def stop_periodic_tasks(self):
         with self.lock:
             if self.network_discovery_timer:
                 self.network_discovery_timer.cancel()
                 self.network_discovery_timer = None
-                self.logger.info("Stopped periodic network discovery")
+                
+            if self.network_monitor_timer:
+                self.network_monitor_timer.cancel()
+                self.network_monitor_timer = None
+                
+            self.logger.info("Stopped all periodic tasks")
     
     def _schedule_next_discovery(self):
         self.network_discovery_timer = threading.Timer(
@@ -71,6 +89,14 @@ class _DiscoveryScheduler:
         self.network_discovery_timer.daemon = True
         self.network_discovery_timer.start()
     
+    def _schedule_next_monitoring(self):
+        self.network_monitor_timer = threading.Timer(
+            self.network_monitor_interval, 
+            self._execute_network_monitoring
+        )
+        self.network_monitor_timer.daemon = True
+        self.network_monitor_timer.start()
+    
     def _execute_network_discovery(self):
         try:
             self.logger.info("Starting network-wide discovery")
@@ -78,8 +104,16 @@ class _DiscoveryScheduler:
         except Exception as e:
             self.logger.error(f"Error during network-wide discovery: {str(e)}")
         finally:
-            # Schedule next discovery regardless of success/failure
             self._schedule_next_discovery()
+    
+    def _execute_network_monitoring(self):
+        try:
+            self.logger.info("Starting network-wide monitoring")
+            NetworkMonitor.monitor_all_routers()
+        except Exception as e:
+            self.logger.error(f"Error during network-wide monitoring: {str(e)}")
+        finally:
+            self._schedule_next_monitoring()
 
-DiscoveryScheduler = _DiscoveryScheduler()
-DiscoveryScheduler.start_periodic_discovery()
+Scheduler = _Scheduler()
+Scheduler.start_periodic_tasks()

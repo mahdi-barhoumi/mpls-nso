@@ -32,7 +32,7 @@ class DHCPLease(models.Model):
     mac_address = models.CharField(max_length=17, primary_key=True, help_text="MAC address of the client")
     ip_address = models.GenericIPAddressField(help_text="Assigned IP address")
     hostname = models.CharField(max_length=255, default="Unknown", help_text="Client hostname")
-    expiry_time = models.DateTimeField(help_text="When this lease expires")
+    active = models.BooleanField(default=True, help_text="Whether this lease is active")
     last_updated = models.DateTimeField(auto_now=True, help_text="When this lease was last updated")
     
     class Meta:
@@ -45,14 +45,7 @@ class DHCPLease(models.Model):
     
     @property
     def is_active(self):
-        return self.expiry_time > timezone.now()
-    
-    @property
-    def remaining_time(self):
-        if not self.is_active:
-            return 0
-        delta = self.expiry_time - timezone.now()
-        return delta.total_seconds()
+        return self.active
 
 class DHCPScope(models.Model):
     network = models.GenericIPAddressField(protocol='IPv4', help_text="Network address of the scope")
@@ -118,22 +111,11 @@ class Router(models.Model):
     
     def __str__(self):
         return f"{self.hostname} ({self.management_ip_address})"
-
-class Customer(models.Model):
-    name = models.CharField(max_length=255, unique=True, help_text="Customer name")
-    description = models.TextField(blank=True, help_text="Customer description")
-    email = models.EmailField(blank=True, help_text="Customer email")
-    phone_number = models.CharField(max_length=20, blank=True, help_text="Customer phone number")
-    created_at = models.DateTimeField(auto_now_add=True, help_text="When this customer was created")
-    updated_at = models.DateTimeField(auto_now=True, help_text="When this customer was updated")
-    
-    class Meta:
-        verbose_name = "Customer"
-        verbose_name_plural = "Customers"
-        ordering = ["name"]
-
-    def __str__(self):
-        return self.name
+        
+    def delete(self, *args, **kwargs):
+        # Delete the DHCP lease for this router's management IP if it exists
+        DHCPLease.objects.filter(ip_address=self.management_ip_address).delete()
+        super().delete(*args, **kwargs)
 
 class VRF(ImmutableFieldMixin, models.Model):
     objects = DefaultManager()
@@ -187,7 +169,7 @@ class Interface(ImmutableFieldMixin, models.Model):
     dhcp_helper_address = models.GenericIPAddressField(null=True, protocol='ipv4', help_text="DHCP helper address if applicable")
     vlan = models.PositiveIntegerField(null=True, validators=[MinValueValidator(1), MaxValueValidator(4094)], help_text="VLAN if applicable")
     vrf = models.ForeignKey(VRF, null=True, on_delete=models.SET_NULL, related_name='interfaces')
-    connected_interfaces = models.ManyToManyField('self', symmetrical=True, related_name='connected_interfaces')
+    connected_interfaces = models.ManyToManyField('self', symmetrical=True)
     first_discovered = models.DateTimeField(auto_now_add=True, help_text="When this interface was first discovered")
     last_discovered = models.DateTimeField(auto_now=True, help_text="When this interface was last discovered")
     
@@ -239,6 +221,45 @@ class Interface(ImmutableFieldMixin, models.Model):
     @property
     def is_management_interface(self):
         return self.ip_address == self.router.management_ip_address
+
+class OSPFProcess(models.Model):
+    objects = DefaultManager()
+
+    router = models.ForeignKey(Router, on_delete=models.CASCADE, related_name='processes', help_text="Router this OSPF process belongs to")
+    vrf = models.ForeignKey(VRF, null=True, on_delete=models.SET_NULL, related_name='processes')
+    process_id = models.PositiveIntegerField(null=False, validators=[MinValueValidator(1), MaxValueValidator(65535)], help_text="Process ID for the OSPF process on the router")
+    ospf_router_id = models.GenericIPAddressField(null=True, protocol='ipv4', help_text="OSPF router ID")
+    priority = models.IntegerField(null=True, validators=[MinValueValidator(0), MaxValueValidator(127)], help_text="OSPF priority")
+
+    def __str__(self):
+        return f"OSPFProcess ({self.process_id}) on {self.router}"
+
+class OSPFNetwork(models.Model):
+    objects = DefaultManager()
+
+    process = models.ForeignKey(OSPFProcess, on_delete=models.CASCADE, related_name='networks', help_text="OSPF process this advertised network belongs to")
+    area = models.IntegerField(null=False, help_text="OSPF network area")
+    network = models.GenericIPAddressField(null=False, protocol='ipv4', help_text="OSPF network advertised")
+    subnet_mask = models.GenericIPAddressField(null=False, protocol='ipv4', help_text="OSPF network subnet mask advertised")
+
+    def __str__(self):
+        return f"OSPFNetwork ({str(ipaddress.IPv4Network(f'{self.network}/{self.subnet_mask}', strict=False))})"
+
+class Customer(models.Model):
+    name = models.CharField(max_length=255, unique=True, help_text="Customer name")
+    description = models.TextField(blank=True, help_text="Customer description")
+    email = models.EmailField(blank=True, help_text="Customer email")
+    phone_number = models.CharField(max_length=20, blank=True, help_text="Customer phone number")
+    created_at = models.DateTimeField(auto_now_add=True, help_text="When this customer was created")
+    updated_at = models.DateTimeField(auto_now=True, help_text="When this customer was updated")
+    
+    class Meta:
+        verbose_name = "Customer"
+        verbose_name_plural = "Customers"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
 
 class Site(models.Model):
     name = models.CharField(max_length=255, help_text="Site name")
@@ -370,3 +391,92 @@ class VPN(models.Model):
         if self.pk:
             self.validate()
         super().save(*args, **kwargs)
+
+class Notification(models.Model):
+    SEVERITY_LEVELS = [
+        ('info', 'Information'),
+        ('warning', 'Warning'),
+        ('critical', 'Critical'),
+    ]
+    
+    SOURCES = [
+        ('monitoring', 'System Monitoring'),
+        ('provisioning', 'System Provisioning'),
+        ('security', 'Security'),
+        ('network', 'Network'),
+        ('other', 'Other')
+    ]
+    
+    title = models.CharField(max_length=255, help_text="Short notification title")
+    message = models.TextField(help_text="Detailed notification message")
+    severity = models.CharField(max_length=10, choices=SEVERITY_LEVELS, help_text="Notification severity level")
+    source = models.CharField(max_length=20, choices=SOURCES, help_text="Source of the notification")
+    acknowledged = models.BooleanField(default=False, help_text="Whether this notification has been acknowledged")
+    acknowledged_by = models.CharField(max_length=255, blank=True, null=True, help_text="Who acknowledged this notification")
+    acknowledged_at = models.DateTimeField(null=True, blank=True, help_text="When this notification was acknowledged")
+    created_at = models.DateTimeField(auto_now_add=True, help_text="When this notification was created")
+    updated_at = models.DateTimeField(auto_now=True, help_text="When this notification was last updated")
+    hash_key = models.CharField(max_length=64, blank=True, null=True, help_text="Unique hash to prevent duplicate notifications")
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['hash_key']),
+            models.Index(fields=['acknowledged', 'created_at']),
+            models.Index(fields=['severity', 'created_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.get_severity_display()}: {self.title}"
+    
+    def acknowledge(self, user):
+        self.acknowledged = True
+        self.acknowledged_by = user
+        self.acknowledged_at = timezone.now()
+        self.save()
+
+class RouterMetric(models.Model):
+    router = models.ForeignKey('Router', on_delete=models.CASCADE, related_name='metrics')
+    cpu_usage_5s = models.FloatField(help_text="5-second CPU usage percentage")
+    cpu_usage_1m = models.FloatField(help_text="1-minute CPU usage percentage")
+    cpu_usage_5m = models.FloatField(help_text="5-minute CPU usage percentage")
+    mem_used_percent = models.FloatField(help_text="Memory usage percentage")
+    mem_total = models.BigIntegerField(help_text="Total memory in KB")
+    mem_used = models.BigIntegerField(help_text="Used memory in KB")
+    mem_free = models.BigIntegerField(help_text="Free memory in KB")
+    storage_used_percent = models.FloatField(help_text="Storage usage percentage")
+    storage_total = models.BigIntegerField(help_text="Total storage in KB")
+    storage_used = models.BigIntegerField(help_text="Used storage in KB")
+    storage_free = models.BigIntegerField(help_text="Free storage in KB")
+    timestamp = models.DateTimeField(default=timezone.now, help_text="When this metric was collected")
+    
+    class Meta:
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['router', 'timestamp']),
+        ]
+    
+    def __str__(self):
+        return f"{self.router.hostname} - {self.timestamp}"
+
+class InterfaceMetric(models.Model):
+    interface = models.ForeignKey('Interface', on_delete=models.CASCADE, related_name='metrics')
+    operational_status = models.CharField(max_length=50, help_text="Operational status of the interface")
+    in_octets = models.BigIntegerField(help_text="Input octets")
+    out_octets = models.BigIntegerField(help_text="Output octets")
+    in_errors = models.IntegerField(help_text="Input errors")
+    out_errors = models.IntegerField(help_text="Output errors")
+    in_discards = models.IntegerField(help_text="Input discards")
+    out_discards = models.IntegerField(help_text="Output discards")
+    bps_in = models.BigIntegerField(help_text="Bits per second in")
+    bps_out = models.BigIntegerField(help_text="Bits per second out")
+    timestamp = models.DateTimeField(default=timezone.now, help_text="When this metric was collected")
+    
+    class Meta:
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['interface', 'timestamp']),
+        ]
+    
+    def __str__(self):
+        return f"{self.interface} - {self.timestamp}"

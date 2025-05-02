@@ -6,9 +6,9 @@ from core.views.sites import SiteView, SiteRoutingView
 from core.views.network_map import NetworkMapView
 from core.views.vpns import VPNView, VPNSiteView
 from core.views.setup import SetupStatusView, AdminSetupView, SettingsSetupView
-from core.views.test import test_view
 from core.views.logs import LogsView
 from core.views.auth import AuthView
+from core.views.test import test_view
 
 urlpatterns = [
     # Auth endpoints

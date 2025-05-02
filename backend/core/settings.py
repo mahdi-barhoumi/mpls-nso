@@ -48,10 +48,6 @@ class Settings(models.Model):
             )
         ],
     )
-    dhcp_lease_time = models.PositiveIntegerField(
-        validators=[MinValueValidator(86400)],
-        help_text='DHCP lease time in seconds'
-    )
     
     # Management settings
     management_vrf = models.CharField(max_length=100)

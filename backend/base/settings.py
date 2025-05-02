@@ -193,7 +193,12 @@ LOGGING = {
             'level': 'INFO',
             'propagate': True,
         },
-        'discovery-scheduler': {
+        'network-monitor': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'scheduler': {
             'handlers': ['console', 'file'],
             'level': 'INFO',
             'propagate': True,
