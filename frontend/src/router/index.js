@@ -47,6 +47,11 @@ const router = createRouter({
           component: () => import('@/views/Dashboard.vue'),
         },
         {
+          path: '/troubleshooting/guide',
+          name: 'guide',
+          component: () => import('@/views/pages/Guide.vue'),
+        },
+        {
           path: '/pages/empty',
           name: 'empty',
           component: () => import('@/views/pages/Empty.vue'),
@@ -65,6 +70,11 @@ const router = createRouter({
           path: '/vpn',
           name: 'vpns',
           component: () => import('@/views/pages/VPNCrud.vue'),
+        },
+        {
+          path: '/troubleshooting/logs',
+          name: 'logs',
+          component: () => import('@/views/pages/LogsView.vue'),
         },
       ],
     },
