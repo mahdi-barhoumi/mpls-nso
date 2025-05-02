@@ -9,6 +9,7 @@ from core.views.setup import SetupStatusView, AdminSetupView, SettingsSetupView
 from core.views.logs import LogsView
 from core.views.auth import AuthView
 from core.views.test import test_view
+from core.views.metrics import RouterMetricsView, InterfaceMetricsView, DashboardStatsView
 
 urlpatterns = [
     # Auth endpoints
@@ -67,6 +68,14 @@ urlpatterns = [
     # Network discovery endpoints
     path('network/discover/', discovery.discover_network, name='discover-network'),
     path('network/map/', NetworkMapView.as_view(), name='map_data'),
+
+    # Metrics endpoints
+    path('metrics/dashboard/', DashboardStatsView.as_view(), name='dashboard-stats'),
+    path('metrics/routers/', RouterMetricsView.as_view(), name='router-metrics'),
+    path('metrics/routers/<int:router_id>/', RouterMetricsView.as_view(), name='router-metrics-detail'),
+    path('metrics/interfaces/', InterfaceMetricsView.as_view(), name='interface-metrics'),
+    path('metrics/interfaces/<int:interface_id>/', InterfaceMetricsView.as_view(), name='interface-metrics-detail'),
+
 
     # Logs endpoint
     path('logs/', LogsView.as_view(), name='logs'),
