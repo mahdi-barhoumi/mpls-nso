@@ -225,26 +225,6 @@
             >
               DHCP sites network subnet mask is required
             </small>
-
-            <span class="p-float-label w-full">
-              <label
-                for="dhcp_lease_time"
-                class="text-surface-600 dark:text-surface-200 font-medium"
-                >DHCP Lease Time</label
-              >
-              <InputNumber
-                id="dhcp_lease_time"
-                v-model="networkData.dhcp_lease_time"
-                :min="86400"
-                suffix=" seconds"
-                :useGrouping="false"
-                class="w-full mt-2"
-                :class="{ 'p-invalid': submitted && !networkData.dhcp_lease_time }"
-              />
-            </span>
-            <small v-if="submitted && !networkData.dhcp_lease_time" class="p-error block mt-2">
-              DHCP lease time is required (minimum 86400 seconds)
-            </small>
           </div>
         </div>
       </div>
@@ -281,7 +261,6 @@ const networkData = reactive({
   restconf_password: '',
   dhcp_sites_network_address: '',
   dhcp_sites_network_subnet_mask: '',
-  dhcp_lease_time: 86400,
 })
 
 const handleNext = async () => {
@@ -297,8 +276,7 @@ const handleNext = async () => {
     !networkData.restconf_username ||
     !networkData.restconf_password ||
     !networkData.dhcp_sites_network_address ||
-    !networkData.dhcp_sites_network_subnet_mask ||
-    !networkData.dhcp_lease_time
+    !networkData.dhcp_sites_network_subnet_mask
   ) {
     toast.add({
       severity: 'error',

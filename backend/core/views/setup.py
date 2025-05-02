@@ -116,11 +116,6 @@ class SettingsSetupView(View):
                     'message': 'BGP AS must be an integer'
                 }, status=400)
 
-            if not isinstance(data.get('dhcp_lease_time'), int):
-                return JsonResponse({
-                    'message': 'DHCP lease time must be an integer'
-                }, status=400)
-
             # Create settings
             settings = Settings(
                 restconf_username=data['restconf_username'],
