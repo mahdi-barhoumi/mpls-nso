@@ -693,3 +693,10 @@ onUnmounted(() => {
   }
 })
 </script>
+
+<!-- TODO: Fix me -->
+<style>
+.card:last-child {
+  margin-bottom: 2rem;
+}
+</style>
