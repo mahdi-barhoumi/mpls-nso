@@ -2,7 +2,7 @@
   <div class="card h-full">
     <div class="flex justify-between mb-4">
       <div>
-        <h5 class="text-lg m-0">Backbone Topology</h5>
+        <h5 class="text-lg m-0">Network Topology</h5>
         <div class="flex gap-2">
           <div class="flex items-center gap-2">
             <div
@@ -56,11 +56,6 @@
           class="flex items-center justify-center bg-orange-100 dark:bg-orange-400/10 rounded-border p-2"
         >
           <Button icon="pi pi-refresh" class="p-button-text p-button-rounded" @click="resetView" />
-        </div>
-        <div
-          class="flex items-center justify-center bg-blue-100 dark:bg-blue-400/10 rounded-border p-2"
-        >
-          <Button icon="pi pi-save" class="p-button-text p-button-rounded" @click="saveLayout" />
         </div>
       </div>
     </div>

@@ -381,6 +381,9 @@ class _NetworkDiscoverer:
         return router
     
     def assign_ce_to_site(self, router, ip_address):
+        # If router already has a site then skip
+        if router.site:
+            return
         try:
             # Convert IP address to IPv4Address object
             ce_ip = ipaddress.IPv4Address(ip_address)
@@ -404,6 +407,11 @@ class _NetworkDiscoverer:
                     # Assign router to site
                     site.router = router
                     site.save()
+
+                    # HACK: This shouldn't be here
+                    from core.modules.network_controller import NetworkController
+                    NetworkController.set_router_hostname(router, f'CE{site.id}')
+                    
                     self.logger.info(f"Assigned CE router {router.hostname} to site {site}")
                     return
             

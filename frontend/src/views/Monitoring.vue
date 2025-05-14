@@ -329,7 +329,7 @@ const chartOptions = {
       min: 0,
       max: 100,
       ticks: {
-        stepSize: 20,
+        stepSize: 10,
         callback: function (value) {
           return value + '%'
         },
@@ -355,7 +355,7 @@ const chartOptions = {
     },
   },
   responsive: true,
-  maintainAspectRatio: false,
+  maintainAspectRatio: true,
   interaction: {
     intersect: false,
     mode: 'index',
