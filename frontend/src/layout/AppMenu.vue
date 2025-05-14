@@ -45,7 +45,7 @@ const model = ref([
           {
             label: 'Device Inventory',
             icon: 'pi pi-fw pi-server',
-            to: '/device-inventory',
+            to: '/inventory',
           },
         ],
       },

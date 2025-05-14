@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@primeuix/themes": "^1.0.0",
+    "@vuelidate/core": "^2.0.3",
+    "@vuelidate/validators": "^2.0.4",
     "axios": "^1.8.4",
     "chart.js": "^3.3.2",
     "chartjs-adapter-date-fns": "^3.0.0",

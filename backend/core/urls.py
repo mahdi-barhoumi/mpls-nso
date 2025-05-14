@@ -8,6 +8,7 @@ from core.views.vpns import VPNView, VPNSiteView
 from core.views.setup import SetupStatusView, AdminSetupView, SettingsSetupView
 from core.views.logs import LogsView
 from core.views.auth import AuthView
+from core.views.users import UserProfileView
 from core.views.test import test_view
 from core.views.metrics import RouterMetricsView, InterfaceMetricsView, DashboardStatsView
 
@@ -15,6 +16,9 @@ urlpatterns = [
     # Auth endpoints
     path('auth/login/', AuthView.as_view(), name='login'),
     path('auth/logout/', AuthView.as_view(), name='logout'),
+
+    # User endpoints
+    path('users/profile/', UserProfileView.as_view(), name='user-profile'),
 
     # Test endpoint
     path('test/', test_view, name='test'),

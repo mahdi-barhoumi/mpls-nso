@@ -77,6 +77,16 @@ const router = createRouter({
           component: () => import('@/views/pages/Administration/VPNCrud.vue'),
         },
         {
+          path: '/inventory',
+          name: 'inventory',
+          component: () => import('@/views/pages/Administration/Inventory.vue'),
+        },
+        {
+          path: '/settings/user',
+          name: 'user',
+          component: () => import('@/views/pages/Settings/UserSettings.vue'),
+        },
+        {
           path: '/troubleshooting/logs',
           name: 'logs',
           component: () => import('@/views/pages/Troubleshooting/LogsView.vue'),
