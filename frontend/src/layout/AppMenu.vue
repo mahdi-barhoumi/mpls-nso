@@ -40,7 +40,7 @@ const model = ref([
           {
             label: 'VPN',
             icon: 'pi pi-fw pi-sitemap',
-            to: '/vpn',
+            to: '/vpns',
           },
           {
             label: 'Device Inventory',

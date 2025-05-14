@@ -104,6 +104,10 @@
                   <i class="pi pi-search" />
                   <InputText v-model="filters['global'].value" placeholder="Search interfaces..." />
                 </span>
+                <div class="flex gap-2">
+                  <Button icon="pi pi-refresh" @click="refreshData" text />
+                  <Button icon="pi pi-download" @click="exportData" text />
+                </div>
               </div>
             </template>
 
@@ -133,7 +137,7 @@
         <!-- Detailed Metrics View -->
         <div v-if="selectedView.value === 'details'" class="h-[400px] overflow-y-auto">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div v-for="router in routerMetrics" :key="router.id" class="card p-4">
+            <div v-for="router in filteredRouterMetrics" :key="router.id" class="card p-4">
               <h6 class="mb-3">{{ router.hostname }}</h6>
               <div class="space-y-4">
                 <!-- CPU Details -->
@@ -245,69 +249,11 @@
         </DataTable>
       </div>
     </div>
-
-    <!-- Interface Metrics -->
-    <div class="col-span-12">
-      <div class="card">
-        <div class="flex justify-between items-center mb-4">
-          <h5 class="text-xl m-0">
-            Interface Status
-            <span v-if="selectedRouter" class="text-primary text-lg ml-2">
-              ({{ selectedRouter.hostname }})
-            </span>
-          </h5>
-          <div class="flex gap-2">
-            <Button icon="pi pi-refresh" @click="refreshData" text />
-            <Button icon="pi pi-download" @click="exportData" text />
-          </div>
-        </div>
-        <DataTable
-          :value="interfaceMetrics"
-          :scrollable="true"
-          scrollHeight="400px"
-          class="p-datatable-sm"
-          :loading="loading"
-          v-model:filters="filters"
-          filterDisplay="menu"
-          :globalFilterFields="['name', 'router_hostname', 'operational_status']"
-        >
-          <template #header>
-            <div class="flex justify-between">
-              <span class="p-input-icon-left">
-                <i class="pi pi-search" />
-                <InputText v-model="filters['global'].value" placeholder="Search interfaces..." />
-              </span>
-            </div>
-          </template>
-
-          <Column field="router_hostname" header="Router" frozen sortable />
-          <Column field="name" header="Interface" sortable />
-          <Column field="operational_status" header="Status" sortable>
-            <template #body="slotProps">
-              <Tag
-                :severity="slotProps.data.operational_status === 'ready' ? 'success' : 'danger'"
-                :value="slotProps.data.operational_status"
-              />
-            </template>
-          </Column>
-          <Column field="bps_in" header="Incoming (bps)" sortable>
-            <template #body="slotProps">
-              {{ formatBandwidth(slotProps.data.bps_in) }}
-            </template>
-          </Column>
-          <Column field="bps_out" header="Outgoing (bps)" sortable>
-            <template #body="slotProps">
-              {{ formatBandwidth(slotProps.data.bps_out) }}
-            </template>
-          </Column>
-        </DataTable>
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import { FilterMatchMode } from '@primevue/core/api'
 import Chart from 'primevue/chart'
@@ -477,12 +423,10 @@ const fetchRouterMetrics = async () => {
 const fetchInterfaceMetrics = async () => {
   try {
     loading.value = true
-    interfaceMetrics.value = await monitoringService.getInterfaceMetrics()
-    if (selectedRouter.value) {
-      interfaceMetrics.value = interfaceMetrics.value.filter(
-        (i) => i.router_id === selectedRouter.value.id,
-      )
-    }
+    const metrics = await monitoringService.getInterfaceMetrics()
+    interfaceMetrics.value = selectedRouter.value
+      ? metrics.filter((i) => i.router_id === selectedRouter.value.id)
+      : metrics
   } catch (error) {
     toast.add({
       severity: 'error',
@@ -507,8 +451,9 @@ const updateChart = async () => {
     }
 
     const hours = selectedTimeRange.value.value
-    const routerId = selectedRouter.value?.id
-    const metrics = await monitoringService.getRouterMetrics(routerId, hours)
+    const metrics = selectedRouter.value
+      ? await monitoringService.getRouterMetrics(selectedRouter.value.id, hours)
+      : await monitoringService.getRouterMetrics(null, hours)
 
     const timestamps = metrics.map((m) => new Date(m.timestamp))
     const metricKey =
@@ -590,6 +535,14 @@ const updateChart = async () => {
     })
   }
 }
+
+// Add computed property for filtered router metrics
+const filteredRouterMetrics = computed(() => {
+  if (selectedRouter.value) {
+    return routerMetrics.value.filter((router) => router.id === selectedRouter.value.id)
+  }
+  return routerMetrics.value
+})
 
 // Add router selection handler
 const onRouterSelect = async (event) => {
@@ -693,3 +646,11 @@ onUnmounted(() => {
   }
 })
 </script>
+
+<!-- TODO: Fix me -->
+<style>
+.card:last-child {
+  margin-bottom: 2rem;
+}
+</style>
+```

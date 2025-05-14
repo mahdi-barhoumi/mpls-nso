@@ -54,44 +54,44 @@ const router = createRouter({
         {
           path: '/troubleshooting/guide',
           name: 'guide',
-          component: () => import('@/views/pages/Guide.vue'),
+          component: () => import('@/views/pages/Troubleshooting/Guide.vue'),
         },
         {
           path: '/pages/empty',
           name: 'empty',
-          component: () => import('@/views/pages/Empty.vue'),
+          component: () => import('@/views/pages/Misc/Empty.vue'),
         },
         {
           path: '/customers',
           name: 'customer',
-          component: () => import('@/views/pages/CustomerCrud.vue'),
+          component: () => import('@/views/pages/Administration/CustomerCrud.vue'),
         },
         {
           path: '/sites',
           name: 'sites',
-          component: () => import('@/views/pages/SiteCrud.vue'),
+          component: () => import('@/views/pages/Administration/SiteCrud.vue'),
         },
         {
-          path: '/vpn',
+          path: '/vpns',
           name: 'vpns',
-          component: () => import('@/views/pages/VPNCrud.vue'),
+          component: () => import('@/views/pages/Administration/VPNCrud.vue'),
         },
         {
           path: '/troubleshooting/logs',
           name: 'logs',
-          component: () => import('@/views/pages/LogsView.vue'),
+          component: () => import('@/views/pages/Troubleshooting/LogsView.vue'),
         },
       ],
     },
     {
       path: '/landing',
       name: 'landing',
-      component: () => import('@/views/pages/Landing.vue'),
+      component: () => import('@/views/Landing.vue'),
     },
     {
       path: '/pages/notfound',
       name: 'notfound',
-      component: () => import('@/views/pages/NotFound.vue'),
+      component: () => import('@/views/pages/Misc/NotFound.vue'),
     },
     {
       path: '/auth/login',
@@ -111,7 +111,7 @@ const router = createRouter({
     {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
-      component: () => import('@/views/pages/NotFound.vue'),
+      component: () => import('@/views/pages/Misc/NotFound.vue'),
     },
   ],
 })
