@@ -165,23 +165,6 @@ class _NetworkMonitor:
         storage_free = storage_total - storage_used
         storage_used_percent = float(storage_stats.get('used-percent', 0))
         
-        # Get system uptime
-        uptime_data = self.restconf.get(
-            router.management_ip_address,
-            "Cisco-IOS-XE-system-stats-oper:system-stats/sys-uptime"
-        )
-        
-        uptime_seconds = int(uptime_data.get('Cisco-IOS-XE-system-stats-oper:sys-uptime', 0))
-
-        # Get hardware health status
-        env_data = self.restconf.get(
-            router.management_ip_address,
-            "Cisco-IOS-XE-environment-oper:environment-sensors"
-        )
-        
-        # Analyze hardware health
-        hardware_status = self._analyze_hardware_health(env_data)
-        
         # Store metrics in database
         router_metric = RouterMetric(
             router=router,
@@ -196,8 +179,6 @@ class _NetworkMonitor:
             storage_total=storage_total,
             storage_used=storage_used,
             storage_free=storage_free,
-            uptime=uptime_seconds,
-            hardware_status=hardware_status
         )
         router_metric.save()
         
@@ -206,28 +187,47 @@ class _NetworkMonitor:
         self._check_memory_thresholds(router, mem_used_percent)
         self._check_storage_thresholds(router, storage_used_percent)
     
-    def _analyze_hardware_health(self, env_data):
-        if not env_data:
-            return 'Unknown'
+    def get_system_info(self, router):
+        try:
+            system_data = self.restconf.get(
+                router.management_ip_address,
+                "openconfig-system:system"
+            )
             
-        sensors = env_data.get('Cisco-IOS-XE-environment-oper:environment-sensors', {}).get('environment-sensor', [])
-        
-        critical_count = 0
-        warning_count = 0
-        
-        for sensor in sensors:
-            state = sensor.get('state', '').lower()
-            if state == 'critical' or state == 'shutdown':
-                critical_count += 1
-            elif state == 'warning' or state == 'notok':
-                warning_count += 1
+            if not system_data or 'openconfig-system:system' not in system_data:
+                return None
                 
-        if critical_count > 0:
-            return 'Critical'
-        elif warning_count > 0:
-            return 'Warning'
-        else:
-            return 'Healthy'
+            system = system_data['openconfig-system:system']
+            state = system.get('state', {})
+            
+            # Calculate uptime from boot-time
+            boot_time = int(state.get('boot-time', 0))
+            current_time = int(timezone.now().timestamp())
+            uptime_seconds = current_time - boot_time
+            
+            return {
+                'uptime': uptime_seconds,
+                'current_datetime': state.get('current-datetime'),
+                'cpu_info': self._parse_cpu_info(system.get('cpus', {}).get('cpu', []))
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error getting system info for {router.hostname}: {str(e)}")
+            return None
+            
+    def _parse_cpu_info(self, cpus):
+        cpu_info = []
+        for cpu in cpus:
+            state = cpu.get('state', {})
+            total = state.get('total', {})
+            cpu_info.append({
+                'index': cpu.get('index'),
+                'total': total.get('instant'),
+                'idle': state.get('idle', {}).get('instant'),
+                'user': state.get('user', {}).get('instant'),
+                'kernel': state.get('kernel', {}).get('instant')
+            })
+        return cpu_info
 
     def collect_interface_metrics(self, router):
         interfaces_data = self.restconf.get(

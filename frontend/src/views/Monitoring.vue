@@ -653,4 +653,3 @@ onUnmounted(() => {
   margin-bottom: 2rem;
 }
 </style>
-```
