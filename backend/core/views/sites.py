@@ -67,11 +67,13 @@ class SiteView(View):
                             'name': site.assigned_interface.name,
                             'router': {
                                 'id': site.assigned_interface.router.id,
-                                'hostname': site.assigned_interface.router.hostname
+                                'hostname': site.assigned_interface.router.hostname,
+                                'status' : site.assigned_interface.router.reachable
                             }
                         } if site.assigned_interface else None,
                         'router_id': site.router.id if site.router else None,
                         'has_routing': site.has_routing,
+                        'status' : site.assigned_interface.router.reachable
                     }
                     for site in sites
                 ]
@@ -131,7 +133,8 @@ class SiteView(View):
                 'location': site.location,
                 'dhcp_scope': str(ipaddress.IPv4Network(f"{site.dhcp_scope.network}/{site.dhcp_scope.subnet_mask}", strict=False)),
                 'assigned_interface_id': site.assigned_interface.id,
-                'router_id': site.router.id if site.router else None
+                'router_id': site.router.id if site.router else None,
+                'status' : site.assigned_interface.router.reachable
             }, status=201)
         
         except json.JSONDecodeError:
@@ -173,7 +176,8 @@ class SiteView(View):
                 'location': site.location,
                 'dhcp_scope': str(ipaddress.IPv4Network(f"{site.dhcp_scope.network}/{site.dhcp_scope.subnet_mask}", strict=False)),
                 'assigned_interface_id': site.assigned_interface.id,
-                'router_id': site.router.id if site.router else None
+                'router_id': site.router.id if site.router else None,
+                'status' : site.assigned_interface.router.reachable
             })
             
         except json.JSONDecodeError:

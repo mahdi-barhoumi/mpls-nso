@@ -1,106 +1,162 @@
 <template>
   <div>
     <div class="card">
-      <div class="font-semibold text-2xl mb-4">Manage Sites</div>
-      <!-- Toolbar -->
-      <Toolbar class="mb-6">
-        <template #start>
+      <div class="flex justify-between items-center mb-6">
+        <div class="font-semibold text-2xl">Manage Sites</div>
+        <div class="flex gap-2">
           <Button
-            label="New"
+            label="New Site"
             icon="pi pi-plus"
-            severity="secondary"
-            class="mr-2"
+            severity="primary"
+            raised
             @click="openNewSiteDialog"
           />
           <Button
-            label="Delete"
+            label="Delete Selected"
             icon="pi pi-trash"
-            severity="secondary"
+            severity="danger"
+            raised
             @click="confirmDeleteSelected"
             :disabled="!selectedSites || !selectedSites.length"
           />
-        </template>
-      </Toolbar>
+        </div>
+      </div>
 
-      <!-- DataTable -->
-      <DataTable
-        ref="dt"
-        v-model:selection="selectedSites"
-        :value="sites"
-        dataKey="id"
-        :paginator="true"
-        :rows="10"
-        :filters="filters"
-        paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
-        :rowsPerPageOptions="[5, 10, 25]"
-        currentPageReportTemplate="Showing {first} to {last} of {totalRecords} sites"
-        selectionMode="multiple"
-        :loading="loading"
-        class="p-datatable-gridlines"
-      >
-        <template #header>
-          <div class="flex flex-wrap gap-2 items-center justify-between">
-            <h4 class="m-0">Sites</h4>
-          </div>
-        </template>
-
-        <Column selectionMode="multiple" style="width: 3rem" :exportable="false"></Column>
-        <Column field="name" header="Name" sortable style="min-width: 16rem"></Column>
-        <Column field="location" header="Location" sortable style="min-width: 16rem"></Column>
-        <Column field="customer.name" header="Customer" sortable style="min-width: 16rem">
-          <template #body="slotProps">
-            {{ slotProps.data.customer?.name || 'N/A' }}
-          </template>
-        </Column>
-        <Column
-          field="assigned_interface.name"
-          header="PE Interface"
-          sortable
-          style="min-width: 16rem"
+      <!-- Grid View -->
+      <div v-if="!loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div
+          v-for="site in sites"
+          :key="site.id"
+          class="relative bg-surface-0 dark:bg-surface-900 p-4 border-round-xl shadow-md transition-all duration-200 hover:shadow-lg"
+          :class="{ 'border-primary border-2': selectedSites.includes(site) }"
         >
-          <template #body="slotProps">
-            {{
-              `${slotProps.data.assigned_interface?.router?.hostname || 'N/A'} - ${
-                slotProps.data.assigned_interface?.name || 'N/A'
-              }`
-            }}
-          </template>
-        </Column>
-        <Column field="dhcp_scope" header="DHCP Scope" sortable style="min-width: 16rem"></Column>
-        <Column field="routing_enabled" header="Routing" style="min-width: 10rem">
-          <template #body="slotProps">
-            <span v-if="slotProps.data.routing_enabled" class="text-green-600 font-semibold"
-              >Enabled</span
-            >
-            <Button
-              v-else
-              label="Enable"
-              icon="pi pi-power-off"
-              size="small"
-              @click="enableRouting(slotProps.data)"
-              :loading="routingLoadingId === slotProps.data.id"
-            />
-          </template>
-        </Column>
-        <Column :exportable="false" style="min-width: 12rem">
-          <template #body="slotProps">
-            <Button
-              icon="pi pi-pencil"
-              outlined
-              rounded
+          <!-- Selection Checkbox -->
+          <div class="absolute top-3 right-3 flex gap-2 items-center">
+            <Tag
+              :value="site.status || 'offline'"
+              :severity="site.status === 'active' ? 'success' : 'warning'"
               class="mr-2"
-              @click="editSite(slotProps.data)"
             />
-            <Button
-              icon="pi pi-trash"
-              outlined
-              rounded
-              severity="danger"
-              @click="confirmDeleteSite(slotProps.data)"
+            <Checkbox
+              v-model="selectedSites"
+              :value="site"
+              :binary="false"
+              :class="{ '!border-primary': selectedSites.includes(site) }"
             />
-          </template>
-        </Column>
-      </DataTable>
+          </div>
+
+          <!-- Site Info -->
+          <div class="flex flex-col gap-3">
+            <div class="flex items-center gap-2">
+              <i class="pi pi-building text-xl text-primary"></i>
+              <div class="font-bold text-xl">{{ site.name }}</div>
+            </div>
+
+            <div class="flex flex-col gap-2 text-surface-600 dark:text-surface-200">
+              <!-- Location -->
+              <div class="flex items-center gap-2" v-if="site.location">
+                <i class="pi pi-map-marker"></i>
+                <span>{{ site.location }}</span>
+              </div>
+
+              <!-- Customer -->
+              <div class="flex items-center gap-2">
+                <i class="pi pi-users"></i>
+                <span>{{ site.customer?.name || 'N/A' }}</span>
+              </div>
+
+              <!-- PE Interface -->
+              <div class="flex items-center gap-2">
+                <i class="pi pi-server"></i>
+                <span
+                  >{{ site.assigned_interface?.router?.hostname || 'N/A' }} -
+                  {{ site.assigned_interface?.name || 'N/A' }}</span
+                >
+              </div>
+
+              <!-- DHCP Scope -->
+              <div class="flex items-center gap-2" v-if="site.dhcp_scope">
+                <i class="pi pi-bolt"></i>
+                <span>{{ site.dhcp_scope }}</span>
+              </div>
+
+              <!-- Routing Status -->
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                  <i class="pi pi-compass" :class="{ 'text-green-500': site.has_routing }"></i>
+                  <div v-if="site.has_routing" class="text-green-500 font-semibold">
+                    Routing Enabled
+                  </div>
+                  <div v-else class="text-surface-400">Routing Disabled</div>
+                </div>
+                <Button
+                  v-if="site.has_routing"
+                  label="Disable"
+                  icon="pi pi-power-off"
+                  size="small"
+                  severity="secondary"
+                  text
+                  @click="disableRouting(site)"
+                  :loading="routingLoadingId === site.id"
+                />
+                <Button
+                  v-else
+                  label="Enable"
+                  icon="pi pi-power-off"
+                  size="small"
+                  severity="secondary"
+                  text
+                  @click="enableRouting(site)"
+                  :loading="routingLoadingId === site.id"
+                  :disabled="site.status !== 'active'"
+                />
+              </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex gap-2 mt-3 justify-end">
+              <Button
+                icon="pi pi-pencil"
+                text
+                rounded
+                severity="secondary"
+                @click="editSite(site)"
+                tooltip="Edit Site"
+              />
+              <Button
+                icon="pi pi-trash"
+                text
+                rounded
+                severity="danger"
+                @click="confirmDeleteSite(site)"
+                tooltip="Delete Site"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading State -->
+      <div v-else class="flex justify-center items-center p-8">
+        <ProgressSpinner />
+      </div>
+
+      <!-- Empty State -->
+      <div
+        v-if="!loading && sites.length === 0"
+        class="flex flex-col items-center justify-center p-8 text-surface-600 dark:text-surface-200"
+      >
+        <i class="pi pi-inbox text-5xl mb-4"></i>
+        <div class="text-xl font-semibold mb-2">No Sites Found</div>
+        <p>Get started by creating your first site.</p>
+        <Button
+          label="Create Site"
+          icon="pi pi-plus"
+          severity="primary"
+          class="mt-4"
+          @click="openNewSiteDialog"
+        />
+      </div>
     </div>
 
     <!-- Site Dialog -->
@@ -458,6 +514,28 @@ const enableRouting = async (site) => {
     routingLoadingId.value = null
   }
 }
+const disableRouting = async (site) => {
+  routingLoadingId.value = site.id
+  try {
+    await SiteService.disableRouting(site.id)
+    toast.add({
+      severity: 'success',
+      summary: 'Success',
+      detail: `Routing disabled for ${site.name}`,
+      life: 3000,
+    })
+    fetchSites()
+  } catch (error) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'Failed to disable routing',
+      life: 3000,
+    })
+  } finally {
+    routingLoadingId.value = null
+  }
+}
 const closeDialog = () => {
   siteDialogVisible.value = false
   submitted.value = false
@@ -481,7 +559,15 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.field {
+.card {
+  background: var(--surface-card);
+  padding: 2rem;
+  border-radius: var(--border-radius);
   margin-bottom: 1rem;
+}
+
+/* Add smooth transition for card selection */
+.border-primary {
+  transition: border-color 0.2s;
 }
 </style>

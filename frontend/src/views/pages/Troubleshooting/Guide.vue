@@ -1,7 +1,7 @@
 <template>
-  <div class="grid">
-    <div class="col-12">
-      <div class="card">
+  <div class="card">
+    <div class="grid">
+      <div class="col-12">
         <h1 class="text-3xl mb-4">Application Guide</h1>
 
         <!-- Table of Contents -->
@@ -12,7 +12,7 @@
         </div>
 
         <!-- Guide Sections -->
-        <ScrollPanel style="height: calc(100vh - 250px)" class="custom-scrollbar">
+        <ScrollPanel class="guide-scroll custom-scrollbar">
           <div v-for="(section, index) in sections" :key="index" :id="section.id" class="mb-4">
             <Card>
               <template #title>
@@ -180,6 +180,11 @@ const scrollTo = (id) => {
 </script>
 
 <style lang="scss" scoped>
+.guide-scroll {
+  height: calc(100vh - 350px) !important;
+  margin-bottom: 2rem;
+}
+
 .custom-scrollbar {
   .p-scrollpanel-wrapper {
     border-right: none;

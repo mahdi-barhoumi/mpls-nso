@@ -70,4 +70,21 @@ export default {
       throw error
     }
   },
+
+  /**
+   * Disable routing for a site
+   * @param {number} siteId - Site ID
+   * @returns {Promise<Object>} Response data
+   */
+  async disableRouting(siteId) {
+    try {
+      const response = await axios.post(
+        `http://127.0.0.1:8000/api/sites/${siteId}/disable-routing/`,
+      )
+      return response.data
+    } catch (error) {
+      console.error('Error disabling routing for site:', error)
+      throw error
+    }
+  },
 }

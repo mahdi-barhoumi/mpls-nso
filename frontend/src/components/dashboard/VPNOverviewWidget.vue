@@ -84,10 +84,6 @@
               <i class="pi pi-check-circle mr-1"></i>
               {{ vpn.activeConnections }} active links
             </div>
-            <div>
-              <i class="pi pi-users mr-1"></i>
-              {{ vpn.totalCustomers }} customers
-            </div>
           </div>
         </div>
       </div>
@@ -127,40 +123,42 @@ const fetchVPNData = async () => {
       VPNService.getVPNs(),
       CustomerService.getCustomers(),
       SiteService.getSites(),
-    ])
+    ]) // Ensure all data is in array format
+    const processedCustomers = Array.isArray(customers) ? customers : []
+    const processedSites = Array.isArray(sites) ? sites : []
 
     // Create lookup maps for efficient data access
-    const customerMap = new Map(customers.map((c) => [c.id, c]))
+    const customerMap = new Map(processedCustomers.map((c) => [c.id, c]))
     const vpnSitesMap = new Map()
-    sites.forEach((site) => {
-      if (!vpnSitesMap.has(site.vpnId)) {
+    processedSites.forEach((site) => {
+      if (site.vpnId && !vpnSitesMap.has(site.vpnId)) {
         vpnSitesMap.set(site.vpnId, [])
       }
-      vpnSitesMap.get(site.vpnId).push(site)
+      if (site.vpnId) {
+        vpnSitesMap.get(site.vpnId).push(site)
+      }
     })
-
-    // Calculate global statistics
+    const vpnsWithSites = vpns.filter((vpn) => vpnSitesMap.get(vpn.id)?.length > 0)
     stats.value = {
       totalVpns: vpns.length,
-      activeVpns: vpns.filter((vpn) => vpn.status === 'active').length,
+      activeVpns: vpnsWithSites.length,
       totalSites: sites.length,
       activeConnections: sites.filter((site) => site.status === 'active').length,
     }
-
     // Process VPN list with enhanced data
-    vpnList.value = vpns
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    const processedVpns = Array.isArray(vpns) ? vpns : []
+    vpnList.value = processedVpns
+      .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
       .slice(0, 5)
       .map((vpn) => {
-        const customer = customerMap.get(vpn.customerId)
+        const customer = customerMap.get(vpn.customer_id)
         const vpnSites = vpnSitesMap.get(vpn.id) || []
         return {
           ...vpn,
           customerName: customer?.name || 'Unknown Customer',
           sites: vpnSites,
+          status: vpnSites.length > 0 ? 'active' : 'pending',
           activeConnections: vpnSites.filter((site) => site.status === 'active').length,
-          totalCustomers: customers.filter((c) => vpnSites.some((site) => site.customerId === c.id))
-            .length,
         }
       })
   } catch (error) {

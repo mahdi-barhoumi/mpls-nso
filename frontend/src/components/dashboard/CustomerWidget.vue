@@ -87,6 +87,7 @@ import Tag from 'primevue/tag'
 import Button from 'primevue/button'
 import CustomerService from '@/service/CustomerService'
 import VPNService from '@/service/VPNService'
+import SiteService from '@/service/SiteService'
 
 const router = useRouter()
 const toast = useToast()
@@ -101,26 +102,58 @@ const recentCustomers = ref([])
 const fetchCustomerData = async () => {
   loading.value = true
   try {
-    // Fetch customers and VPNs in parallel
-    const [customerResponse, vpnResponse] = await Promise.all([
+    const [customerResponse, vpnResponse, siteResponse] = await Promise.all([
       CustomerService.getCustomers(),
       VPNService.getVPNs(),
+      SiteService.getSites(),
     ])
 
     const customers = Array.isArray(customerResponse) ? customerResponse : []
     const vpns = Array.isArray(vpnResponse) ? vpnResponse : []
+    const sites = Array.isArray(siteResponse) ? siteResponse : []
+
+    // Create a map of customer IDs to their sites
+    const customerSites = sites.reduce((acc, site) => {
+      if (site.customer?.id) {
+        if (!acc[site.customer.id]) {
+          acc[site.customer.id] = []
+        }
+        acc[site.customer.id].push(site)
+      }
+      return acc
+    }, {})
+
+    // Create a map of customer IDs to their VPNs
+    const customerVPNs = vpns.reduce((acc, vpn) => {
+      if (vpn.customer_id) {
+        if (!acc[vpn.customer_id]) {
+          acc[vpn.customer_id] = []
+        }
+        acc[vpn.customer_id].push(vpn)
+      }
+      return acc
+    }, {})
 
     // Calculate statistics
+    const totalSites = sites.length
+    const activeVpns = vpns.filter((vpn) => vpn.status === 'active').length
+
     stats.value = {
       totalCustomers: customers.length,
-      activeServices: vpns.filter((vpn) => vpn.status === 'active').length,
-      totalSites: customers.reduce((total, customer) => total + (customer.sites?.length || 0), 0),
+      activeServices: activeVpns,
+      totalSites,
     }
 
-    // Get recent customers
-    recentCustomers.value = customers
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    // Process recent customers with their related data
+    const sortableCustomers = [...customers]
+    recentCustomers.value = sortableCustomers
+      .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
       .slice(0, 5)
+      .map((customer) => ({
+        ...customer,
+        vpns: customerVPNs[customer.id] || [],
+        sites: customerSites[customer.id] || [],
+      }))
   } catch (error) {
     console.error('Error fetching customer data:', error)
     toast.add({
@@ -144,7 +177,6 @@ const navigateToCustomers = () => {
 
 onMounted(() => {
   fetchCustomerData()
-  // Refresh data every minute
   const interval = setInterval(fetchCustomerData, 60000)
   onUnmounted(() => clearInterval(interval))
 })

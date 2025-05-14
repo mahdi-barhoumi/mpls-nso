@@ -16,6 +16,7 @@ class VPNView(View):
                     'id': vpn.id,
                     'name': vpn.name,
                     'description': vpn.description,
+                    'created_at' : vpn.created_at,
                     'customer': {
                         'id': vpn.customer.id,
                         'name': vpn.customer.name
@@ -36,6 +37,7 @@ class VPNView(View):
                 'name': vpn.name,
                 'customer': vpn.customer.name,
                 'customer_id': vpn.customer.id,
+                'created_at' : vpn.created_at,
                 'description': vpn.description,
                 'site_count': vpn.sites.count()
             } for vpn in vpns],
