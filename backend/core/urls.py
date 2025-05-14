@@ -11,6 +11,7 @@ from core.views.auth import AuthView
 from core.views.users import UserProfileView
 from core.views.test import test_view
 from core.views.metrics import RouterMetricsView, InterfaceMetricsView, DashboardStatsView
+from core.views.notifications import NotificationView
 
 urlpatterns = [
     # Auth endpoints
@@ -30,6 +31,11 @@ urlpatterns = [
 
     # Utility endpoints
     path('utils/host-interfaces/', utils.list_host_interfaces, name='host-interfaces'),
+
+    # Notification endpoints
+    path('notifications/', NotificationView.as_view(), name='notification-list'),
+    path('notifications/<int:notification_id>/', NotificationView.as_view(), name='notification-detail'),
+    path('notifications/<int:notification_id>/acknowledge/', NotificationView.as_view(), name='notification-acknowledge'),
 
     # Models endpoints
     
