@@ -432,6 +432,196 @@ class _NetworkMonitor:
         deleted_interface_metrics = InterfaceMetric.objects.filter(timestamp__lt=cutoff_date).delete()
         self.logger.info(f"Purged {deleted_interface_metrics[0]} old interface metrics")
 
+    def get_device_info(self, router):
+        """
+        Retrieve comprehensive device information including both static/semi-static data and system info.
+        This includes uptime, software version, hardware details, CPU info, and system information.
+        """
+        try:
+            device_info = {}
+            
+            # Get system information (uptime, current time, CPU info)
+            system_data = self.restconf.get(
+                router.management_ip_address,
+                "openconfig-system:system"
+            )
+            
+            if system_data and 'openconfig-system:system' in system_data:
+                system = system_data['openconfig-system:system']
+                state = system.get('state', {})
+                
+                # Calculate uptime from boot-time
+                boot_time = int(state.get('boot-time', 0))
+                current_time = int(timezone.now().timestamp())
+                uptime_seconds = current_time - boot_time
+                
+                device_info.update({
+                    'uptime_seconds': uptime_seconds,
+                    'uptime_formatted': self._format_uptime(uptime_seconds),
+                    'current_datetime': state.get('current-datetime'),
+                    'cpu_cores': len(system.get('cpus', {}).get('cpu', [])),
+                    'cpu_info': self._parse_cpu_info(system.get('cpus', {}).get('cpu', []))
+                })
+            
+            # Get platform/hardware information
+            platform_data = self.restconf.get(
+                router.management_ip_address,
+                "Cisco-IOS-XE-platform-oper:components/component"
+            )
+            
+            if platform_data and 'Cisco-IOS-XE-platform-oper:component' in platform_data:
+                components = platform_data['Cisco-IOS-XE-platform-oper:component']
+                
+                # Find chassis component for main device info
+                chassis_info = None
+                for component in components:
+                    if component.get('state', {}).get('type') == 'comp-chassis':
+                        chassis_info = component.get('state', {})
+                        break
+                
+                if chassis_info:
+                    device_info.update({
+                        'chassis_description': chassis_info.get('description', 'Unknown'),
+                        'manufacturer': chassis_info.get('mfg-name', 'Unknown'),
+                        'hardware_version': chassis_info.get('version', 'Unknown'),
+                        'serial_number': chassis_info.get('serial-no', 'Unknown'),
+                        'part_number': chassis_info.get('part-no', 'Unknown'),
+                        'manufacturing_date': chassis_info.get('mfg-date', 'Unknown')
+                    })
+                
+                # Get module/slot information
+                modules = []
+                for component in components:
+                    state = component.get('state', {})
+                    if state.get('type') == 'comp-fru' and state.get('location'):
+                        modules.append({
+                            'name': component.get('cname'),
+                            'location': state.get('location'),
+                            'description': state.get('description'),
+                            'serial_number': state.get('serial-no'),
+                            'part_number': state.get('part-no'),
+                            'version': state.get('version'),
+                            'status': state.get('status'),
+                            'firmware_version': state.get('firmware-ver')
+                        })
+                
+                device_info['modules'] = modules
+            
+            # Get software/filesystem information for IOS version
+            software_data = self.restconf.get(
+                router.management_ip_address,
+                "Cisco-IOS-XE-platform-software-oper:cisco-platform-software/q-filesystem"
+            )
+            
+            if software_data and 'Cisco-IOS-XE-platform-software-oper:q-filesystem' in software_data:
+                filesystem = software_data['Cisco-IOS-XE-platform-software-oper:q-filesystem']
+                
+                if filesystem:
+                    # Get filesystem info
+                    partitions = []
+                    for partition in filesystem[0].get('partitions', []):
+                        partitions.append({
+                            'name': partition.get('name'),
+                            'total_size_kb': partition.get('total-size'),
+                            'used_size_kb': partition.get('used-size'),
+                            'used_percent': partition.get('used-percent'),
+                            'is_primary': partition.get('is-primary', False),
+                            'is_writable': partition.get('is-writable', False),
+                            'status': partition.get('disk-status')
+                        })
+                    
+                    device_info['partitions'] = partitions
+                    
+                    # Extract IOS version from image files
+                    image_files = filesystem[0].get('image-files', [])
+                    ios_version = None
+                    boot_image = None
+                    
+                    for image_file in image_files:
+                        file_path = image_file.get('full-path', '')
+                        if 'mono-universalk9' in file_path or 'universalk9' in file_path:
+                            # Extract version from filename (e.g., csr1000v-mono-universalk9.17.03.05.SPA.pkg)
+                            parts = file_path.split('.')
+                            if len(parts) >= 4:
+                                ios_version = f"{parts[-4]}.{parts[-3]}.{parts[-2]}"
+                            boot_image = file_path.split(':')[-1]  # Remove bootflash: prefix
+                            break
+                    
+                    device_info.update({
+                        'ios_version': ios_version or 'Unknown',
+                        'boot_image': boot_image or 'Unknown',
+                        'image_files': [
+                            {
+                                'path': img.get('full-path'),
+                                'size_bytes': img.get('file-size'),
+                                'sha1sum': img.get('sha1sum')
+                            } for img in image_files
+                        ]
+                    })
+            
+            # Get total system memory information
+            memory_data = self.restconf.get(
+                router.management_ip_address,
+                "Cisco-IOS-XE-memory-oper:memory-statistics/memory-statistic"
+            )
+            
+            if memory_data and 'Cisco-IOS-XE-memory-oper:memory-statistic' in memory_data:
+                memory_pools = []
+                total_system_memory = 0
+                
+                for mem_stat in memory_data['Cisco-IOS-XE-memory-oper:memory-statistic']:
+                    pool_info = {
+                        'name': mem_stat.get('name'),
+                        'total_bytes': int(mem_stat.get('total-memory', 0)),
+                        'used_bytes': int(mem_stat.get('used-memory', 0)),
+                        'free_bytes': int(mem_stat.get('free-memory', 0)),
+                        'lowest_usage_bytes': int(mem_stat.get('lowest-usage', 0)),
+                        'highest_usage_bytes': int(mem_stat.get('highest-usage', 0))
+                    }
+                    memory_pools.append(pool_info)
+                    
+                    # Sum up total system memory (excluding reserve pools)
+                    if not mem_stat.get('name', '').startswith('reserve'):
+                        total_system_memory += pool_info['total_bytes']
+                
+                device_info.update({
+                    'memory_pools': memory_pools,
+                    'total_system_memory_bytes': total_system_memory,
+                    'total_system_memory_mb': round(total_system_memory / (1024 * 1024), 2)
+                })
+            
+            self.logger.info(f"Retrieved device info for {router.hostname}: IOS {device_info.get('ios_version', 'Unknown')}, "
+                           f"Uptime: {device_info.get('uptime_formatted', 'Unknown')}, "
+                           f"Memory: {device_info.get('total_system_memory_mb', 0)}MB, "
+                           f"CPU Cores: {device_info.get('cpu_cores', 0)}")
+            
+            return device_info
+            
+        except Exception as e:
+            self.logger.error(f"Error getting device info for {router.hostname}: {str(e)}")
+            return None
+    
+    def _format_uptime(self, uptime_seconds):
+        """Format uptime seconds into human-readable string"""
+        if uptime_seconds <= 0:
+            return "Unknown"
+        
+        days = uptime_seconds // 86400
+        hours = (uptime_seconds % 86400) // 3600
+        minutes = (uptime_seconds % 3600) // 60
+        seconds = uptime_seconds % 60
+        
+        parts = []
+        if days > 0:
+            parts.append(f"{days}d")
+        if hours > 0:
+            parts.append(f"{hours}h")
+        if minutes > 0:
+            parts.append(f"{minutes}m")
+        if seconds > 0 or not parts:
+            parts.append(f"{seconds}s")
+        
+        return " ".join(parts)
 
 NetworkMonitor = _NetworkMonitor()
 NetworkMonitor.initialize()

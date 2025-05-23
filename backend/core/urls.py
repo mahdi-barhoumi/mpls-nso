@@ -10,7 +10,7 @@ from core.views.logs import LogsView
 from core.views.auth import AuthView
 from core.views.users import UserProfileView
 from core.views.test import test_view
-from core.views.metrics import RouterMetricsView, InterfaceMetricsView, DashboardStatsView
+from core.views.monitor import RouterMetricsView, InterfaceMetricsView, DashboardStatsView, RouterInfoView
 from core.views.notifications import NotificationView
 
 urlpatterns = [
@@ -79,13 +79,13 @@ urlpatterns = [
     path('network/discover/', discovery.discover_network, name='discover-network'),
     path('network/map/', NetworkMapView.as_view(), name='map_data'),
 
-    # Metrics endpoints
-    path('metrics/dashboard/', DashboardStatsView.as_view(), name='dashboard-stats'),
-    path('metrics/routers/', RouterMetricsView.as_view(), name='router-metrics'),
-    path('metrics/routers/<int:router_id>/', RouterMetricsView.as_view(), name='router-metrics-detail'),
-    path('metrics/interfaces/', InterfaceMetricsView.as_view(), name='interface-metrics'),
-    path('metrics/interfaces/<int:interface_id>/', InterfaceMetricsView.as_view(), name='interface-metrics-detail'),
-
+    # Monitoring endpoints
+    path('monitoring/dashboard/', DashboardStatsView.as_view(), name='dashboard-stats'),
+    path('monitoring/routers/', RouterMetricsView.as_view(), name='router-metrics'),
+    path('monitoring/routers/<int:router_id>/', RouterMetricsView.as_view(), name='router-metrics-detail'),
+    path('monitoring/interfaces/', InterfaceMetricsView.as_view(), name='interface-metrics'),
+    path('monitoring/interfaces/<int:interface_id>/', InterfaceMetricsView.as_view(), name='interface-metrics-detail'),
+    path('monitoring/device-info/<int:router_id>/', RouterInfoView.as_view(), name='router-device-info'),
 
     # Logs endpoint
     path('logs/', LogsView.as_view(), name='logs'),

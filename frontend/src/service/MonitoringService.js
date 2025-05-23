@@ -1,4 +1,4 @@
-const BASE_URL = 'http://127.0.0.1:8000/api/metrics'
+const BASE_URL = 'http://127.0.0.1:8000/api/monitoring'
 
 export default class MonitoringService {
   async getDashboardStats() {
