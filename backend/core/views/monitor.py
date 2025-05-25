@@ -5,7 +5,8 @@ from django.utils.decorators import method_decorator
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from datetime import timedelta
-from core.models import Router, Interface, RouterMetric, InterfaceMetric
+from django.db.models import Q, F, Count
+from core.models import Router, Interface, RouterMetric, InterfaceMetric, Site, Customer
 from core.modules.monitor import NetworkMonitor
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -25,18 +26,21 @@ class RouterMetricsView(View):
                 ).order_by('timestamp')
 
                 metrics_data = [{
+                    'id': metric.id,
+                    'router_id': router.id,
+                    'hostname': router.hostname,
                     'timestamp': metric.timestamp.isoformat(),
-                    'cpu_usage_5s': metric.cpu_usage_5s,
-                    'cpu_usage_1m': metric.cpu_usage_1m,
-                    'cpu_usage_5m': metric.cpu_usage_5m,
-                    'mem_used_percent': metric.mem_used_percent,
-                    'mem_total': metric.mem_total,
-                    'mem_used': metric.mem_used,
-                    'mem_free': metric.mem_free,
-                    'storage_used_percent': metric.storage_used_percent,
-                    'storage_total': metric.storage_total,
-                    'storage_used': metric.storage_used,
-                    'storage_free': metric.storage_free
+                    'cpu_usage_5s': metric.cpu_usage_5s or 0,
+                    'cpu_usage_1m': metric.cpu_usage_1m or 0,
+                    'cpu_usage_5m': metric.cpu_usage_5m or 0,
+                    'mem_used_percent': metric.mem_used_percent or 0,
+                    'mem_total': metric.mem_total or 0,
+                    'mem_used': metric.mem_used or 0,
+                    'mem_free': metric.mem_free or 0,
+                    'storage_used_percent': metric.storage_used_percent or 0,
+                    'storage_total': metric.storage_total or 0,
+                    'storage_used': metric.storage_used or 0,
+                    'storage_free': metric.storage_free or 0
                 } for metric in metrics]
 
                 return JsonResponse(metrics_data, safe=False)
@@ -47,14 +51,15 @@ class RouterMetricsView(View):
                     latest_metric = RouterMetric.objects.filter(router=router).order_by('-timestamp').first()
                     if latest_metric:
                         latest_metrics.append({
+                            'id': latest_metric.id,
                             'router_id': router.id,
                             'hostname': router.hostname,
                             'timestamp': latest_metric.timestamp.isoformat(),
-                            'cpu_usage_5s': latest_metric.cpu_usage_5s,
-                            'cpu_usage_1m': latest_metric.cpu_usage_1m,
-                            'cpu_usage_5m': latest_metric.cpu_usage_5m,
-                            'mem_used_percent': latest_metric.mem_used_percent,
-                            'storage_used_percent': latest_metric.storage_used_percent
+                            'cpu_usage_5s': latest_metric.cpu_usage_5s or 0,
+                            'cpu_usage_1m': latest_metric.cpu_usage_1m or 0,
+                            'cpu_usage_5m': latest_metric.cpu_usage_5m or 0,
+                            'mem_used_percent': latest_metric.mem_used_percent or 0,
+                            'storage_used_percent': latest_metric.storage_used_percent or 0
                         })
 
                 return JsonResponse(latest_metrics, safe=False)
