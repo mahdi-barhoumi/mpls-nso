@@ -382,8 +382,9 @@ class _NetworkDiscoverer:
     
     def assign_ce_to_site(self, router, ip_address):
         # If router already has a site then skip
-        if router.site:
+        if router.site is None:
             return
+        
         try:
             # Convert IP address to IPv4Address object
             ce_ip = ipaddress.IPv4Address(ip_address)

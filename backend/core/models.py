@@ -269,9 +269,9 @@ class Site(models.Model):
     dhcp_scope = models.OneToOneField(DHCPScope, null=True, on_delete=models.SET_NULL, help_text="DHCP scope for customer edge management (/30 subnet)")
     link_network = models.GenericIPAddressField(protocol='IPv4', help_text="P2P link network (/30 subnet) for site connectivity")
     assigned_interface = models.ForeignKey(Interface, null=True, on_delete=models.SET_NULL, related_name='site', help_text="Assigned provider interface for this site")
-    vrf = models.ForeignKey(VRF, null=True, on_delete=models.SET_NULL, related_name='sites', help_text="VRF for this site")
+    vrf = models.ForeignKey(VRF, null=True, on_delete=models.SET_NULL, related_name='site', help_text="VRF for this site")
     ospf_process_id = models.PositiveIntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(65535)], help_text="OSPF process ID used by the PE router for this site's routing")
-    router = models.ForeignKey(Router, null=True, on_delete=models.SET_NULL, related_name='sites', help_text="Customer edge router for this site")
+    router = models.ForeignKey(Router, null=True, on_delete=models.SET_NULL, related_name='site', help_text="Customer edge router for this site")
     has_routing = models.BooleanField(default=False, help_text="Whether routing is enabled for this site")
 
     class Meta:
