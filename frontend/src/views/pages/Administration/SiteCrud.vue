@@ -1,553 +1,480 @@
 <template>
   <div>
-    <div class="card">
-      <div class="flex justify-between items-center mb-6">
-        <div class="font-semibold text-2xl">Manage Sites</div>
-        <div class="flex gap-2">
-          <Button
-            label="New Site"
-            icon="pi pi-plus"
-            severity="primary"
-            raised
-            @click="openNewSiteDialog"
-          />
-          <Button
-            label="Delete Selected"
-            icon="pi pi-trash"
-            severity="danger"
-            raised
-            @click="confirmDeleteSelected"
-            :disabled="!selectedSites || !selectedSites.length"
-          />
-        </div>
-      </div>
+    <h2>Site Management</h2>
 
-      <!-- Grid View -->
-      <div v-if="!loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div
-          v-for="site in sites"
-          :key="site.id"
-          class="relative bg-surface-0 dark:bg-surface-900 p-4 border-round-xl shadow-md transition-all duration-200 hover:shadow-lg"
-          :class="{ 'border-primary border-2': selectedSites.includes(site) }"
-        >
-          <!-- Selection Checkbox -->
-          <div class="absolute top-3 right-3 flex gap-2 items-center">
-            <Tag
-              :value="site.status || 'offline'"
-              :severity="site.status === 'active' ? 'success' : 'warning'"
-              class="mr-2"
-            />
-            <Checkbox
-              v-model="selectedSites"
-              :value="site"
-              :binary="false"
-              :class="{ '!border-primary': selectedSites.includes(site) }"
-            />
-          </div>
+    <!-- Create Site Form -->
+    <div v-if="showCreateForm" style="border: 1px solid #ccc; padding: 20px; margin: 20px 0">
+      <h3>{{ isEditing ? 'Edit Site' : 'Create New Site' }}</h3>
 
-          <!-- Site Info -->
-          <div class="flex flex-col gap-3">
-            <div class="flex items-center gap-2">
-              <i class="pi pi-building text-xl text-primary"></i>
-              <div class="font-bold text-xl">{{ site.name }}</div>
-            </div>
-
-            <div class="flex flex-col gap-2 text-surface-600 dark:text-surface-200">
-              <!-- Location -->
-              <div class="flex items-center gap-2" v-if="site.location">
-                <i class="pi pi-map-marker"></i>
-                <span>{{ site.location }}</span>
-              </div>
-
-              <!-- Customer -->
-              <div class="flex items-center gap-2">
-                <i class="pi pi-users"></i>
-                <span>{{ site.customer?.name || 'N/A' }}</span>
-              </div>
-
-              <!-- PE Interface -->
-              <div class="flex items-center gap-2">
-                <i class="pi pi-server"></i>
-                <span
-                  >{{ site.assigned_interface?.router?.hostname || 'N/A' }} -
-                  {{ site.assigned_interface?.name || 'N/A' }}</span
-                >
-              </div>
-
-              <!-- DHCP Scope -->
-              <div class="flex items-center gap-2" v-if="site.dhcp_scope">
-                <i class="pi pi-bolt"></i>
-                <span>{{ site.dhcp_scope }}</span>
-              </div>
-
-              <!-- Routing Status -->
-              <div class="flex items-center justify-between gap-2">
-                <div class="flex items-center gap-2">
-                  <i class="pi pi-compass" :class="{ 'text-green-500': site.has_routing }"></i>
-                  <div v-if="site.has_routing" class="text-green-500 font-semibold">
-                    Routing Enabled
-                  </div>
-                  <div v-else class="text-surface-400">Routing Disabled</div>
-                </div>
-                <Button
-                  v-if="site.has_routing"
-                  label="Disable"
-                  icon="pi pi-power-off"
-                  size="small"
-                  severity="secondary"
-                  text
-                  @click="disableRouting(site)"
-                  :loading="routingLoadingId === site.id"
-                />
-                <Button
-                  v-else
-                  label="Enable"
-                  icon="pi pi-power-off"
-                  size="small"
-                  severity="secondary"
-                  text
-                  @click="enableRouting(site)"
-                  :loading="routingLoadingId === site.id"
-                  :disabled="site.status !== 'active'"
-                />
-              </div>
-            </div>
-
-            <!-- Actions -->
-            <div class="flex gap-2 mt-3 justify-end">
-              <Button
-                icon="pi pi-pencil"
-                text
-                rounded
-                severity="secondary"
-                @click="editSite(site)"
-                tooltip="Edit Site"
-              />
-              <Button
-                icon="pi pi-trash"
-                text
-                rounded
-                severity="danger"
-                @click="confirmDeleteSite(site)"
-                tooltip="Delete Site"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Loading State -->
-      <div v-else class="flex justify-center items-center p-8">
-        <ProgressSpinner />
-      </div>
-
-      <!-- Empty State -->
-      <div
-        v-if="!loading && sites.length === 0"
-        class="flex flex-col items-center justify-center p-8 text-surface-600 dark:text-surface-200"
-      >
-        <i class="pi pi-inbox text-5xl mb-4"></i>
-        <div class="text-xl font-semibold mb-2">No Sites Found</div>
-        <p>Get started by creating your first site.</p>
-        <Button
-          label="Create Site"
-          icon="pi pi-plus"
-          severity="primary"
-          class="mt-4"
-          @click="openNewSiteDialog"
+      <div style="margin-bottom: 15px">
+        <label>Name*:</label>
+        <input
+          v-model="formData.name"
+          type="text"
+          required
+          style="width: 100%; padding: 8px; margin-top: 5px"
         />
+      </div>
+
+      <div style="margin-bottom: 15px">
+        <label>Location:</label>
+        <input
+          v-model="formData.location"
+          type="text"
+          style="width: 100%; padding: 8px; margin-top: 5px"
+        />
+      </div>
+
+      <div style="margin-bottom: 15px">
+        <label>Description:</label>
+        <textarea
+          v-model="formData.description"
+          style="width: 100%; padding: 8px; margin-top: 5px; height: 60px"
+        ></textarea>
+      </div>
+
+      <div style="margin-bottom: 15px">
+        <label>Link Network:</label>
+        <input
+          v-model="formData.link_network"
+          type="text"
+          placeholder="e.g., 192.168.0.0"
+          style="width: 100%; padding: 8px; margin-top: 5px"
+        />
+      </div>
+
+      <div v-if="!isEditing" style="margin-bottom: 15px">
+        <label>Customer*:</label>
+        <select
+          v-model="formData.customer_id"
+          required
+          style="width: 100%; padding: 8px; margin-top: 5px"
+        >
+          <option value="">Select Customer</option>
+          <option v-for="customer in customers" :key="customer.id" :value="customer.id">
+            {{ customer.name }}
+          </option>
+        </select>
+      </div>
+
+      <div v-if="!isEditing" style="margin-bottom: 15px">
+        <label>PE Router*:</label>
+        <select
+          v-model="selectedPERouter"
+          @change="fetchPEInterfaces"
+          required
+          style="width: 100%; padding: 8px; margin-top: 5px"
+        >
+          <option value="">Select PE Router</option>
+          <option v-for="router in peRouters" :key="router.id" :value="router.id">
+            {{ router.hostname }}
+          </option>
+        </select>
+      </div>
+
+      <div v-if="!isEditing && selectedPERouter" style="margin-bottom: 15px">
+        <label>PE Interface*:</label>
+        <select
+          v-model="formData.assigned_interface_id"
+          required
+          style="width: 100%; padding: 8px; margin-top: 5px"
+        >
+          <option value="">Select Interface</option>
+          <option v-for="iface in peInterfaces" :key="iface.id" :value="iface.id">
+            {{ iface.name }}
+          </option>
+        </select>
+      </div>
+
+      <div style="margin-top: 20px">
+        <button @click="saveSite" :disabled="saving" style="padding: 10px 20px; margin-right: 10px">
+          {{ saving ? 'Saving...' : isEditing ? 'Update' : 'Create' }}
+        </button>
+        <button @click="cancelForm" style="padding: 10px 20px">Cancel</button>
+      </div>
+
+      <div v-if="formError" style="color: red; margin-top: 10px">
+        {{ formError }}
       </div>
     </div>
 
-    <!-- Site Dialog -->
-    <Dialog
-      v-model:visible="siteDialogVisible"
-      :appendTo="'body'"
-      :style="{ width: '450px' }"
-      :header="isEditing ? 'Edit Site' : 'New Site'"
-      :modal="true"
-    >
-      <div class="flex flex-col gap-6">
-        <div>
-          <label for="name" class="block font-bold mb-3">Name</label>
-          <InputText
-            id="name"
-            v-model.trim="currentSite.name"
-            required="true"
-            autofocus
-            :invalid="submitted && !currentSite.name"
-            fluid
-          />
-          <small v-if="submitted && !currentSite.name" class="text-red-500"
-            >Name is required.</small
-          >
-        </div>
-        <div>
-          <label for="location" class="block font-bold mb-3">Location</label>
-          <InputText id="location" v-model="currentSite.location" fluid />
-        </div>
-        <div>
-          <label for="pe_router" class="block font-bold mb-3">PE Router</label>
-          <Dropdown
-            id="pe_router"
-            v-model="selectedPERouter"
-            :options="peRouters"
-            optionLabel="hostname"
-            placeholder="Select a PE Router"
-            @change="fetchPERouterInterfaces"
-            required
-            :disabled="isEditing"
-          />
-        </div>
-        <div v-if="selectedPERouter">
-          <label for="pe_interface" class="block font-bold mb-3">PE Interface</label>
-          <Dropdown
-            id="pe_interface"
-            v-model="currentSite.assigned_interface"
-            :options="peInterfaces"
-            optionLabel="name"
-            placeholder="Select a PE Interface"
-            required
-            :disabled="isEditing"
-          />
-        </div>
-        <div>
-          <label for="customer" class="block font-bold mb-3">Customer</label>
-          <Dropdown
-            id="customer"
-            v-model="currentSite.customer"
-            :options="customers"
-            optionLabel="name"
-            placeholder="Select a Customer"
-            required
-            :disabled="isEditing"
-          />
-        </div>
-      </div>
-      <template #footer>
-        <Button label="Cancel" icon="pi pi-times" text @click="closeDialog" />
-        <Button label="Save" icon="pi pi-check" @click="saveSite" />
-      </template>
-    </Dialog>
-    <!-- Confirm Delete Site Dialog -->
-    <Dialog
-      v-model:visible="deleteSiteDialog"
-      :style="{ width: '450px' }"
-      header="Confirm"
-      :modal="true"
-    >
-      <div class="flex items-center gap-4">
-        <i class="pi pi-exclamation-triangle !text-3xl" />
-        <span v-if="currentSite"
-          >Are you sure you want to delete <b>{{ currentSite.name }}</b
-          >?</span
-        >
-      </div>
-      <template #footer>
-        <Button label="No" icon="pi pi-times" text @click="deleteSiteDialog = false" />
-        <Button label="Yes" icon="pi pi-check" severity="danger" @click="deleteSite" />
-      </template>
-    </Dialog>
+    <!-- Action Buttons -->
+    <div style="margin: 20px 0">
+      <button
+        @click="openCreateForm"
+        v-if="!showCreateForm"
+        style="padding: 10px 20px; margin-right: 10px"
+      >
+        Create New Site
+      </button>
+      <button @click="fetchSites" style="padding: 10px 20px">Refresh</button>
+    </div>
 
-    <!-- Confirm Delete Selected Sites Dialog -->
-    <Dialog
-      v-model:visible="deleteSitesDialog"
-      :style="{ width: '450px' }"
-      header="Confirm"
-      :modal="true"
+    <!-- Sites List -->
+    <div v-if="loading" style="padding: 20px; text-align: center">Loading sites...</div>
+
+    <div v-else-if="sites.length === 0" style="padding: 20px; text-align: center; color: #666">
+      No sites found. Create your first site above.
+    </div>
+
+    <div v-else>
+      <table style="width: 100%; border-collapse: collapse; margin-top: 20px">
+        <thead>
+          <tr style="background-color: #f5f5f5">
+            <th style="border: 1px solid #ccc; padding: 10px; text-align: left">Name</th>
+            <th style="border: 1px solid #ccc; padding: 10px; text-align: left">Location</th>
+            <th style="border: 1px solid #ccc; padding: 10px; text-align: left">Customer</th>
+            <th style="border: 1px solid #ccc; padding: 10px; text-align: left">Link Network</th>
+            <th style="border: 1px solid #ccc; padding: 10px; text-align: left">PE Router</th>
+            <th style="border: 1px solid #ccc; padding: 10px; text-align: left">Interface</th>
+            <th style="border: 1px solid #ccc; padding: 10px; text-align: left">DHCP Scope</th>
+            <th style="border: 1px solid #ccc; padding: 10px; text-align: left">Status</th>
+            <th style="border: 1px solid #ccc; padding: 10px; text-align: left">Routing</th>
+            <th style="border: 1px solid #ccc; padding: 10px; text-align: left">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="site in sites" :key="site.id">
+            <td style="border: 1px solid #ccc; padding: 10px">{{ site.name }}</td>
+            <td style="border: 1px solid #ccc; padding: 10px">{{ site.location || 'N/A' }}</td>
+            <td style="border: 1px solid #ccc; padding: 10px">
+              {{ site.customer?.name || 'N/A' }}
+            </td>
+            <td style="border: 1px solid #ccc; padding: 10px">{{ site.link_network || 'N/A' }}</td>
+            <td style="border: 1px solid #ccc; padding: 10px">
+              {{ site.assigned_interface?.router?.hostname || 'N/A' }}
+            </td>
+            <td style="border: 1px solid #ccc; padding: 10px">
+              {{ site.assigned_interface?.name || 'N/A' }}
+            </td>
+            <td style="border: 1px solid #ccc; padding: 10px">{{ site.dhcp_scope || 'N/A' }}</td>
+            <td style="border: 1px solid #ccc; padding: 10px">
+              <span :style="{ color: getStatusColor(site.status) }">
+                {{ getStatusText(site.status) }}
+              </span>
+            </td>
+            <td style="border: 1px solid #ccc; padding: 10px">
+              <span :style="{ color: site.has_routing ? 'green' : 'red' }">
+                {{ site.has_routing ? 'Enabled' : 'Disabled' }}
+              </span>
+            </td>
+            <td style="border: 1px solid #ccc; padding: 10px">
+              <button @click="editSite(site)" style="padding: 5px 10px; margin-right: 5px">
+                Edit
+              </button>
+              <button
+                @click="deleteSite(site)"
+                style="
+                  padding: 5px 10px;
+                  margin-right: 5px;
+                  background-color: #dc3545;
+                  color: white;
+                "
+                :disabled="deleting === site.id"
+              >
+                {{ deleting === site.id ? 'Deleting...' : 'Delete' }}
+              </button>
+              <button
+                v-if="site.has_routing"
+                @click="disableRouting(site)"
+                style="padding: 5px 10px; background-color: #fd7e14; color: white"
+                :disabled="routingAction === site.id"
+              >
+                {{ routingAction === site.id ? 'Processing...' : 'Disable Routing' }}
+              </button>
+              <button
+                v-else
+                @click="enableRouting(site)"
+                :style="{
+                  padding: '5px 10px',
+                  backgroundColor: isStatusActive(site.status) ? '#28a745' : '#6c757d',
+                  color: 'white',
+                  opacity: isStatusActive(site.status) ? '1' : '0.6',
+                  cursor: isStatusActive(site.status) ? 'pointer' : 'not-allowed',
+                }"
+                :disabled="routingAction === site.id || !isStatusActive(site.status)"
+              >
+                {{ routingAction === site.id ? 'Processing...' : 'Enable Routing' }}
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Messages -->
+    <div
+      v-if="message"
+      :style="{
+        padding: '10px',
+        marginTop: '20px',
+        backgroundColor: messageType === 'error' ? '#f8d7da' : '#d4edda',
+        color: messageType === 'error' ? '#721c24' : '#155724',
+        border: '1px solid ' + (messageType === 'error' ? '#f5c6cb' : '#c3e6cb'),
+        borderRadius: '4px',
+      }"
     >
-      <div class="flex items-center gap-4">
-        <i class="pi pi-exclamation-triangle !text-3xl" />
-        <span>Are you sure you want to delete the selected sites?</span>
-      </div>
-      <template #footer>
-        <Button label="No" icon="pi pi-times" text @click="deleteSitesDialog = false" />
-        <Button label="Yes" icon="pi pi-check" severity="danger" @click="deleteSelectedSites" />
-      </template>
-    </Dialog>
+      {{ message }}
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useToast } from 'primevue/usetoast'
 import SiteService from '@/service/SiteService'
 import RouterService from '@/service/RouterService'
 import CustomerService from '@/service/CustomerService'
-import { FilterMatchMode } from '@primevue/core/api'
 
 // State
 const sites = ref([])
 const customers = ref([])
 const peRouters = ref([])
 const peInterfaces = ref([])
-const selectedPERouter = ref(null)
-const selectedSites = ref([])
-const currentSite = ref({})
-const siteDialogVisible = ref(false)
-const deleteSiteDialog = ref(false)
-const deleteSitesDialog = ref(false)
-const loading = ref(false)
-const submitted = ref(false)
+const selectedPERouter = ref('')
+const showCreateForm = ref(false)
 const isEditing = ref(false)
-const filters = ref({
-  global: { value: null, matchMode: FilterMatchMode.CONTAINS },
+const loading = ref(false)
+const saving = ref(false)
+const deleting = ref(null)
+const routingAction = ref(null)
+const message = ref('')
+const messageType = ref('success')
+const formError = ref('')
+
+const formData = ref({
+  name: '',
+  location: '',
+  description: '',
+  link_network: '',
+  customer_id: '',
+  assigned_interface_id: '',
 })
-const routingLoadingId = ref(null)
 
-// Toast
-const toast = useToast()
+// Helper functions for status handling
+const isStatusActive = (status) => {
+  // Handle both boolean and string status values
+  if (typeof status === 'boolean') {
+    return status === true
+  }
+  return status === 'active'
+}
 
-// Fetch Sites
+const getStatusText = (status) => {
+  // Convert status to display text
+  if (typeof status === 'boolean') {
+    return status ? 'Active' : 'Inactive'
+  }
+  // Handle string status values
+  if (status === 'active') return 'Active'
+  if (status === 'inactive') return 'Inactive'
+  return status || 'Offline'
+}
+
+const getStatusColor = (status) => {
+  // Return appropriate color based on status
+  if (isStatusActive(status)) {
+    return 'green'
+  }
+  if (typeof status === 'boolean' && status === false) {
+    return 'red'
+  }
+  if (status === 'inactive') {
+    return 'red'
+  }
+  return 'orange' // fallback for other statuses
+}
+
+// Methods
+const showMessage = (msg, type = 'success') => {
+  message.value = msg
+  messageType.value = type
+  setTimeout(() => {
+    message.value = ''
+  }, 5000)
+}
+
+const openCreateForm = () => {
+  formData.value = {
+    name: '',
+    location: '',
+    description: '',
+    link_network: '',
+    customer_id: '',
+    assigned_interface_id: '',
+  }
+  selectedPERouter.value = ''
+  peInterfaces.value = []
+  isEditing.value = false
+  showCreateForm.value = true
+  formError.value = ''
+}
+
+const cancelForm = () => {
+  showCreateForm.value = false
+  formError.value = ''
+}
+
 const fetchSites = async () => {
   loading.value = true
   try {
     const response = await SiteService.getSites()
     sites.value = Array.isArray(response) ? response : []
+    showMessage('Sites loaded successfully')
   } catch (error) {
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: 'Failed to fetch sites',
-      life: 3000,
-    })
+    console.error('Error fetching sites:', error)
+    showMessage('Failed to fetch sites', 'error')
   } finally {
     loading.value = false
   }
 }
 
-// Fetch Customers
 const fetchCustomers = async () => {
   try {
     const response = await CustomerService.getCustomers()
     customers.value = Array.isArray(response) ? response : []
   } catch (error) {
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: 'Failed to fetch customers',
-      life: 3000,
-    })
+    console.error('Error fetching customers:', error)
+    showMessage('Failed to fetch customers', 'error')
   }
 }
 
-// Fetch PE Routers
 const fetchPERouters = async () => {
   try {
-    const response = await RouterService.getPERouters() // Fetch only PE routers
+    const response = await RouterService.getPERouters()
     peRouters.value = Array.isArray(response) ? response : []
   } catch (error) {
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: 'Failed to fetch PE routers',
-      life: 3000,
-    })
+    console.error('Error fetching PE routers:', error)
+    showMessage('Failed to fetch PE routers', 'error')
   }
 }
 
-// Fetch PE Router Interfaces
-const fetchPERouterInterfaces = async () => {
-  if (!selectedPERouter.value) return
+const fetchPEInterfaces = async () => {
+  if (!selectedPERouter.value) {
+    peInterfaces.value = []
+    return
+  }
+
   try {
-    const response = await RouterService.getConnectedInterfaces(selectedPERouter.value.id)
-    // Filter interfaces to only show those that are not connected
+    const response = await RouterService.getConnectedInterfaces(selectedPERouter.value)
     peInterfaces.value = response.filter((iface) => !iface.connected)
   } catch (error) {
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: 'Failed to fetch PE router interfaces',
-      life: 3000,
-    })
+    console.error('Error fetching PE interfaces:', error)
+    showMessage('Failed to fetch PE interfaces', 'error')
+    peInterfaces.value = []
   }
 }
-const editSite = (site) => {
-  currentSite.value = { ...site }
-  selectedPERouter.value = site.pe_router || null
-  peInterfaces.value = [] // Reset interfaces
-  isEditing.value = true
-  siteDialogVisible.value = true
-}
-const confirmDeleteSite = (site) => {
-  currentSite.value = site
-  deleteSiteDialog.value = true
-}
-const deleteSite = async () => {
-  try {
-    await SiteService.deleteSite(currentSite.value.id)
-    toast.add({
-      severity: 'success',
-      summary: 'Success',
-      detail: 'Site deleted successfully',
-      life: 3000,
-    })
-    fetchSites() // Refresh the site list
-  } catch (error) {
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: 'Failed to delete site',
-      life: 3000,
-    })
-  } finally {
-    deleteSiteDialog.value = false
-  }
-}
-const confirmDeleteSelected = () => {
-  if (!selectedSites.value.length) {
-    toast.add({
-      severity: 'warn',
-      summary: 'Warning',
-      detail: 'No sites selected for deletion',
-      life: 3000,
-    })
-    return
-  }
-  deleteSitesDialog.value = true
-}
-const deleteSelectedSites = async () => {
-  try {
-    const ids = selectedSites.value.map((site) => site.id)
-    await Promise.all(ids.map((id) => SiteService.deleteSite(id)))
-    toast.add({
-      severity: 'success',
-      summary: 'Success',
-      detail: 'Selected sites deleted successfully',
-      life: 3000,
-    })
-    fetchSites() // Refresh the site list
-    selectedSites.value = [] // Clear the selection
-  } catch (error) {
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: 'Failed to delete selected sites',
-      life: 3000,
-    })
-  } finally {
-    deleteSitesDialog.value = false
-  }
-}
+
 const saveSite = async () => {
-  submitted.value = true
+  formError.value = ''
 
   // Validate required fields
-  if (
-    !currentSite.value.name ||
-    !currentSite.value.customer ||
-    !currentSite.value.assigned_interface
-  ) {
-    toast.add({
-      severity: 'warn',
-      summary: 'Warning',
-      detail: 'Please fill in all required fields',
-      life: 3000,
-    })
+  if (!formData.value.name) {
+    formError.value = 'Name is required'
     return
   }
+
+  if (!isEditing.value) {
+    if (!formData.value.customer_id || !formData.value.assigned_interface_id) {
+      formError.value = 'Customer and PE Interface are required'
+      return
+    }
+  }
+
+  saving.value = true
 
   try {
     if (isEditing.value) {
-      // Update existing site with only editable fields
       const updatePayload = {
-        id: currentSite.value.id,
-        name: currentSite.value.name,
-        location: currentSite.value.location,
+        name: formData.value.name,
+        location: formData.value.location,
+        description: formData.value.description,
       }
-      await SiteService.updateSite(currentSite.value.id, updatePayload)
-      toast.add({
-        severity: 'success',
-        summary: 'Success',
-        detail: 'Site updated successfully',
-        life: 3000,
-      })
+      await SiteService.updateSite(formData.value.id, updatePayload)
+      showMessage('Site updated successfully')
     } else {
-      // Create new site with all fields
-      const createPayload = {
-        name: currentSite.value.name,
-        location: currentSite.value.location,
-        customer_id: currentSite.value.customer.id,
-        assigned_interface_id: currentSite.value.assigned_interface.id,
-      }
-      await SiteService.createSite(createPayload)
-      toast.add({
-        severity: 'success',
-        summary: 'Success',
-        detail: 'Site created successfully',
-        life: 3000,
-      })
+      await SiteService.createSite(formData.value)
+      showMessage('Site created successfully')
     }
 
-    // Refresh the site list and close the dialog
+    showCreateForm.value = false
     fetchSites()
-    siteDialogVisible.value = false
-    submitted.value = false
   } catch (error) {
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: 'Failed to save site',
-      life: 3000,
-    })
+    console.error('Error saving site:', error)
+    formError.value = 'Failed to save site. Please try again.'
+  } finally {
+    saving.value = false
   }
 }
+
+const editSite = (site) => {
+  formData.value = {
+    id: site.id,
+    name: site.name,
+    location: site.location || '',
+    description: site.description || '',
+    link_network: site.link_network || '',
+  }
+  isEditing.value = true
+  showCreateForm.value = true
+  formError.value = ''
+}
+
+const deleteSite = async (site) => {
+  if (!confirm(`Are you sure you want to delete "${site.name}"?`)) {
+    return
+  }
+
+  deleting.value = site.id
+
+  try {
+    await SiteService.deleteSite(site.id)
+    showMessage(`Site "${site.name}" deleted successfully`)
+    fetchSites()
+  } catch (error) {
+    console.error('Error deleting site:', error)
+    showMessage('Failed to delete site', 'error')
+  } finally {
+    deleting.value = null
+  }
+}
+
 const enableRouting = async (site) => {
-  routingLoadingId.value = site.id
+  if (!isStatusActive(site.status)) {
+    showMessage('Cannot enable routing on inactive site', 'error')
+    return
+  }
+  if (site.router_id === null || site.router_id === undefined) {
+    showMessage('No router is connected to this site', 'error')
+    return
+  }
+
+  routingAction.value = site.id
+
   try {
     await SiteService.enableRouting(site.id)
-    toast.add({
-      severity: 'success',
-      summary: 'Success',
-      detail: `Routing enabled for ${site.name}`,
-      life: 3000,
-    })
+    showMessage(`Routing enabled for "${site.name}"`)
     fetchSites()
   } catch (error) {
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: 'Failed to enable routing',
-      life: 3000,
-    })
+    console.error('Error enabling routing:', error)
+    showMessage('Failed to enable routing', 'error')
   } finally {
-    routingLoadingId.value = null
+    routingAction.value = null
   }
 }
+
 const disableRouting = async (site) => {
-  routingLoadingId.value = site.id
+  routingAction.value = site.id
+
   try {
     await SiteService.disableRouting(site.id)
-    toast.add({
-      severity: 'success',
-      summary: 'Success',
-      detail: `Routing disabled for ${site.name}`,
-      life: 3000,
-    })
+    showMessage(`Routing disabled for "${site.name}"`)
     fetchSites()
   } catch (error) {
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: 'Failed to disable routing',
-      life: 3000,
-    })
+    console.error('Error disabling routing:', error)
+    showMessage('Failed to disable routing', 'error')
   } finally {
-    routingLoadingId.value = null
+    routingAction.value = null
   }
-}
-const closeDialog = () => {
-  siteDialogVisible.value = false
-  submitted.value = false
-}
-// Open New Site Dialog
-const openNewSiteDialog = () => {
-  currentSite.value = {}
-  selectedPERouter.value = null
-  peInterfaces.value = []
-  submitted.value = false
-  isEditing.value = false
-  siteDialogVisible.value = true
 }
 
 // Lifecycle
@@ -557,17 +484,3 @@ onMounted(() => {
   fetchPERouters()
 })
 </script>
-
-<style scoped>
-.card {
-  background: var(--surface-card);
-  padding: 2rem;
-  border-radius: var(--border-radius);
-  margin-bottom: 1rem;
-}
-
-/* Add smooth transition for card selection */
-.border-primary {
-  transition: border-color 0.2s;
-}
-</style>
