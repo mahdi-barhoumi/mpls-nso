@@ -1,88 +1,119 @@
 <template>
-  <div v-if="show" style="border: 1px solid #ccc; padding: 20px; margin: 20px 0">
-    <h3>{{ isEditing ? 'Edit Site' : 'Create New Site' }}</h3>
+  <Dialog
+    :visible="show"
+    @update:visible="$emit('update:show', $event)"
+    modal
+    :header="isEditing ? 'Edit Site' : 'Create Site'"
+    :style="{ width: '35rem' }"
+  >
+    <span class="text-surface-500 dark:text-surface-400 block mb-6">
+      {{ isEditing ? 'Update site information.' : 'Create a new site.' }}
+    </span>
 
-    <div style="margin-bottom: 15px">
-      <label>Name*:</label>
-      <input
-        v-model="formData.name"
-        type="text"
-        required
-        style="width: 100%; padding: 8px; margin-top: 5px"
+    <div class="flex flex-col gap-4">
+      <div class="flex items-center gap-4 mb-2">
+        <label for="name" class="font-semibold w-32">Name*</label>
+        <div class="flex-auto">
+          <InputText
+            id="name"
+            v-model.trim="formData.name"
+            required="true"
+            autofocus
+            :class="{ 'p-invalid': submitted && !formData.name }"
+            class="w-full"
+            autocomplete="off"
+          />
+          <small v-if="submitted && !formData.name" class="p-error">Name is required.</small>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-4 mb-2">
+        <label for="location" class="font-semibold w-32">Location</label>
+        <InputText id="location" v-model="formData.location" class="flex-auto" autocomplete="off" />
+      </div>
+
+      <div class="flex items-center gap-4 mb-2">
+        <label for="description" class="font-semibold w-32">Description</label>
+        <Textarea
+          id="description"
+          v-model="formData.description"
+          rows="3"
+          autoResize
+          class="flex-auto"
+        />
+      </div>
+
+      <div v-if="!isEditing" class="flex items-center gap-4 mb-2">
+        <label for="customer" class="font-semibold w-32">Customer*</label>
+        <div class="flex-auto">
+          <Dropdown
+            id="customer"
+            v-model="formData.customer_id"
+            :options="customers"
+            optionLabel="name"
+            optionValue="id"
+            placeholder="Select Customer"
+            :class="{ 'p-invalid': submitted && !formData.customer_id }"
+            class="w-full"
+          />
+          <small v-if="submitted && !formData.customer_id" class="p-error">
+            Customer is required.
+          </small>
+        </div>
+      </div>
+
+      <div v-if="!isEditing" class="flex items-center gap-4 mb-2">
+        <label for="peRouter" class="font-semibold w-32">PE Router*</label>
+        <div class="flex-auto">
+          <Dropdown
+            id="peRouter"
+            v-model="selectedPERouter"
+            :options="peRouters"
+            optionLabel="hostname"
+            optionValue="id"
+            placeholder="Select PE Router"
+            :class="{ 'p-invalid': submitted && !selectedPERouter }"
+            class="w-full"
+            @change="handlePERouterChange"
+          />
+          <small v-if="submitted && !selectedPERouter" class="p-error">
+            PE Router is required.
+          </small>
+        </div>
+      </div>
+
+      <div v-if="!isEditing && selectedPERouter" class="flex items-center gap-4 mb-2">
+        <label for="interface" class="font-semibold w-32">PE Interface*</label>
+        <div class="flex-auto">
+          <Dropdown
+            id="interface"
+            v-model="formData.assigned_interface_id"
+            :options="peInterfaces"
+            optionLabel="name"
+            optionValue="id"
+            placeholder="Select Interface"
+            :class="{ 'p-invalid': submitted && !formData.assigned_interface_id }"
+            class="w-full"
+          />
+          <small v-if="submitted && !formData.assigned_interface_id" class="p-error">
+            Interface is required.
+          </small>
+        </div>
+      </div>
+
+      <small v-if="error" class="p-error block mt-2">{{ error }}</small>
+    </div>
+
+    <div class="flex justify-end gap-2 mt-8">
+      <Button type="button" label="Cancel" severity="secondary" @click="handleCancel" />
+      <Button
+        type="button"
+        :label="saving ? 'Saving...' : isEditing ? 'Update' : 'Create'"
+        :loading="saving"
+        @click="handleSave"
       />
     </div>
-
-    <div style="margin-bottom: 15px">
-      <label>Location:</label>
-      <input
-        v-model="formData.location"
-        type="text"
-        style="width: 100%; padding: 8px; margin-top: 5px"
-      />
-    </div>
-
-    <div style="margin-bottom: 15px">
-      <label>Description:</label>
-      <textarea
-        v-model="formData.description"
-        style="width: 100%; padding: 8px; margin-top: 5px; height: 60px"
-      ></textarea>
-    </div>
-
-    <div v-if="!isEditing" style="margin-bottom: 15px">
-      <label>Customer*:</label>
-      <select
-        v-model="formData.customer_id"
-        required
-        style="width: 100%; padding: 8px; margin-top: 5px"
-      >
-        <option value="">Select Customer</option>
-        <option v-for="customer in customers" :key="customer.id" :value="customer.id">
-          {{ customer.name }}
-        </option>
-      </select>
-    </div>
-
-    <div v-if="!isEditing" style="margin-bottom: 15px">
-      <label>PE Router*:</label>
-      <select
-        v-model="selectedPERouter"
-        @change="handlePERouterChange"
-        required
-        style="width: 100%; padding: 8px; margin-top: 5px"
-      >
-        <option value="">Select PE Router</option>
-        <option v-for="router in peRouters" :key="router.id" :value="router.id">
-          {{ router.hostname }}
-        </option>
-      </select>
-    </div>
-
-    <div v-if="!isEditing && selectedPERouter" style="margin-bottom: 15px">
-      <label>PE Interface*:</label>
-      <select
-        v-model="formData.assigned_interface_id"
-        required
-        style="width: 100%; padding: 8px; margin-top: 5px"
-      >
-        <option value="">Select Interface</option>
-        <option v-for="iface in peInterfaces" :key="iface.id" :value="iface.id">
-          {{ iface.name }}
-        </option>
-      </select>
-    </div>
-
-    <div style="margin-top: 20px">
-      <button @click="handleSave" :disabled="saving" style="padding: 10px 20px; margin-right: 10px">
-        {{ saving ? 'Saving...' : isEditing ? 'Update' : 'Create' }}
-      </button>
-      <button @click="handleCancel" style="padding: 10px 20px">Cancel</button>
-    </div>
-
-    <div v-if="error" style="color: red; margin-top: 10px">
-      {{ error }}
-    </div>
-  </div>
+  </Dialog>
 </template>
 
 <script setup>
@@ -99,7 +130,7 @@ const props = defineProps({
   initialData: Object,
 })
 
-const emit = defineEmits(['save', 'cancel', 'pe-router-change'])
+const emit = defineEmits(['save', 'cancel', 'pe-router-change', 'update:show'])
 
 const formData = ref({
   name: '',
@@ -110,6 +141,7 @@ const formData = ref({
 })
 
 const selectedPERouter = ref('')
+const submitted = ref(false)
 
 // Watch for initial data changes (for editing)
 watch(
@@ -135,15 +167,28 @@ watch(
         assigned_interface_id: '',
       }
       selectedPERouter.value = ''
+      submitted.value = false
     }
   },
 )
 
 const handleSave = () => {
+  submitted.value = true
+  if (
+    !formData.value.name ||
+    (!props.isEditing &&
+      (!formData.value.customer_id ||
+        !selectedPERouter.value ||
+        !formData.value.assigned_interface_id))
+  ) {
+    return
+  }
   emit('save', formData.value)
 }
 
 const handleCancel = () => {
+  submitted.value = false
+  emit('update:show', false)
   emit('cancel')
 }
 
