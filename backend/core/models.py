@@ -273,6 +273,8 @@ class Site(models.Model):
     ospf_process_id = models.PositiveIntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(65535)], help_text="OSPF process ID used by the PE router for this site's routing")
     router = models.ForeignKey(Router, null=True, on_delete=models.SET_NULL, related_name='site', help_text="Customer edge router for this site")
     has_routing = models.BooleanField(default=False, help_text="Whether routing is enabled for this site")
+    created_at = models.DateTimeField(auto_now_add=True, help_text="When this VPN was created or discovered")
+    updated_at = models.DateTimeField(auto_now=True, help_text="When this VPN was last updated")
 
     class Meta:
         unique_together = [['customer', 'name']]

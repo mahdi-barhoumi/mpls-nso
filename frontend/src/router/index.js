@@ -94,11 +94,6 @@ const router = createRouter({
       ],
     },
     {
-      path: '/landing',
-      name: 'landing',
-      component: () => import('@/views/Landing.vue'),
-    },
-    {
       path: '/pages/notfound',
       name: 'notfound',
       component: () => import('@/views/pages/Misc/NotFound.vue'),

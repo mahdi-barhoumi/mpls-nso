@@ -1,6 +1,6 @@
 <template>
   <div
-    class="bg-surface-0 dark:bg-surface-900 py-12 px-8 sm:px-20 rounded-[2.5rem] w-full max-w-[80rem] mx-auto"
+    class="bg-surface-0 dark:bg-surface-900 py-3 px-2 sm:px-20 rounded-[2.5rem] w-full max-w-[80rem] mx-auto pb-0"
   >
     <div
       v-if="networkSettingsExist"
@@ -15,10 +15,11 @@
       </div>
       <Button label="Next" icon="pi pi-arrow-right" iconPos="right" @click="$emit('next')" />
     </div>
-    <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-8">
-      <!-- Host Network Section -->
-      <div class="col-span-1">
-        <div class="bg-surface-50 dark:bg-surface-900 p-6 rounded-2xl h-full">
+    <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-10">
+      <!-- Host Settings + Scheduling Settings Column -->
+      <div class="col-span-1 flex flex-col gap-0">
+        <!-- Host Settings -->
+        <div class="bg-surface-50 dark:bg-surface-900 px-8 py-4 rounded-2xl flex flex-col gap-1">
           <div class="flex items-center mb-4">
             <span
               class="inline-flex items-center justify-center bg-primary-50 dark:bg-primary-400/10 rounded-full w-8 h-8 mr-3"
@@ -26,10 +27,11 @@
               <i class="pi pi-server text-primary text-lg"></i>
             </span>
             <span class="text-surface-900 dark:text-surface-0 font-medium text-lg"
-              >Host Network</span
+              >Host Settings</span
             >
           </div>
-          <div class="flex flex-col gap-2">
+          <div class="flex flex-col gap-3">
+            <!-- Host Interface -->
             <span class="p-float-label w-full">
               <label for="host_interface" class="text-surface-600 dark:text-surface-200 font-medium"
                 >Host Interface</label
@@ -47,37 +49,7 @@
             <small v-if="submitted && !networkData.host_interface_id" class="p-error block mb-2">
               Host interface is required
             </small>
-            <span class="p-float-label w-full">
-              <label for="management_vrf" class="text-surface-600 dark:text-surface-200 font-medium"
-                >Management VRF</label
-              >
-              <InputText
-                id="management_vrf"
-                v-model.trim="networkData.management_vrf"
-                class="w-full mt-2"
-                :class="{ 'p-invalid': submitted && !networkData.management_vrf }"
-              />
-            </span>
-            <small v-if="submitted && !networkData.management_vrf">
-              Management VRF is required
-            </small>
-            <span class="p-float-label w-full">
-              <label for="bgp_as" class="text-surface-600 dark:text-surface-200 font-medium"
-                >BGP Autonomous System</label
-              >
-              <InputNumber
-                id="bgp_as"
-                v-model="networkData.bgp_as"
-                :min="1"
-                :max="65535"
-                class="w-full mt-2"
-                :useGrouping="false"
-                :class="{ 'p-invalid': submitted && !networkData.bgp_as }"
-              />
-            </span>
-            <small v-if="submitted && !networkData.bgp_as" class="p-error block mb-2">
-              BGP AS number is required
-            </small>
+            <!-- Host Address -->
             <span class="p-float-label w-full">
               <label for="host_address" class="text-surface-600 dark:text-surface-200 font-medium"
                 >Host Address</label
@@ -92,7 +64,7 @@
             <small v-if="submitted && !networkData.host_address" class="p-error block mb-2">
               Host address is required
             </small>
-
+            <!-- Host Subnet Mask -->
             <span class="p-float-label w-full">
               <label
                 for="host_subnet_mask"
@@ -111,42 +83,95 @@
             </small>
           </div>
         </div>
-      </div>
-      <!-- RESTCONF Section -->
-      <div class="col-span-1">
-        <div class="bg-surface-50 dark:bg-surface-900 p-6 rounded-2xl h-full">
+        <!-- Scheduling Settings (now stacked below Host Settings) -->
+        <div class="bg-surface-50 dark:bg-surface-900 px-8 py-4 rounded-2xl flex flex-col gap-1">
           <div class="flex items-center mb-4">
             <span
               class="inline-flex items-center justify-center bg-primary-50 dark:bg-primary-400/10 rounded-full w-8 h-8 mr-3"
             >
-              <i class="pi pi-lock text-primary text-lg"></i>
+              <i class="pi pi-clock text-primary text-lg"></i>
             </span>
             <span class="text-surface-900 dark:text-surface-0 font-medium text-lg"
-              >RESTCONF Access</span
+              >Scheduling Settings</span
             >
           </div>
-          <div class="flex flex-col gap-2">
+          <div class="flex flex-col gap-4">
+            <!-- Monitoring Interval -->
+            <span class="p-float-label w-full">
+              <label for="monitoring_interval" class="text-surface-600 dark:text-surface-200 font-medium"
+                >Monitoring Interval</label
+              >
+              <Dropdown
+                id="monitoring_interval"
+                v-model="networkData.monitoring_interval"
+                :options="monitoringOptions"
+                optionLabel="label"
+                optionValue="value"
+                class="w-full mt-2"
+                :class="{ 'p-invalid': submitted && !networkData.monitoring_interval }"
+                placeholder="Select Monitoring Interval"
+                :showClear="true"
+              />
+            </span>
+            <small v-if="submitted && !networkData.monitoring_interval" class="p-error block mb-2">
+              Monitoring interval is required
+            </small>
+            <!-- Discovery Interval -->
+            <span class="p-float-label w-full">
+              <label for="discovery_interval" class="text-surface-600 dark:text-surface-200 font-medium"
+                >Discovery Interval</label
+              >
+              <Dropdown
+                id="discovery_interval"
+                v-model="networkData.discovery_interval"
+                :options="discoveryOptions"
+                optionLabel="label"
+                optionValue="value"
+                class="w-full mt-2"
+                :class="{ 'p-invalid': submitted && !networkData.discovery_interval }"
+                placeholder="Select Discovery Interval"
+                :showClear="true"
+              />
+            </span>
+            <small v-if="submitted && !networkData.discovery_interval" class="p-error block mb-2">
+              Discovery interval is required
+            </small>
+          </div>
+        </div>
+      </div>
+      <!-- Management Configurations Section -->
+      <div class="col-span-1 flex flex-col">
+        <div class="bg-surface-50 dark:bg-surface-900 px-8 py-4 rounded-2xl flex flex-col gap-2 h-full">
+          <div class="flex items-center mb-4">
+            <span
+              class="inline-flex items-center justify-center bg-primary-50 dark:bg-primary-400/10 rounded-full w-8 h-8 mr-3"
+            >
+              <i class="pi pi-cog text-primary text-lg"></i>
+            </span>
+            <span class="text-surface-900 dark:text-surface-0 font-medium text-lg"
+              >Management Settings</span
+            >
+          </div>
+          <div class="flex flex-col gap-4">
+            <!-- RESTCONF Username -->
             <span class="p-float-label p-input-icon-right w-full">
-              <i class="pi pi-user mr-3"></i>
               <label
                 for="restconf_username"
                 class="text-surface-600 dark:text-surface-200 font-medium"
                 >RESTCONF Username</label
               >
-
               <InputText
                 id="restconf_username"
                 v-model.trim="networkData.restconf_username"
-                class="w-full mt-2 mb-4"
+                class="w-full mt-2"
                 :class="{ 'p-invalid': submitted && !networkData.restconf_username }"
               />
             </span>
             <small v-if="submitted && !networkData.restconf_username" class="p-error block mt-2">
               RESTCONF username is required
             </small>
+            <!-- RESTCONF Password -->
             <span class="p-float-label w-full">
-              <i class="pi pi-lock mr-3"></i>
-
               <label
                 for="restconf_password"
                 class="text-surface-600 dark:text-surface-200 font-medium"
@@ -157,38 +182,80 @@
                 v-model="networkData.restconf_password"
                 :toggleMask="true"
                 :feedback="false"
-                class="w-full mt-2 mb-4"
+                class="w-full mt-2"
                 :inputClass="{
                   'w-full': true,
                   'p-invalid': submitted && !networkData.restconf_password,
                 }"
               />
             </span>
+            <!-- Management VRF -->
+            <span class="p-float-label w-full">
+              <label for="management_vrf" class="text-surface-600 dark:text-surface-200 font-medium"
+                >Management VRF Name</label
+              >
+              <InputText
+                id="management_vrf"
+                v-model.trim="networkData.management_vrf"
+                class="w-full mt-2"
+                :class="{ 'p-invalid': submitted && !networkData.management_vrf }"
+              />
+            </span>
+            <small v-if="submitted && !networkData.management_vrf">
+              Management VRF is required
+            </small>
+            <!-- BGP AS -->
+            <span class="p-float-label w-full">
+              <label for="bgp_as" class="text-surface-600 dark:text-surface-200 font-medium"
+                >BGP Autonomous System Number</label
+              >
+              <Dropdown
+                id="bgp_as"
+                v-model="networkData.bgp_as"
+                :options="bgpAsOptions"
+                :filter="true"
+                :showClear="true"
+                class="w-full mt-2"
+                :class="{ 'p-invalid': submitted && !networkData.bgp_as }"
+                :virtualScrollerOptions="{ itemSize: 35, style: { height: '350px' } }"
+                :filterMatchMode="'contains'"
+                :optionLabel="'asLabel'"
+                :optionValue="'value'"
+                placeholder="Select BGP AS"
+              >
+                <template #option="slotProps">
+                  <span>{{ slotProps.option.value }}</span>
+                </template>
+              </Dropdown>
+            </span>
+            <small v-if="submitted && !networkData.bgp_as" class="p-error block mb-2">
+              BGP AS number is required
+            </small>
             <small v-if="submitted && !networkData.restconf_password" class="p-error block mt-2">
               RESTCONF password is required
             </small>
           </div>
         </div>
       </div>
-      <!-- DHCP Configuration Section -->
-      <div class="col-span-1">
-        <div class="bg-surface-50 dark:bg-surface-900 p-6 rounded-2xl h-full">
+      <!-- Site Service Settings Section -->
+      <div class="col-span-1 flex flex-col">
+        <div class="bg-surface-50 dark:bg-surface-900 px-8 py-4 rounded-2xl flex flex-col gap-2 h-full">
           <div class="flex items-center mb-4">
             <span
               class="inline-flex items-center justify-center bg-primary-50 dark:bg-primary-400/10 rounded-full w-8 h-8 mr-3"
             >
-              <i class="pi pi-sitemap text-primary text-lg"></i>
+              <i class="pi pi-globe text-primary text-lg"></i>
             </span>
             <span class="text-surface-900 dark:text-surface-0 font-medium text-lg"
-              >DHCP Configuration</span
+              >Site Service Settings</span
             >
           </div>
-          <div class="flex flex-col gap-2">
+          <div class="flex flex-col gap-4">
             <span class="p-float-label w-full">
               <label
                 for="dhcp_sites_network_address"
                 class="text-surface-600 dark:text-surface-200 font-medium"
-                >Sites Network Address</label
+                >Management Parent Subnet Address</label
               >
               <InputText
                 id="dhcp_sites_network_address"
@@ -201,14 +268,13 @@
               v-if="submitted && !networkData.dhcp_sites_network_address"
               class="p-error block mt-2"
             >
-              DHCP sites network address is required
+            Management parent subnet address is required
             </small>
-
             <span class="p-float-label w-full">
               <label
                 for="dhcp_sites_network_subnet_mask"
                 class="text-surface-600 dark:text-surface-200 font-medium"
-                >Sites Network Subnet Mask</label
+                >Management Parent Subnet Mask</label
               >
               <InputText
                 id="dhcp_sites_network_subnet_mask"
@@ -223,13 +289,53 @@
               v-if="submitted && !networkData.dhcp_sites_network_subnet_mask"
               class="p-error block mt-2"
             >
-              DHCP sites network subnet mask is required
+              Management parent subnet mask is required
+            </small>
+            <!-- Link Parent Subnet Address -->
+            <span class="p-float-label w-full">
+              <label
+                for="link_parent_subnet_address"
+                class="text-surface-600 dark:text-surface-200 font-medium"
+                >Link Parent Subnet Address</label
+              >
+              <InputText
+                id="link_parent_subnet_address"
+                v-model.trim="networkData.link_parent_subnet_address"
+                class="w-full mt-2"
+                :class="{ 'p-invalid': submitted && !networkData.link_parent_subnet_address && submitted }"
+              />
+            </span>
+            <small
+              v-if="submitted && !networkData.link_parent_subnet_address"
+              class="p-error block mt-2"
+            >
+              Link parent subnet address is required
+            </small>
+            <!-- Link Parent Subnet Mask -->
+            <span class="p-float-label w-full">
+              <label
+                for="link_parent_subnet_mask"
+                class="text-surface-600 dark:text-surface-200 font-medium"
+                >Link Parent Subnet Mask</label
+              >
+              <InputText
+                id="link_parent_subnet_mask"
+                v-model.trim="networkData.link_parent_subnet_mask"
+                class="w-full mt-2"
+                :class="{ 'p-invalid': submitted && !networkData.link_parent_subnet_mask && submitted }"
+              />
+            </span>
+            <small
+              v-if="submitted && !networkData.link_parent_subnet_mask"
+              class="p-error block mt-2"
+            >
+              Link parent subnet mask is required
             </small>
           </div>
         </div>
       </div>
       <!-- Navigation Buttons -->
-      <div class="col-span-3 mt-8">
+      <div class="col-span-3 mt-0">
         <div class="flex items-center justify-between">
           <Button label="Back" icon="pi pi-arrow-left" text @click="$emit('prev')" />
           <Button label="Next" icon="pi pi-arrow-right" iconPos="right" @click="handleNext" />
@@ -251,6 +357,27 @@ const submitted = ref(false)
 const hostInterfaces = ref([])
 const networkSettingsExist = ref(false)
 
+// Generate BGP AS options as objects for better filtering and labeling
+const bgpAsOptions = Array.from({ length: 65535 }, (_, i) => ({
+  value: i + 1,
+  asLabel: String(i + 1),
+}))
+
+// Monitoring should be more frequent than discovery
+const monitoringOptions = [
+  { label: '1 minute', value: 1 },
+  { label: '2 minutes', value: 2 },
+  { label: '5 minutes', value: 5 },
+  { label: '10 minutes', value: 10 },
+]
+const discoveryOptions = [
+  { label: '5 minutes', value: 5 },
+  { label: '10 minutes', value: 10 },
+  { label: '15 minutes', value: 15 },
+  { label: '30 minutes', value: 30 },
+  { label: '60 minutes', value: 60 },
+]
+
 const networkData = reactive({
   management_vrf: '',
   bgp_as: null,
@@ -261,6 +388,10 @@ const networkData = reactive({
   restconf_password: '',
   dhcp_sites_network_address: '',
   dhcp_sites_network_subnet_mask: '',
+  link_parent_subnet_address: '',
+  link_parent_subnet_mask: '',
+  monitoring_interval: null,
+  discovery_interval: null,
 })
 
 const handleNext = async () => {
@@ -276,7 +407,11 @@ const handleNext = async () => {
     !networkData.restconf_username ||
     !networkData.restconf_password ||
     !networkData.dhcp_sites_network_address ||
-    !networkData.dhcp_sites_network_subnet_mask
+    !networkData.dhcp_sites_network_subnet_mask ||
+    !networkData.link_parent_subnet_address ||
+    !networkData.link_parent_subnet_mask ||
+    !networkData.monitoring_interval ||
+    !networkData.discovery_interval
   ) {
     toast.add({
       severity: 'error',

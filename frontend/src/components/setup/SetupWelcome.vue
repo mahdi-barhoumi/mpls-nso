@@ -23,8 +23,8 @@
           <i class="pi pi-cog text-primary text-xl"></i>
         </span>
         <div class="flex flex-col">
-          <span class="text-surface-900 dark:text-surface-0 font-medium">Service administration</span>
-          <span class="text-muted-color text-sm">Manage network services, VPNs, and customer sites</span>
+          <span class="text-surface-900 dark:text-surface-0 font-medium">Service Administration</span>
+          <span class="text-muted-color text-sm">Manage customers, sites and VPNs</span>
         </div>
       </div>
       <div class="bg-surface-50 dark:bg-surface-900 p-4 rounded-xl flex items-center gap-4">
@@ -34,7 +34,7 @@
           <i class="pi pi-chart-line text-primary text-xl"></i>
         </span>
         <div class="flex flex-col">
-          <span class="text-surface-900 dark:text-surface-0 font-medium">Network monitoring</span>
+          <span class="text-surface-900 dark:text-surface-0 font-medium">Network Monitoring</span>
           <span class="text-muted-color text-sm">Monitor performance, availability, and service health</span>
         </div>
       </div>
@@ -45,7 +45,7 @@
           <i class="pi pi-sitemap text-primary text-xl"></i>
         </span>
         <div class="flex flex-col">
-          <span class="text-surface-900 dark:text-surface-0 font-medium">Device provisioning</span>
+          <span class="text-surface-900 dark:text-surface-0 font-medium">Device Provisioning</span>
           <span class="text-muted-color text-sm">Automated device configuration and deployment</span>
         </div>
       </div>

@@ -1,6 +1,6 @@
 <template>
   <div
-    class="bg-surface-0 dark:bg-surface-900 py-12 px-8 sm:px-20 rounded-[2.5rem] w-full max-w-[32rem] mx-auto"
+    class="bg-surface-0 dark:bg-surface-900 py-3 px-2 sm:px-20 rounded-[2.5rem] w-full max-w-[32rem] mx-auto"
   >
     <div class="flex flex-col items-center text-center">
       <div class="mb-8">
@@ -24,17 +24,6 @@
           <span
             class="inline-flex items-center justify-center bg-primary-50 dark:bg-primary-400/10 rounded-full w-8 h-8"
           >
-            <i class="pi pi-server text-primary text-xl"></i>
-          </span>
-          <span class="text-surface-900 dark:text-surface-0 font-medium">Network Controller</span>
-          <span class="text-muted-color ml-auto"
-            >Network configuration and monitoring services are active</span
-          >
-        </div>
-        <div class="bg-surface-50 dark:bg-surface-900 p-4 rounded-xl flex items-center gap-4">
-          <span
-            class="inline-flex items-center justify-center bg-primary-50 dark:bg-primary-400/10 rounded-full w-8 h-8"
-          >
             <i class="pi pi-search text-primary text-xl"></i>
           </span>
           <span class="text-surface-900 dark:text-surface-0 font-medium">Discovery Service</span>
@@ -44,7 +33,7 @@
           <span
             class="inline-flex items-center justify-center bg-primary-50 dark:bg-primary-400/10 rounded-full w-8 h-8"
           >
-            <i class="pi pi-wifi text-primary text-xl"></i>
+            <i class="pi pi-server text-primary text-xl"></i>
           </span>
           <span class="text-surface-900 dark:text-surface-0 font-medium">DHCP Service</span>
           <span class="text-muted-color ml-auto">IP address management service is running</span>

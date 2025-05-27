@@ -40,6 +40,8 @@ class SiteView(View):
                         'hostname': site.router.hostname ,
                    }if site.router else None,
                     'has_routing': site.has_routing,
+                    'created_at': site.created_at,
+                    'updated_at': site.updated_at,
                 }
                 
                 return JsonResponse(site_data)
@@ -81,7 +83,9 @@ class SiteView(View):
                         'hostname': site.router.hostname if site.assigned_interface else None ,
                    }if site.router else None,
                         'has_routing': site.has_routing,
-                        'status' : site.assigned_interface.router.reachable
+                        'status' : site.assigned_interface.router.reachable,
+                        'created_at': site.created_at,
+                        'updated_at': site.updated_at,
                     }
                     for site in sites
                 ]

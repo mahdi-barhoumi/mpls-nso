@@ -15,6 +15,7 @@ class RouterView(View):
                 
                 router_data = {
                     'id': router.id,
+                    'reachable': router.reachable,
                     'role': router.get_role_display(),
                     'hostname': router.hostname,
                     'management_ip_address': router.management_ip_address,
@@ -30,6 +31,7 @@ class RouterView(View):
                 routers = Router.objects.all()
                 router_list = [{
                     'id': router.id,
+                    'reachable': router.reachable,
                     'role': router.get_role_display(),
                     'hostname': router.hostname,
                     'management_ip_address': router.management_ip_address,

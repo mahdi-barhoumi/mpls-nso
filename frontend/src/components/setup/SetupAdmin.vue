@@ -93,13 +93,12 @@
           </small>
         </div>
       </div>
-
-      <div class="flex items-center justify-between mt-8">
+    </div>
+  </div>
+  <div class="flex items-center justify-between mt-8">
         <Button label="Back" icon="pi pi-arrow-left" text @click="$emit('prev')" />
         <Button label="Next" icon="pi pi-arrow-right" iconPos="right" @click="handleNext" />
       </div>
-    </div>
-  </div>
 </template>
 
 <script setup>

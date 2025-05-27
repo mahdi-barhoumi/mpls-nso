@@ -1,8 +1,8 @@
 <script setup>
 import MapWidget from '@/components/dashboard/MapWidget.vue'
 import RouterWidget from '@/components/dashboard/RouterWidget.vue'
-import VPNOverviewWidget from '@/components/dashboard/VPNOverviewWidget.vue'
-import CustomerWidget from '@/components/dashboard/CustomerWidget.vue'
+import MonitoringOverviewWidget from '@/components/dashboard/MonitoringOverviewWidget.vue'
+import ServiceOverviewWidget from '@/components/dashboard/ServiceOverviewWidget.vue'
 import { ref } from 'vue'
 
 const selectedRouter = ref(null)
@@ -13,30 +13,30 @@ const handleRouterSelect = (router) => {
 </script>
 
 <template>
-  <div class="grid grid-cols-12 gap-4 h-[calc(100vh-12rem)]">
+  <div class="grid grid-cols-12 gap-4 h-[calc(100vh-8.08rem)]">
     <!-- Left Column: Map and Router Details -->
-    <div class="col-span-12 lg:col-span-8 grid grid-rows-2 gap-4 h-full">
+    <div class="col-span-12 lg:col-span-8 grid grid-rows-12 gap-4 h-full">
       <!-- Network Map -->
-      <div class="h-full">
+      <div class="row-span-7 h-full">
         <MapWidget @node-selected="handleRouterSelect" class="h-full" />
       </div>
 
       <!-- Router Details -->
-      <div class="h-full">
+      <div class="row-span-5 h-full">
         <RouterWidget :selected-router="selectedRouter" class="h-full" />
       </div>
     </div>
 
-    <!-- Right Column: VPN Overview and Customer Info -->
+    <!-- Right Column: Monitoring Overview and Customer Info -->
     <div class="col-span-12 lg:col-span-4 grid grid-rows-2 gap-4 h-full">
-      <!-- VPN Overview Widget -->
+      <!-- Monitoring Overview Widget -->
       <div class="h-full">
-        <VPNOverviewWidget class="h-full" />
+        <MonitoringOverviewWidget class="h-full" />
       </div>
 
-      <!-- Customer Widget -->
+      <!-- Service Overview Widget -->
       <div class="h-full">
-        <CustomerWidget class="h-full" />
+        <ServiceOverviewWidget class="h-full" />
       </div>
     </div>
   </div>

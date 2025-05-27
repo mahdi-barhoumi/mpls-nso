@@ -1,8 +1,8 @@
 <template>
   <div class="card h-full">
-    <div class="flex justify-between mb-4">
+    <div class="flex justify-between mb-2">
       <div>
-        <h5 class="text-lg m-0">Network Topology</h5>
+        <h5 class="text-lg m-1">Network Topology</h5>
         <div class="flex gap-2">
           <div class="flex items-center gap-2">
             <div

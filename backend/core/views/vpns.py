@@ -16,7 +16,8 @@ class VPNView(View):
                     'id': vpn.id,
                     'name': vpn.name,
                     'description': vpn.description,
-                    'created_at' : vpn.created_at,
+                    'created_at': vpn.created_at,
+                    'updated_at': vpn.updated_at,
                     'customer': {
                         'id': vpn.customer.id,
                         'name': vpn.customer.name
@@ -25,6 +26,8 @@ class VPNView(View):
                         'id': site.id,
                         'name': site.name,
                         'location': site.location,
+                        'created_at': site.created_at,
+                        'updated_at': site.updated_at,
                     } for site in vpn.sites.all()]
                 })
             except VPN.DoesNotExist:
@@ -37,7 +40,8 @@ class VPNView(View):
                 'name': vpn.name,
                 'customer': vpn.customer.name,
                 'customer_id': vpn.customer.id,
-                'created_at' : vpn.created_at,
+                'created_at': vpn.created_at,
+                'updated_at': vpn.updated_at,
                 'description': vpn.description,
                 'site_count': vpn.sites.count()
             } for vpn in vpns],
@@ -142,6 +146,8 @@ class VPNView(View):
                     'id': site.id,
                     'name': site.name,
                     'location': site.location,
+                    'created_at': site.created_at,
+                    'updated_at': site.updated_at,
                 } for site in vpn.sites.all()]
             })
             
