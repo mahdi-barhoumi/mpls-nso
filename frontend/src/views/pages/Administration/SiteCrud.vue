@@ -2,91 +2,20 @@
   <div>
     <h2>Site Management</h2>
 
-    <!-- Create Site Form -->
-    <div v-if="showCreateForm" style="border: 1px solid #ccc; padding: 20px; margin: 20px 0">
-      <h3>{{ isEditing ? 'Edit Site' : 'Create New Site' }}</h3>
-
-      <div style="margin-bottom: 15px">
-        <label>Name*:</label>
-        <input
-          v-model="formData.name"
-          type="text"
-          required
-          style="width: 100%; padding: 8px; margin-top: 5px"
-        />
-      </div>
-
-      <div style="margin-bottom: 15px">
-        <label>Location:</label>
-        <input
-          v-model="formData.location"
-          type="text"
-          style="width: 100%; padding: 8px; margin-top: 5px"
-        />
-      </div>
-
-      <div style="margin-bottom: 15px">
-        <label>Description:</label>
-        <textarea
-          v-model="formData.description"
-          style="width: 100%; padding: 8px; margin-top: 5px; height: 60px"
-        ></textarea>
-      </div>
-
-      <div v-if="!isEditing" style="margin-bottom: 15px">
-        <label>Customer*:</label>
-        <select
-          v-model="formData.customer_id"
-          required
-          style="width: 100%; padding: 8px; margin-top: 5px"
-        >
-          <option value="">Select Customer</option>
-          <option v-for="customer in customers" :key="customer.id" :value="customer.id">
-            {{ customer.name }}
-          </option>
-        </select>
-      </div>
-
-      <div v-if="!isEditing" style="margin-bottom: 15px">
-        <label>PE Router*:</label>
-        <select
-          v-model="selectedPERouter"
-          @change="fetchPEInterfaces"
-          required
-          style="width: 100%; padding: 8px; margin-top: 5px"
-        >
-          <option value="">Select PE Router</option>
-          <option v-for="router in peRouters" :key="router.id" :value="router.id">
-            {{ router.hostname }}
-          </option>
-        </select>
-      </div>
-
-      <div v-if="!isEditing && selectedPERouter" style="margin-bottom: 15px">
-        <label>PE Interface*:</label>
-        <select
-          v-model="formData.assigned_interface_id"
-          required
-          style="width: 100%; padding: 8px; margin-top: 5px"
-        >
-          <option value="">Select Interface</option>
-          <option v-for="iface in peInterfaces" :key="iface.id" :value="iface.id">
-            {{ iface.name }}
-          </option>
-        </select>
-      </div>
-
-      <div style="margin-top: 20px">
-        <button @click="saveSite" :disabled="saving" style="padding: 10px 20px; margin-right: 10px">
-          {{ saving ? 'Saving...' : isEditing ? 'Update' : 'Create' }}
-        </button>
-        <button @click="cancelForm" style="padding: 10px 20px">Cancel</button>
-      </div>
-
-      <div v-if="formError" style="color: red; margin-top: 10px">
-        {{ formError }}
-      </div>
-    </div>
+    <!-- Site Form Component -->
+    <SiteForm
+      :show="showCreateForm"
+      :is-editing="isEditing"
+      :customers="customers"
+      :pe-routers="peRouters"
+      :pe-interfaces="peInterfaces"
+      :saving="saving"
+      :error="formError"
+      :initial-data="formData"
+      @save="saveSite"
+      @cancel="cancelForm"
+      @pe-router-change="fetchPEInterfaces"
+    />
 
     <!-- Action Buttons -->
     <div style="margin: 20px 0">
@@ -100,126 +29,28 @@
       <button @click="fetchSites" style="padding: 10px 20px">Refresh</button>
     </div>
 
-    <!-- Sites List -->
-    <div v-if="loading" style="padding: 20px; text-align: center">Loading sites...</div>
+    <!-- Sites List Component -->
+    <SiteList
+      :sites="sites"
+      :loading="loading"
+      :deleting="deleting"
+      :routing-action="routingAction"
+      @edit="editSite"
+      @delete="deleteSite"
+      @enable-routing="enableRouting"
+      @disable-routing="disableRouting"
+    />
 
-    <div v-else-if="sites.length === 0" style="padding: 20px; text-align: center; color: #666">
-      No sites found. Create your first site above.
-    </div>
-
-    <div v-else>
-      <table style="width: 100%; border-collapse: collapse; margin-top: 20px">
-        <thead>
-          <tr style="background-color: #f5f5f5">
-            <th style="border: 1px solid #ccc; padding: 10px; text-align: left">Name</th>
-            <th style="border: 1px solid #ccc; padding: 10px; text-align: left">Location</th>
-            <th style="border: 1px solid #ccc; padding: 10px; text-align: left">Customer</th>
-
-            <th style="border: 1px solid #ccc; padding: 10px; text-align: left">
-              Provider Interface
-            </th>
-            <th style="border: 1px solid #ccc; padding: 10px; text-align: left">Customer Edge</th>
-            <th style="border: 1px solid #ccc; padding: 10px; text-align: left">
-              Management Subnet
-            </th>
-            <th style="border: 1px solid #ccc; padding: 10px; text-align: left">Link Subnet</th>
-
-            <th style="border: 1px solid #ccc; padding: 10px; text-align: left">Status</th>
-            <th style="border: 1px solid #ccc; padding: 10px; text-align: left">Routing</th>
-            <th style="border: 1px solid #ccc; padding: 10px; text-align: left">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="site in sites" :key="site.id">
-            <td style="border: 1px solid #ccc; padding: 10px">{{ site.name }}</td>
-            <td style="border: 1px solid #ccc; padding: 10px">{{ site.location || 'N/A' }}</td>
-            <td style="border: 1px solid #ccc; padding: 10px">
-              {{ site.customer?.name || 'N/A' }}
-            </td>
-
-            <td style="border: 1px solid #ccc; padding: 10px">
-              {{ site.assigned_interface?.router?.hostname || 'N/A' }} via
-              {{ site.assigned_interface?.name || 'N/A' }}
-            </td>
-            <td style="border: 1px solid #ccc; padding: 10px">
-              {{ site.CE_router?.hostname || 'N/A' }}
-            </td>
-            <td style="border: 1px solid #ccc; padding: 10px">{{ site.dhcp_scope || 'N/A' }}</td>
-            <td style="border: 1px solid #ccc; padding: 10px">{{ site.link_network || 'N/A' }}</td>
-
-            <td style="border: 1px solid #ccc; padding: 10px">
-              <span :style="{ color: getStatusColor(site.status) }">
-                {{ getStatusText(site.status) }}
-              </span>
-            </td>
-            <td style="border: 1px solid #ccc; padding: 10px">
-              <span :style="{ color: site.has_routing ? 'green' : 'red' }">
-                {{ site.has_routing ? 'Enabled' : 'Disabled' }}
-              </span>
-            </td>
-            <td style="border: 1px solid #ccc; padding: 10px">
-              <button @click="editSite(site)" style="padding: 5px 10px; margin-right: 5px">
-                Edit
-              </button>
-              <button
-                @click="deleteSite(site)"
-                style="
-                  padding: 5px 10px;
-                  margin-right: 5px;
-                  background-color: #dc3545;
-                  color: white;
-                "
-                :disabled="deleting === site.id"
-              >
-                {{ deleting === site.id ? 'Deleting...' : 'Delete' }}
-              </button>
-              <button
-                v-if="site.has_routing"
-                @click="disableRouting(site)"
-                style="padding: 5px 10px; background-color: #fd7e14; color: white"
-                :disabled="routingAction === site.id"
-              >
-                {{ routingAction === site.id ? 'Processing...' : 'Disable Routing' }}
-              </button>
-              <button
-                v-else
-                @click="enableRouting(site)"
-                :style="{
-                  padding: '5px 10px',
-                  backgroundColor: isStatusActive(site.status) ? '#28a745' : '#6c757d',
-                  color: 'white',
-                  opacity: isStatusActive(site.status) ? '1' : '0.6',
-                  cursor: isStatusActive(site.status) ? 'pointer' : 'not-allowed',
-                }"
-                :disabled="routingAction === site.id || !isStatusActive(site.status)"
-              >
-                {{ routingAction === site.id ? 'Processing...' : 'Enable Routing' }}
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Messages -->
-    <div
-      v-if="message"
-      :style="{
-        padding: '10px',
-        marginTop: '20px',
-        backgroundColor: messageType === 'error' ? '#f8d7da' : '#d4edda',
-        color: messageType === 'error' ? '#721c24' : '#155724',
-        border: '1px solid ' + (messageType === 'error' ? '#f5c6cb' : '#c3e6cb'),
-        borderRadius: '4px',
-      }"
-    >
-      {{ message }}
-    </div>
+    <!-- Message Alert Component -->
+    <MessageAlert :message="message" :type="messageType" />
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import SiteForm from '@/components/SiteCrud/SiteForm.vue'
+import SiteList from '@/components/SiteCrud/SiteList.vue'
+import MessageAlert from '@/components/SiteCrud/MessageAlert.vue'
 import SiteService from '@/service/SiteService'
 import RouterService from '@/service/RouterService'
 import CustomerService from '@/service/CustomerService'
@@ -229,7 +60,6 @@ const sites = ref([])
 const customers = ref([])
 const peRouters = ref([])
 const peInterfaces = ref([])
-const selectedPERouter = ref('')
 const showCreateForm = ref(false)
 const isEditing = ref(false)
 const loading = ref(false)
@@ -244,44 +74,9 @@ const formData = ref({
   name: '',
   location: '',
   description: '',
-  link_network: '',
   customer_id: '',
   assigned_interface_id: '',
 })
-
-// Helper functions for status handling
-const isStatusActive = (status) => {
-  // Handle both boolean and string status values
-  if (typeof status === 'boolean') {
-    return status === true
-  }
-  return status === 'active'
-}
-
-const getStatusText = (status) => {
-  // Convert status to display text
-  if (typeof status === 'boolean') {
-    return status ? 'Active' : 'Inactive'
-  }
-  // Handle string status values
-  if (status === 'active') return 'Active'
-  if (status === 'inactive') return 'Inactive'
-  return status || 'Offline'
-}
-
-const getStatusColor = (status) => {
-  // Return appropriate color based on status
-  if (isStatusActive(status)) {
-    return 'green'
-  }
-  if (typeof status === 'boolean' && status === false) {
-    return 'red'
-  }
-  if (status === 'inactive') {
-    return 'red'
-  }
-  return 'orange' // fallback for other statuses
-}
 
 // Methods
 const showMessage = (msg, type = 'success') => {
@@ -300,7 +95,6 @@ const openCreateForm = () => {
     customer_id: '',
     assigned_interface_id: '',
   }
-  selectedPERouter.value = ''
   peInterfaces.value = []
   isEditing.value = false
   showCreateForm.value = true
@@ -346,14 +140,14 @@ const fetchPERouters = async () => {
   }
 }
 
-const fetchPEInterfaces = async () => {
-  if (!selectedPERouter.value) {
+const fetchPEInterfaces = async (routerId) => {
+  if (!routerId) {
     peInterfaces.value = []
     return
   }
 
   try {
-    const response = await RouterService.getConnectedInterfaces(selectedPERouter.value)
+    const response = await RouterService.getConnectedInterfaces(routerId)
     peInterfaces.value = response.filter((iface) => !iface.connected)
   } catch (error) {
     console.error('Error fetching PE interfaces:', error)
@@ -362,17 +156,17 @@ const fetchPEInterfaces = async () => {
   }
 }
 
-const saveSite = async () => {
+const saveSite = async (siteData) => {
   formError.value = ''
 
   // Validate required fields
-  if (!formData.value.name) {
+  if (!siteData.name) {
     formError.value = 'Name is required'
     return
   }
 
   if (!isEditing.value) {
-    if (!formData.value.customer_id || !formData.value.assigned_interface_id) {
+    if (!siteData.customer_id || !siteData.assigned_interface_id) {
       formError.value = 'Customer and PE Interface are required'
       return
     }
@@ -383,14 +177,14 @@ const saveSite = async () => {
   try {
     if (isEditing.value) {
       const updatePayload = {
-        name: formData.value.name,
-        location: formData.value.location,
-        description: formData.value.description,
+        name: siteData.name,
+        location: siteData.location,
+        description: siteData.description,
       }
-      await SiteService.updateSite(formData.value.id, updatePayload)
+      await SiteService.updateSite(siteData.id, updatePayload)
       showMessage('Site updated successfully')
     } else {
-      await SiteService.createSite(formData.value)
+      await SiteService.createSite(siteData)
       showMessage('Site created successfully')
     }
 
@@ -436,6 +230,14 @@ const deleteSite = async (site) => {
 }
 
 const enableRouting = async (site) => {
+  // Status validation
+  const isStatusActive = (status) => {
+    if (typeof status === 'boolean') {
+      return status === true
+    }
+    return status === 'active'
+  }
+
   if (!isStatusActive(site.status)) {
     showMessage('Cannot enable routing on inactive site', 'error')
     return
