@@ -1,32 +1,45 @@
 <template>
-  <div>
-    <h2>Site Management</h2>
+  <div class="card">
+    <h5 class="mb-4">Site Management</h5>
+
+    <!-- Toolbar -->
+    <Toolbar class="mb-4">
+      <template #start>
+        <Button label="New" icon="pi pi-plus" class="mr-2" @click="openNewSiteDialog" />
+        <Button
+          label="Delete"
+          icon="pi pi-trash"
+          severity="secondary"
+          @click="confirmDeleteSelected"
+          :disabled="!selectedSites || !selectedSites.length"
+        />
+      </template>
+      <template #end>
+        <Button
+          label="Refresh"
+          icon="pi pi-refresh"
+          severity="secondary"
+          @click="fetchSites"
+          :loading="loading"
+        />
+      </template>
+    </Toolbar>
 
     <!-- Site Form Component -->
-    <SiteForm
-      :show="showCreateForm"
-      :is-editing="isEditing"
-      :customers="customers"
-      :pe-routers="peRouters"
-      :pe-interfaces="peInterfaces"
-      :saving="saving"
-      :error="formError"
-      :initial-data="formData"
-      @save="saveSite"
-      @cancel="cancelForm"
-      @pe-router-change="fetchPEInterfaces"
-    />
-
-    <!-- Action Buttons -->
-    <div style="margin: 20px 0">
-      <button
-        @click="openCreateForm"
-        v-if="!showCreateForm"
-        style="padding: 10px 20px; margin-right: 10px"
-      >
-        Create New Site
-      </button>
-      <button @click="fetchSites" style="padding: 10px 20px">Refresh</button>
+    <div v-if="showCreateForm" class="mb-5">
+      <SiteForm
+        :show="showCreateForm"
+        :is-editing="isEditing"
+        :customers="customers"
+        :pe-routers="peRouters"
+        :pe-interfaces="peInterfaces"
+        :saving="saving"
+        :error="formError"
+        :initial-data="formData"
+        @save="saveSite"
+        @cancel="cancelForm"
+        @pe-router-change="fetchPEInterfaces"
+      />
     </div>
 
     <!-- Sites List Component -->
@@ -41,19 +54,37 @@
       @disable-routing="disableRouting"
     />
 
-    <!-- Message Alert Component -->
-    <MessageAlert :message="message" :type="messageType" />
+    <!-- Floating Message Alert Component -->
+    <Toast ref="toast" position="top-right" />
+
+    <!-- Alternative floating message using OverlayPanel if you prefer custom implementation -->
+    <div v-if="message" class="fixed top-0 right-0 z-5 m-3" style="z-index: 1100">
+      <Message
+        :severity="messageType === 'error' ? 'error' : 'success'"
+        :closable="true"
+        @close="message = ''"
+        class="shadow-3"
+      >
+        {{ message }}
+      </Message>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useToast } from 'primevue/usetoast'
+import Button from 'primevue/button'
+import Message from 'primevue/message'
+import Toast from 'primevue/toast'
 import SiteForm from '@/components/SiteCrud/SiteForm.vue'
 import SiteList from '@/components/SiteCrud/SiteList.vue'
-import MessageAlert from '@/components/SiteCrud/MessageAlert.vue'
 import SiteService from '@/service/SiteService'
 import RouterService from '@/service/RouterService'
 import CustomerService from '@/service/CustomerService'
+
+// Toast setup
+const toast = useToast()
 
 // State
 const sites = ref([])
@@ -80,6 +111,15 @@ const formData = ref({
 
 // Methods
 const showMessage = (msg, type = 'success') => {
+  // Use PrimeVue Toast for better UX
+  toast.add({
+    severity: type === 'error' ? 'error' : 'success',
+    summary: type === 'error' ? 'Error' : 'Success',
+    detail: msg,
+    life: 5000,
+  })
+
+  // Also set local message for custom floating display if preferred
   message.value = msg
   messageType.value = type
   setTimeout(() => {
@@ -283,3 +323,21 @@ onMounted(() => {
   fetchPERouters()
 })
 </script>
+
+<style scoped>
+.fixed {
+  position: fixed !important;
+}
+
+.top-0 {
+  top: 0 !important;
+}
+
+.right-0 {
+  right: 0 !important;
+}
+
+.z-5 {
+  z-index: 1100 !important;
+}
+</style>

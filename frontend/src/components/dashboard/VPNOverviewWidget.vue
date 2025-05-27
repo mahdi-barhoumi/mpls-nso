@@ -71,20 +71,8 @@
                 {{ new Date(vpn.created_at).toLocaleDateString() }}
               </div>
             </div>
-            <div class="flex flex-col items-end gap-2">
-              <Tag
-                :value="vpn.status"
-                :severity="vpn.status === 'active' ? 'success' : 'warning'"
-              />
-              <Tag :value="`${vpn.sites.length} sites`" severity="info" class="text-xs" />
-            </div>
           </div>
-          <div class="flex justify-between mt-2 text-xs text-500">
-            <div>
-              <i class="pi pi-check-circle mr-1"></i>
-              {{ vpn.activeConnections }} active links
-            </div>
-          </div>
+          <div class="flex justify-between mt-2 text-xs text-500"></div>
         </div>
       </div>
 
