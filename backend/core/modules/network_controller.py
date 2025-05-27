@@ -797,6 +797,7 @@ class _NetworkController:
                 return False
 
             # Only set has_routing to False if all removal succeeded
+            site.link_network = None
             site.has_routing = False
             site.save()
             self.logger.info(f"Successfully disabled routing for site {site}")
