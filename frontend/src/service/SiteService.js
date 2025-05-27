@@ -78,8 +78,8 @@ export default {
    */
   async disableRouting(siteId) {
     try {
-      const response = await axios.post(
-        `http://127.0.0.1:8000/api/sites/${siteId}/disable-routing/`,
+      const response = await axios.delete(
+        `http://127.0.0.1:8000/api/sites/${siteId}/enable-routing/`,
       )
       return response.data
     } catch (error) {

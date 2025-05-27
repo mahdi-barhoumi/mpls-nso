@@ -628,13 +628,14 @@ class _NetworkController:
         all_possible_subnets = list(base_network.subnets(new_prefix=30))
         
         # Get all currently used link networks for the same customer
-        used_networks = Site.objects.filter(customer=site.customer).exclude(pk=self.pk).values_list('link_network', flat=True)
+        used_networks = Site.objects.filter(customer=site.customer).exclude(pk=site.pk).values_list('link_network', flat=True)
         used_networks = [ipaddress.ip_network(f"{ip}/30") for ip in used_networks if ip]
         
         # Find the first available subnet
         for subnet in all_possible_subnets:
             if subnet not in used_networks:
                 site.link_network = str(subnet.network_address)
+                break
         
         # If no subnet is available, raise an exception
         if not site.link_network:
