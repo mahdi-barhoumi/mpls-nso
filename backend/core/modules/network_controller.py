@@ -619,6 +619,28 @@ class _NetworkController:
             return False
         
         # Determine IP addressing for the link
+        link_network = None
+
+        # Start with the 192.168.0.0/16 network
+        base_network = ipaddress.ip_network('192.168.0.0/16')
+        
+        # Get all /30 subnets from the base network
+        all_possible_subnets = list(base_network.subnets(new_prefix=30))
+        
+        # Get all currently used link networks for the same customer
+        used_networks = Site.objects.filter(customer=self.customer).exclude(pk=self.pk).values_list('link_network', flat=True)
+        used_networks = [ipaddress.ip_network(f"{ip}/30") for ip in used_networks if ip]
+        
+        # Find the first available subnet
+        for subnet in all_possible_subnets:
+            if subnet not in used_networks:
+                site.link_network = str(subnet.network_address)
+        
+        # If no subnet is available, raise an exception
+        if not site.link_network:
+            self.logger.error("No available /30 subnet in 192.168.0.0/16 range for this customer")
+            return False
+        
         link_network = ipaddress.IPv4Network(f'{site.link_network}/30', strict=False)
         pe_ip = str(link_network[1])
         ce_ip = str(link_network[-2])

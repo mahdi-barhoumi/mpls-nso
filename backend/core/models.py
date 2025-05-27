@@ -306,30 +306,7 @@ class Site(models.Model):
             conflicting_site = existing_sites.first()
             raise ValidationError(f"Link network is already in use by site '{conflicting_site.name}' for the same customer")
     
-    def find_available_link_network(self):
-        # Start with the 192.168.0.0/16 network
-        base_network = ipaddress.ip_network('192.168.0.0/16')
-        
-        # Get all /30 subnets from the base network
-        all_possible_subnets = list(base_network.subnets(new_prefix=30))
-        
-        # Get all currently used link networks for the same customer
-        used_networks = Site.objects.filter(customer=self.customer).exclude(pk=self.pk).values_list('link_network', flat=True)
-        used_networks = [ipaddress.ip_network(f"{ip}/30") for ip in used_networks if ip]
-        
-        # Find the first available subnet
-        for subnet in all_possible_subnets:
-            if subnet not in used_networks:
-                return str(subnet.network_address)
-        
-        # If no subnet is available, raise an exception
-        raise ValidationError("No available /30 subnet in 192.168.0.0/16 range for this customer")
-    
-    def save(self, *args, **kwargs):
-        # If this is a new Site
-        if not self.pk:
-            self.link_network = self.find_available_link_network()
-        
+    def save(self, *args, **kwargs):        
         # Validate before saving
         self.validate()
         super().save(*args, **kwargs)
