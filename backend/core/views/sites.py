@@ -22,6 +22,7 @@ class SiteView(View):
                     'description': site.description,
                     'location': site.location,
                     'dhcp_scope': str(ipaddress.IPv4Network(f"{site.dhcp_scope.network}/{site.dhcp_scope.subnet_mask}", strict=False)),
+                    'link_network': str(ipaddress.IPv4Network(f"{site.link_network}/30", strict=False)),
                     'customer': {
                         'id': site.customer.id,
                         'name': site.customer.name
@@ -34,7 +35,10 @@ class SiteView(View):
                             'hostname': site.assigned_interface.router.hostname
                         }
                     } if site.assigned_interface else None,
-                   'router_id': site.router.id if site.router else None,
+                   'CE_router': {
+                        'id': site.router.id ,
+                        'hostname': site.router.hostname ,
+                   }if site.router else None,
                     'has_routing': site.has_routing,
                 }
                 
@@ -58,6 +62,7 @@ class SiteView(View):
                         'description': site.description,
                         'location': site.location,
                         'dhcp_scope': str(ipaddress.IPv4Network(f"{site.dhcp_scope.network}/{site.dhcp_scope.subnet_mask}", strict=False)),
+                        'link_network': str(ipaddress.IPv4Network(f"{site.link_network}/30", strict=False)),
                         'customer': {
                             'id': site.customer.id,
                             'name': site.customer.name
@@ -71,7 +76,10 @@ class SiteView(View):
                                 'status' : site.assigned_interface.router.reachable
                             }
                         } if site.assigned_interface else None,
-                        'router_id': site.router.id if site.router else None,
+                        'CE_router': {
+                        'id': site.router.id if site.assigned_interface else None,
+                        'hostname': site.router.hostname if site.assigned_interface else None ,
+                   }if site.router else None,
                         'has_routing': site.has_routing,
                         'status' : site.assigned_interface.router.reachable
                     }

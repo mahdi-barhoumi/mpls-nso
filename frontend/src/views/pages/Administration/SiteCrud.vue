@@ -33,16 +33,6 @@
         ></textarea>
       </div>
 
-      <div style="margin-bottom: 15px">
-        <label>Link Network:</label>
-        <input
-          v-model="formData.link_network"
-          type="text"
-          placeholder="e.g., 192.168.0.0"
-          style="width: 100%; padding: 8px; margin-top: 5px"
-        />
-      </div>
-
       <div v-if="!isEditing" style="margin-bottom: 15px">
         <label>Customer*:</label>
         <select
@@ -124,10 +114,16 @@
             <th style="border: 1px solid #ccc; padding: 10px; text-align: left">Name</th>
             <th style="border: 1px solid #ccc; padding: 10px; text-align: left">Location</th>
             <th style="border: 1px solid #ccc; padding: 10px; text-align: left">Customer</th>
-            <th style="border: 1px solid #ccc; padding: 10px; text-align: left">Link Network</th>
-            <th style="border: 1px solid #ccc; padding: 10px; text-align: left">PE Router</th>
-            <th style="border: 1px solid #ccc; padding: 10px; text-align: left">Interface</th>
-            <th style="border: 1px solid #ccc; padding: 10px; text-align: left">DHCP Scope</th>
+
+            <th style="border: 1px solid #ccc; padding: 10px; text-align: left">
+              Provider Interface
+            </th>
+            <th style="border: 1px solid #ccc; padding: 10px; text-align: left">Customer Edge</th>
+            <th style="border: 1px solid #ccc; padding: 10px; text-align: left">
+              Management Subnet
+            </th>
+            <th style="border: 1px solid #ccc; padding: 10px; text-align: left">Link Subnet</th>
+
             <th style="border: 1px solid #ccc; padding: 10px; text-align: left">Status</th>
             <th style="border: 1px solid #ccc; padding: 10px; text-align: left">Routing</th>
             <th style="border: 1px solid #ccc; padding: 10px; text-align: left">Actions</th>
@@ -140,14 +136,17 @@
             <td style="border: 1px solid #ccc; padding: 10px">
               {{ site.customer?.name || 'N/A' }}
             </td>
-            <td style="border: 1px solid #ccc; padding: 10px">{{ site.link_network || 'N/A' }}</td>
+
             <td style="border: 1px solid #ccc; padding: 10px">
-              {{ site.assigned_interface?.router?.hostname || 'N/A' }}
-            </td>
-            <td style="border: 1px solid #ccc; padding: 10px">
+              {{ site.assigned_interface?.router?.hostname || 'N/A' }} via
               {{ site.assigned_interface?.name || 'N/A' }}
             </td>
+            <td style="border: 1px solid #ccc; padding: 10px">
+              {{ site.CE_router?.hostname || 'N/A' }}
+            </td>
             <td style="border: 1px solid #ccc; padding: 10px">{{ site.dhcp_scope || 'N/A' }}</td>
+            <td style="border: 1px solid #ccc; padding: 10px">{{ site.link_network || 'N/A' }}</td>
+
             <td style="border: 1px solid #ccc; padding: 10px">
               <span :style="{ color: getStatusColor(site.status) }">
                 {{ getStatusText(site.status) }}
@@ -298,7 +297,6 @@ const openCreateForm = () => {
     name: '',
     location: '',
     description: '',
-    link_network: '',
     customer_id: '',
     assigned_interface_id: '',
   }
@@ -412,7 +410,6 @@ const editSite = (site) => {
     name: site.name,
     location: site.location || '',
     description: site.description || '',
-    link_network: site.link_network || '',
   }
   isEditing.value = true
   showCreateForm.value = true
@@ -443,7 +440,7 @@ const enableRouting = async (site) => {
     showMessage('Cannot enable routing on inactive site', 'error')
     return
   }
-  if (site.router_id === null || site.router_id === undefined) {
+  if (site.CE_router === null || site.CE_router === undefined) {
     showMessage('No router is connected to this site', 'error')
     return
   }

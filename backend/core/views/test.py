@@ -12,7 +12,7 @@ from core.models import *
 def test_view(request):
     try:
 
-        #interface = Interface.objects.filter(ip_address="172.0.0.6")
+        Interface.objects.filter(router=Router.objects.get(pk=5)).delete()
 
         #data = serialize('json', interface)
 
@@ -20,7 +20,7 @@ def test_view(request):
 
         #data = NetworkController.disable_route_redistribution(site=Site.objects.get(pk=2))
 
-        data = Router.objects.get(pk=6).delete()
+        data = Router.objects.get(pk=5).delete()
 
         return JsonResponse(data, safe=False)
 
