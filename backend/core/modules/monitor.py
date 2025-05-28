@@ -590,10 +590,7 @@ class _NetworkMonitor:
                     'total_system_memory_mb': round(total_system_memory / (1024 * 1024), 2)
                 })
             
-            self.logger.info(f"Retrieved device info for {router.hostname}: IOS {device_info.get('ios_version', 'Unknown')}, "
-                           f"Uptime: {device_info.get('uptime_formatted', 'Unknown')}, "
-                           f"Memory: {device_info.get('total_system_memory_mb', 0)}MB, "
-                           f"CPU Cores: {device_info.get('cpu_cores', 0)}")
+            self.logger.info(f"Retrieved device info for {router}")
             
             return device_info
             

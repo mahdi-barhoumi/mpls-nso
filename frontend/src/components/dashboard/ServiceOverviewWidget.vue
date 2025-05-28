@@ -74,7 +74,6 @@
             rounded
             size="small"
             class="ml-auto"
-            @click="navigateToLogs"
             tooltip="View All Activity"
           />
         </div>
@@ -146,11 +145,6 @@ const recentCustomers = ref([])
 function formatDate(date) {
   if (!date) return ''
   return new Date(date).toLocaleDateString()
-}
-
-// Use only the darker color for light mode, and the same for dark mode
-function getRecentBg() {
-  return 'bg-surface-200 dark:bg-surface-800/80'
 }
 
 const fetchServiceData = async () => {
