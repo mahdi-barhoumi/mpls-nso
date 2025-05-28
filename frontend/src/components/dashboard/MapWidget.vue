@@ -72,61 +72,65 @@
         @layout-updated="onLayoutUpdated"
         class="h-full w-full"
       >
-        <!-- Define custom node rendering -->
+        <!-- Custom node rendering -->
         <template #override-node="{ nodeId, scale = 1, config, ...slotProps }">
-          <text
-            :x="0"
-            :y="(config.radius + 10) * scale"
-            :font-size="12 * scale"
-            text-anchor="middle"
-            dominant-baseline="central"
-            fill="var(--p-blue-600)"
-          >
-            {{ getNodeName(nodeId) }}
-          </text>
-          <image
-            :xlink:href="getNodeIcon(nodeId)"
-            :x="-(config.radius - 8) * scale"
-            :y="-(config.radius - 8) * scale"
-            :width="(config.radius - 8) * 2 * scale"
-            :height="(config.radius - 8) * 2 * scale"
-          />
+          <g>
+            <image
+              :xlink:href="getNodeIcon(nodeId)"
+              :x="-(config.radius - 8) * scale"
+              :y="-(config.radius - 8) * scale"
+              :width="(config.radius - 8) * 2 * scale"
+              :height="(config.radius - 8) * 2 * scale"
+            />
+            <text
+              :x="0"
+              :y="(config.radius + 12) * scale"
+              :font-size="13 * scale"
+              font-weight="400"
+              text-anchor="middle"
+              dominant-baseline="central"
+              :fill="getLabelColor()"
+              style="letter-spacing:0.5px;"
+            >
+              {{ getNodeName(nodeId) }}
+            </text>
+          </g>
         </template>
 
-        <!-- Define custom edge labels -->
+        <!-- Custom edge labels -->
         <template #edge-label="{ edge, scale = 1, ...slotProps }">
           <v-edge-label
-            v-if="
-              edge.sourceInterfaceType === 'physical' && edge.targetInterfaceType === 'physical'
-            "
+            v-if="edge.sourceInterfaceType === 'physical' && edge.targetInterfaceType === 'physical'"
             :text="edge.subnet"
             align="center"
             vertical-align="above"
             v-bind="slotProps"
-            fill="var(--p-primary-500)"
+            :fill="getEdgeLabelColor()"
             :font-size="10 * (scale || 1)"
+            font-weight="400"
+            style="letter-spacing:0.2px;"
           />
           <v-edge-label
-            v-if="
-              edge.sourceInterfaceType === 'physical' && edge.targetInterfaceType === 'physical'
-            "
-            :text="edge.sourceInterfaceName"
+            v-if="edge.sourceInterfaceType === 'physical' && edge.targetInterfaceType === 'physical'"
+            :text="abbreviateIface(edge.sourceInterfaceName)"
             align="source"
             vertical-align="above"
             v-bind="slotProps"
-            fill="var(--text-color)"
-            :font-size="10 * (scale || 1)"
+            :fill="getIfaceLabelColor()"
+            :font-size="9 * (scale || 1)"
+            font-weight="400"
+            style="letter-spacing:0.2px;"
           />
           <v-edge-label
-            v-if="
-              edge.sourceInterfaceType === 'physical' && edge.targetInterfaceType === 'physical'
-            "
-            :text="edge.targetInterfaceName"
+            v-if="edge.sourceInterfaceType === 'physical' && edge.targetInterfaceType === 'physical'"
+            :text="abbreviateIface(edge.targetInterfaceName)"
             align="target"
             vertical-align="above"
             v-bind="slotProps"
-            :font-size="10 * (scale || 1)"
-            fill="var(--text-color)"
+            :font-size="9 * (scale || 1)"
+            font-weight="400"
+            :fill="getIfaceLabelColor()"
+            style="letter-spacing:0.2px;"
           />
         </template>
       </v-network-graph>
@@ -420,6 +424,33 @@ export default {
       return node.label
     },
 
+    getLabelColor() {
+      // Theme-aware: dark text on light, light text on dark
+      return document.documentElement.className.includes('dark') ? '#e5e7eb' : '#222';
+    },
+
+    getEdgeLabelColor() {
+      // Slightly muted, theme-aware
+      return document.documentElement.className.includes('dark') ? '#cbd5e1' : '#374151';
+    },
+
+    getIfaceLabelColor() {
+      // Even more muted, theme-aware
+      return document.documentElement.className.includes('dark') ? '#94a3b8' : '#64748b';
+    },
+
+    abbreviateIface(name) {
+      if (!name) return ''
+      return name
+        .replace(/^GigabitEthernet/, 'Gi')
+        .replace(/^FastEthernet/, 'Fa')
+        .replace(/^TenGigabitEthernet/, 'Te')
+        .replace(/^Ethernet/, 'Eth')
+        .replace(/^Port-channel/, 'Po')
+        .replace(/^Loopback/, 'Lo')
+        .replace(/^Serial/, 'Se')
+    },
+
     zoomIn() {
       this.$refs.graph.zoomIn()
     },
@@ -440,6 +471,13 @@ export default {
   height: 600px;
   background-color: var(--surface-ground);
   border: 1px solid var(--surface-border);
+}
+
+/* Subtle, visible edge lines */
+:deep(.v-network-graph-edge-path) {
+  stroke: #a3a3a3 !important;
+  stroke-width: 2.5px !important;
+  opacity: 0.85;
 }
 
 .p-button.p-button-text {

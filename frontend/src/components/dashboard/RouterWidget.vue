@@ -51,7 +51,7 @@
         <div class="flex items-center gap-3">
           <i class="pi pi-database text-green-500"></i>
           <div>
-            <div class="text-muted-color">Version</div>
+            <div class="text-muted-color">Software Version</div>
             <div class="font-medium">{{ deviceInfo?.ios_version || 'N/A' }}</div>
           </div>
         </div>
@@ -84,19 +84,20 @@
               class="iface-card p-2 border-round flex flex-col gap-1"
               :class="[
                 iface.enabled ? 'iface-highlight-up' : 'iface-highlight-down',
-                !iface.is_connected && 'iface-down'
+                routerData.reachable === false ? 'iface-highlight-unknown' : ''
               ]"
               :title="iface.name"
             >
               <div class="flex items-center gap-2">
                 <span
                   class="iface-status-dot"
-                  :class="iface.enabled ? 'bg-green-400' : 'bg-red-400'"
-                  :title="iface.enabled ? 'Connected' : 'Disconnected'"
+                  :class="routerData.reachable === false ? 'bg-gray-400' : iface.enabled ? 'bg-green-400' : 'bg-red-400'"
+                  :title="routerData.reachable === false ? 'Unknown' : iface.enabled ? 'Connected' : 'Disconnected'"
                 ></span>
                 <span class="font-medium text-xs truncate flex-1">{{ iface.name }}</span>
-                <span class="text-xs font-mono" :class="iface.enabled ? 'text-green-400' : 'text-red-400'">
-                  {{ iface.enabled ? 'UP' : 'DOWN' }}
+                <span class="text-xs font-mono"
+                  :class="routerData.reachable === false ? 'text-gray-400' : iface.enabled ? 'text-green-400' : 'text-red-400'">
+                  {{ routerData.reachable === false ? 'UNKNOWN' : iface.enabled ? 'UP' : 'DOWN' }}
                 </span>
               </div>
               <div class="text-2xs text-muted-color truncate">
@@ -197,8 +198,7 @@ watch(
   background: var(--surface-100);
 }
 .iface-down {
-  opacity: 0.7;
-  filter: grayscale(0.2);
+  /* Remove opacity and grayscale that soften the color */
 }
 .iface-status-dot {
   width: 0.75em;
@@ -218,5 +218,8 @@ watch(
 }
 .iface-highlight-down {
   border-left: 3px solid #ef4444 !important; /* red-500 */
+}
+.iface-highlight-unknown {
+  border-left: 3px solid #94a3b8 !important; /* gray-400 */
 }
 </style>

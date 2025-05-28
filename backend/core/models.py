@@ -379,10 +379,11 @@ class Notification(models.Model):
     ]
     
     SOURCES = [
-        ('monitoring', 'System Monitoring'),
-        ('provisioning', 'System Provisioning'),
-        ('security', 'Security'),
-        ('network', 'Network'),
+        ('monitoring', 'Monitoring'),
+        ('discovery', 'Discovery'),
+        ('tftp', 'Provisioning'),
+        ('dhcp', 'Provisioning'),
+        ('service', 'Service'),
         ('other', 'Other')
     ]
     

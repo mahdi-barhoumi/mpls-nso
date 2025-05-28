@@ -16,15 +16,20 @@ const model = ref([
   },
 
   {
-    label: 'Tools',
+    label: 'Administration',
     items: [
+      {
+        label: 'Device Inventory',
+        icon: 'pi pi-fw pi-server',
+        to: '/inventory',
+      },
       {
         label: 'Monitoring',
         icon: 'pi pi-fw pi-chart-bar',
         to: '/monitoring',
       },
       {
-        label: 'Administration',
+        label: 'Services',
         icon: 'pi pi-fw pi-briefcase',
         items: [
           {
@@ -39,14 +44,9 @@ const model = ref([
           },
           {
             label: 'VPN',
-            icon: 'pi pi-fw pi-sitemap',
+            icon: 'pi pi-fw pi-shield',
             to: '/vpns',
-          },
-          {
-            label: 'Device Inventory',
-            icon: 'pi pi-fw pi-server',
-            to: '/inventory',
-          },
+          }
         ],
       },
       {
@@ -54,15 +54,15 @@ const model = ref([
         icon: 'pi pi-fw pi-cog',
         items: [
           {
-            label: 'User Settings',
-            icon: 'pi pi-fw pi-user-edit',
-            to: '/settings/user',
-          },
-          {
-            label: 'Server Settings',
+            label: 'System Settings',
             icon: 'pi pi-fw pi-sliders-h',
             to: '/settings/server',
           },
+          {
+            label: 'User Settings',
+            icon: 'pi pi-fw pi-user-edit',
+            to: '/settings/user',
+          }
         ],
       },
       {
@@ -70,15 +70,15 @@ const model = ref([
         icon: 'pi pi-fw pi-wrench',
         items: [
           {
-            label: 'Logs',
-            icon: 'pi pi-fw pi-file',
-            to: '/troubleshooting/logs',
-          },
-          {
-            label: 'Guide',
+            label: 'Documentation',
             icon: 'pi pi-fw pi-book',
             to: '/troubleshooting/guide',
           },
+          {
+            label: 'Logs',
+            icon: 'pi pi-fw pi-file',
+            to: '/troubleshooting/logs',
+          }
         ],
       },
     ],

@@ -26,21 +26,23 @@ const props = defineProps({
     }
 });
 
-const isActiveMenu = ref(false);
+// Use an array to keep track of open menu keys
+const activeMenuKeys = ref([]); // local state for open menus
 const itemKey = ref(null);
 
 onBeforeMount(() => {
     itemKey.value = props.parentItemKey ? props.parentItemKey + '-' + props.index : String(props.index);
-
-    const activeItem = layoutState.activeMenuItem;
-
-    isActiveMenu.value = activeItem === itemKey.value || activeItem ? activeItem.startsWith(itemKey.value + '-') : false;
+    // Optionally, restore open state from layoutState if needed
 });
+
+function isActiveMenuFn(key) {
+    return activeMenuKeys.value.includes(key);
+}
 
 watch(
     () => layoutState.activeMenuItem,
-    (newVal) => {
-        isActiveMenu.value = newVal === itemKey.value || newVal.startsWith(itemKey.value + '-');
+    () => {
+        // No-op: we now use local activeMenuKeys
     }
 );
 
@@ -58,9 +60,17 @@ function itemClick(event, item) {
         item.command({ originalEvent: event, item: item });
     }
 
-    const foundItemKey = item.items ? (isActiveMenu.value ? props.parentItemKey : itemKey) : itemKey.value;
-
-    setActiveMenuItem(foundItemKey);
+    // Toggle open/close for this menu
+    if (item.items) {
+        const idx = activeMenuKeys.value.indexOf(itemKey.value);
+        if (idx === -1) {
+            activeMenuKeys.value.push(itemKey.value);
+        } else {
+            activeMenuKeys.value.splice(idx, 1);
+        }
+    } else {
+        setActiveMenuItem(itemKey.value);
+    }
 }
 
 function checkActiveRoute(item) {
@@ -69,7 +79,7 @@ function checkActiveRoute(item) {
 </script>
 
 <template>
-    <li :class="{ 'layout-root-menuitem': root, 'active-menuitem': isActiveMenu }">
+    <li :class="{ 'layout-root-menuitem': root, 'active-menuitem': isActiveMenuFn(itemKey) }">
         <div v-if="root && item.visible !== false" class="layout-menuitem-root-text">{{ item.label }}</div>
         <a v-if="(!item.to || item.items) && item.visible !== false" :href="item.url" @click="itemClick($event, item, index)" :class="item.class" :target="item.target" tabindex="0">
             <i :class="item.icon" class="layout-menuitem-icon"></i>
@@ -82,7 +92,7 @@ function checkActiveRoute(item) {
             <i class="pi pi-fw pi-angle-down layout-submenu-toggler" v-if="item.items"></i>
         </router-link>
         <Transition v-if="item.items && item.visible !== false" name="layout-submenu">
-            <ul v-show="root ? true : isActiveMenu" class="layout-submenu">
+            <ul v-show="root ? true : isActiveMenuFn(itemKey)" class="layout-submenu">
                 <app-menu-item v-for="(child, i) in item.items" :key="child" :index="i" :item="child" :parentItemKey="itemKey" :root="false"></app-menu-item>
             </ul>
         </Transition>
