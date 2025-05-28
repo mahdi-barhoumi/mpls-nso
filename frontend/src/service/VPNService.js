@@ -6,11 +6,9 @@ export default {
   async getVPNs() {
     try {
       const response = await axios.get(`${API_URL}?expand=sites`)
-      console.log('Fetched sites:', response.data)
 
       return response.data
     } catch (error) {
-      console.error('Error fetching VPNs:', error)
       throw error
     }
   },
@@ -19,7 +17,6 @@ export default {
       const response = await axios.get(`${API_URL}${id}/`)
       return response.data
     } catch (error) {
-      console.error('Error fetching VPN:', error)
       throw error
     }
   },
@@ -28,7 +25,6 @@ export default {
       const response = await axios.post(API_URL, vpnData)
       return response.data
     } catch (error) {
-      console.error('Error creating VPN:', error)
       throw error
     }
   },
@@ -38,7 +34,6 @@ export default {
       await axios.delete(`${API_URL}${id}/`)
       return true
     } catch (error) {
-      console.error('Error deleting VPN:', error)
       throw error
     }
   },
@@ -48,7 +43,6 @@ export default {
       const response = await axios.patch(`${API_URL}${id}/`, vpnData)
       return response.data
     } catch (error) {
-      console.error('Error updating VPN:', error)
       if (error.response?.status === 405) {
         throw new Error('VPN update operation not supported')
       }

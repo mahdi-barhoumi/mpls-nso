@@ -10,18 +10,57 @@ const { toggleMenu, toggleDarkMode, isDarkTheme } = useLayout()
 const router = useRouter()
 const authService = new AuthService()
 const currentUser = ref(null)
-const notifications = notificationService.getNotifications()
 
-// Computed property to safely check notifications length
-const notificationCount = computed(() => notifications.value?.length || 0)
+// Notifications state and polling logic
+const notifications = ref([])
+let pollingInterval = null
+
+const fetchNotifications = async () => {
+  try {
+    const data = await notificationService.fetchNotifications()
+    notifications.value = data.map(notification => ({
+      ...notification,
+      timestamp: new Date(notification.created_at)
+    }))
+  } catch (error) {
+    // Optionally handle error
+  }
+}
+
+const startPolling = (intervalMs = 30000) => {
+  stopPolling()
+  fetchNotifications()
+  pollingInterval = setInterval(fetchNotifications, intervalMs)
+}
+
+const stopPolling = () => {
+  if (pollingInterval) {
+    clearInterval(pollingInterval)
+    pollingInterval = null
+  }
+}
+
+const acknowledgeNotification = async (id) => {
+  await notificationService.acknowledgeNotification(id)
+  notifications.value = notifications.value.map(n =>
+    n.id === id ? { ...n, acknowledged: true } : n
+  )
+}
+
+const clearAllNotifications = async () => {
+  // Acknowledge all notifications in parallel
+  await Promise.all(notifications.value.map(n => acknowledgeNotification(n.id)))
+}
+
+const notificationCount = computed(() => notifications.value?.filter(n => !n.acknowledged).length || 0)
 
 onMounted(() => {
   currentUser.value = authService.getCurrentUser()
-  notificationService.startPolling()
+  startPolling()
 })
 
 onUnmounted(() => {
-  notificationService.stopPolling()
+  stopPolling()
 })
 
 async function handleLogout() {
@@ -33,22 +72,41 @@ function goToSettings() {
   router.push('settings/user')
 }
 
-function handleNotificationClick(notification) {
-  if (notification.type === 'log') {
+// Notification click handler using source and id
+async function handleNotificationClick(notification) {
+  // Route based on notification source
+  if (notification.source === 'monitoring') {
+    router.push('/monitoring/routers')
+  } else if (notification.source === 'provisioning') {
+    router.push('/sites')
+  } else if (notification.source === 'network') {
     router.push('/logs')
-  } else if (notification.type === 'monitoring') {
-    router.push(`/monitoring/routers/${notification.resourceId}`)
+  } else if (notification.source === 'security') {
+    router.push('/logs')
   }
-  notificationService.clearNotification(notification.id)
+  // Always acknowledge after click
+  await acknowledgeNotification(notification.id)
 }
 
-function clearAllNotifications() {
-  notificationService.clearAllNotifications()
-}
-
+// Icon and color based on severity and source
 const getNotificationIcon = (notification) => {
-  if (notification.type === 'log') return 'pi-exclamation-circle'
-  return 'pi-server'
+  if (notification.severity === 'critical') return 'pi-exclamation-triangle'
+  if (notification.severity === 'warning') return 'pi-exclamation-circle'
+  if (notification.severity === 'info') {
+    if (notification.source === 'monitoring') return 'pi-server'
+    if (notification.source === 'provisioning') return 'pi-cog'
+    if (notification.source === 'security') return 'pi-shield'
+    if (notification.source === 'network') return 'pi-globe'
+    return 'pi-info-circle'
+  }
+  return 'pi-bell'
+}
+
+const getNotificationColor = (notification) => {
+  if (notification.severity === 'critical') return 'text-red-600'
+  if (notification.severity === 'warning') return 'text-yellow-500'
+  if (notification.severity === 'info') return 'text-blue-500'
+  return 'text-gray-500'
 }
 </script>
 
@@ -84,9 +142,10 @@ const getNotificationIcon = (notification) => {
           }"
         >
           <i class="pi pi-bell"></i>
+          <!-- Show badge for unacknowledged notifications -->
           <span
             v-if="notificationCount > 0"
-            class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center"
+            class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center z-10"
           >
             {{ notificationCount }}
           </span>
@@ -110,19 +169,40 @@ const getNotificationIcon = (notification) => {
             </button>
           </div>
 
-          <div v-if="notificationCount > 0" class="flex flex-col gap-2">
+          <div v-if="notifications.length > 0" class="flex flex-col gap-2">
             <button
-              v-for="notification in notifications.value"
+              v-for="notification in notifications"
               :key="notification.id"
               @click="handleNotificationClick(notification)"
-              class="flex items-start gap-3 p-3 rounded-md hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors text-left"
+              :class="[
+                'flex items-start gap-3 p-3 rounded-md hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors text-left relative',
+                notification.acknowledged ? 'opacity-60 cursor-default' : 'cursor-pointer'
+              ]"
+              :disabled="notification.acknowledged"
             >
-              <i :class="['pi', getNotificationIcon(notification), 'mt-0.5 text-red-500']"></i>
+              <i :class="['pi', getNotificationIcon(notification), getNotificationColor(notification), 'mt-0.5']"></i>
               <div class="flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="font-semibold" :class="getNotificationColor(notification)">
+                    {{ notification.severity_display }}
+                  </span>
+                  <span class="text-xs text-surface-500">
+                    {{ notification.source_display }}
+                  </span>
+                  <!-- Show checkmark if acknowledged -->
+                  <i
+                    v-if="notification.acknowledged"
+                    class="pi pi-check-circle text-green-500 text-xs ml-2"
+                    title="Acknowledged"
+                  ></i>
+                </div>
                 <p class="text-surface-900 dark:text-surface-0 font-medium">
+                  {{ notification.title }}
+                </p>
+                <p class="text-surface-700 dark:text-surface-200 text-sm">
                   {{ notification.message }}
                 </p>
-                <p class="text-sm text-surface-500">
+                <p class="text-xs text-surface-500">
                   {{ new Date(notification.timestamp).toLocaleString() }}
                 </p>
               </div>

@@ -7,8 +7,6 @@ from django.shortcuts import get_object_or_404
 from core.models import Notification
 
 class NotificationView(APIView):
-    permission_classes = [IsAuthenticated]
-
     def serialize_notification(self, notification):
         return {
             'id': notification.id,
