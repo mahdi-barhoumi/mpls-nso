@@ -28,43 +28,39 @@
       </div>
     </div>
 
-    <div class="card-content">
-      <!-- Quick Stats -->
-      <div class="grid grid-cols-3 gap-4 mb-3">
-        <div class="surface-100 p-2 pr-4 border-round flex flex-col items-center gap-1">
-          <div class="flex items-center justify-center bg-blue-100 dark:bg-blue-400/20 rounded-full w-9 h-9 shadow mb-1">
-            <i class="pi pi-users text-blue-500 text-xl"></i>
+    <div class="card-content flex flex-col h-full">
+      <!-- Fixed Header Section -->
+      <div class="flex-shrink-0">
+        <!-- Quick Stats - Fixed -->
+        <div class="grid grid-cols-3 gap-4 mb-3">
+          <div class="surface-100 p-2 pr-4 border-round flex flex-col items-center gap-1">
+            <div class="flex items-center justify-center bg-blue-100 dark:bg-blue-400/20 rounded-full w-9 h-9 shadow mb-1">
+              <i class="pi pi-users text-blue-500 text-xl"></i>
+            </div>
+            <div class="text-base font-medium">{{ stats.totalCustomers }}</div>
+            <div class="text-500 text-xs">Customers</div>
           </div>
-          <div class="text-base font-medium">{{ stats.totalCustomers }}</div>
-          <div class="text-500 text-xs">Customers</div>
-        </div>
-        <div class="surface-100 p-2 pr-4 border-round flex flex-col items-center gap-1">
-          <div class="flex items-center justify-center bg-orange-100 dark:bg-orange-400/20 rounded-full w-9 h-9 shadow mb-1">
-            <i class="pi pi-map-marker text-orange-500 text-xl"></i>
+          <div class="surface-100 p-2 pr-4 border-round flex flex-col items-center gap-1">
+            <div class="flex items-center justify-center bg-orange-100 dark:bg-orange-400/20 rounded-full w-9 h-9 shadow mb-1">
+              <i class="pi pi-map-marker text-orange-500 text-xl"></i>
+            </div>
+            <div class="text-base font-medium">{{ stats.totalSites }}</div>
+            <div class="text-500 text-xs">Sites</div>
           </div>
-          <div class="text-base font-medium">{{ stats.totalSites }}</div>
-          <div class="text-500 text-xs">Sites</div>
-        </div>
-        <div class="surface-100 p-2 pr-4 border-round flex flex-col items-center gap-1">
-          <div class="flex items-center justify-center bg-purple-100 dark:bg-purple-400/20 rounded-full w-9 h-9 shadow mb-1">
-            <i class="pi pi-shield text-purple-500 text-xl"></i>
+          <div class="surface-100 p-2 pr-4 border-round flex flex-col items-center gap-1">
+            <div class="flex items-center justify-center bg-purple-100 dark:bg-purple-400/20 rounded-full w-9 h-9 shadow mb-1">
+              <i class="pi pi-shield text-purple-500 text-xl"></i>
+            </div>
+            <div class="text-base font-medium">{{ stats.totalVpns }}</div>
+            <div class="text-500 text-xs">VPNs</div>
           </div>
-          <div class="text-base font-medium">{{ stats.totalVpns }}</div>
-          <div class="text-500 text-xs">VPNs</div>
         </div>
-      </div>
 
-      <!-- Separator -->
-      <div class="w-full border-t border-gray-200 dark:border-surface-700 my-4"></div>
+        <!-- Separator - Fixed -->
+        <div class="w-full border-t border-gray-200 dark:border-surface-700 my-4"></div>
 
-      <!-- Loading State -->
-      <div v-if="loading" class="flex justify-center items-center p-4">
-        <i class="pi pi-spin pi-spinner text-primary" style="font-size: 1.5rem"></i>
-      </div>
-
-      <!-- Recent Activity -->
-      <div v-else-if="recentCustomers.length > 0">
-        <div class="flex items-center my-2">
+        <!-- Recent Changes Header - Fixed -->
+        <div v-if="!loading && recentCustomers.length > 0" class="flex items-center my-2">
           <div class="text-sm font-bold" style="color: var(--surface-900)">
             Recent changes:
           </div>
@@ -77,8 +73,19 @@
             tooltip="View All Activity"
           />
         </div>
+      </div>
+
+      <!-- Dynamic Content Section -->
+      <div class="flex-1 min-h-0">
+        <!-- Loading State -->
+        <div v-if="loading" class="flex justify-center items-center p-4">
+          <i class="pi pi-spin pi-spinner text-primary" style="font-size: 1.5rem"></i>
+        </div>
+
+        <!-- Scrollable Customer List Only -->
         <div
-          style="max-height: 260px; scrollbar-gutter: stable; scrollbar-width: thin;"
+          v-else-if="recentCustomers.length > 0"
+          class="custom-scrollbar h-full overflow-y-auto"
         >
           <div
             v-for="(customer, idx) in recentCustomers"
@@ -115,9 +122,9 @@
             </div>
           </div>
         </div>
-      </div>
 
-      <div v-else class="text-center text-500 text-sm p-3">No customers found</div>
+        <div v-else class="text-center text-500 text-sm p-3">No customers found</div>
+      </div>
     </div>
   </div>
 </template>
@@ -245,7 +252,6 @@ onMounted(() => {
 .custom-scrollbar {
   scrollbar-color: var(--surface-300) var(--surface-50);
   scrollbar-width: thin;
-  overflow-y: scroll;
 }
 .custom-scrollbar::-webkit-scrollbar {
   width: 8px;
@@ -262,7 +268,6 @@ onMounted(() => {
 /* Add a left border highlight for recent items */
 .recent-item-highlight {
   border-left: 3px solid var(--primary-color, #6366f1);
-  /* fallback to a blue if --primary-color is not set */
   background: none !important;
 }
 </style>
