@@ -21,7 +21,14 @@
           />
         </template>
         <template #end>
-          <Button label="Export" icon="pi pi-upload" severity="secondary" @click="exportCSV" />
+          <Button label="Export" icon="pi pi-upload" severity="secondary" @click="exportCSV" class="mr-2" />
+          <Button
+            label="Refresh"
+            icon="pi pi-refresh"
+            severity="secondary"
+            @click="fetchCustomers"
+            :loading="loading"
+          />
         </template>
       </Toolbar>
 
@@ -40,15 +47,17 @@
         selectionMode="multiple"
         :loading="loading"
         class="p-datatable-gridlines"
+        stripedRows
+        showGridlines
       >
         <template #header>
           <div class="flex flex-wrap gap-2 items-center justify-between">
-            <div class="font-semibold text-xl mb-4">Customers</div>
+            <div class="font-semibold text-xl my-2">Customers</div>
             <IconField>
               <InputIcon>
                 <i class="pi pi-search" />
               </InputIcon>
-              <InputText v-model="filters['global'].value" placeholder="Search..." />
+              <InputText v-model="filters['global'].value" placeholder="Search customers..." />
             </IconField>
           </div>
         </template>
@@ -62,55 +71,121 @@
           sortable
           style="min-width: 12rem"
         ></Column>
-        <Column field="created_at" header="Created At" sortable style="min-width: 12rem">
+        <Column field="created_at" header="Registered" sortable style="min-width: 12rem">
           <template #body="slotProps">
-            {{ formatDate(slotProps.data.created_at) }}
+            {{ formatDateTime(slotProps.data.created_at) }}
           </template>
         </Column>
-        <Column :exportable="false" style="min-width: 12rem">
+        <Column
+          :exportable="false"
+          style="min-width: 12rem"
+          headerClass="text-center"
+          bodyClass="actions-center"
+        >
           <template #body="slotProps">
-            <Button
-              icon="pi pi-eye"
-              outlined
-              rounded
-              class="mr-2"
-              severity="help"
-              @click="viewCustomer(slotProps.data)"
-            />
-            <Button
-              icon="pi pi-pencil"
-              outlined
-              rounded
-              class="mr-2"
-              severity="warn"
-              @click="editCustomer(slotProps.data)"
-            />
-            <Button
-              icon="pi pi-trash"
-              outlined
-              rounded
-              severity="danger"
-              @click="confirmDeleteCustomer(slotProps.data)"
-            />
+            <div class="actions-center">
+              <Button
+                icon="pi pi-eye"
+                outlined
+                rounded
+                class="mr-2"
+                severity="help"
+                @click="viewCustomer(slotProps.data)"
+              />
+              <Button
+                icon="pi pi-pencil"
+                outlined
+                rounded
+                class="mr-2"
+                severity="warn"
+                @click="editCustomer(slotProps.data)"
+              />
+              <Button
+                icon="pi pi-trash"
+                outlined
+                rounded
+                severity="danger"
+                @click="confirmDeleteCustomer(slotProps.data)"
+              />
+            </div>
           </template>
         </Column>
+        <template #empty>
+          <div class="text-center text-color-secondary py-3">No customers registered yet.</div>
+        </template>
       </DataTable>
     </div>
 
     <!-- Customer Details Dialog -->
     <Dialog
       v-model:visible="customerDetailsDialogVisible"
-      :style="{ width: '450px' }"
+      :style="{ width: '700px', maxWidth: '95vw' }"
       header="Customer Details"
       :modal="true"
     >
-      <div class="flex flex-col gap-4">
-        <div><span class="font-bold">Name:</span> {{ currentCustomer.name }}</div>
-        <div><span class="font-bold">Email:</span> {{ currentCustomer.email }}</div>
-        <div><span class="font-bold">Phone Number:</span> {{ currentCustomer.phone_number }}</div>
-        <div><span class="font-bold">Description:</span> {{ currentCustomer.description }}</div>
-        <div>
-          <span class="font-bold">Created At:</span> {{ formatDate(currentCustomer.created_at) }}
+      <div class="flex flex-col gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pl-4">
+          <div>
+            <div class="font-bold mb-1">Name:</div>
+            <div class="mb-2">{{ currentCustomer.name }}</div>
+            <div class="font-bold mb-1">Email:</div>
+            <div class="mb-2">{{ currentCustomer.email }}</div>
+            <div class="font-bold mb-1">Phone Number:</div>
+            <div class="mb-2">{{ currentCustomer.phone_number }}</div>
+            <div class="font-bold mb-1">Registered:</div>
+            <div class="mb-2">{{ formatDateTime(currentCustomer.created_at) }}</div>
+          </div>
+          <div>
+            <div class="font-bold mb-1">Description:</div>
+            <div class="mb-2 whitespace-pre-line">
+              {{ currentCustomer.description && currentCustomer.description.trim() ? currentCustomer.description : 'No description' }}
+            </div>
+          </div>
+        </div>
+
+        <div v-if="currentCustomer.sites && currentCustomer.sites.length" class="mt-2">
+          <div class="font-bold text-lg mb-2">Sites</div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div
+              v-for="site in currentCustomer.sites"
+              :key="site.id"
+              class="p-3 rounded site-card"
+            >
+              <div class="font-semibold">{{ site.name }}</div>
+              <div class="text-sm text-color-secondary">{{ site.description }}</div>
+              <div class="mt-1 text-xs">
+                <span class="font-bold">Location:</span> {{ site.location || '-' }}<br>
+                <span class="font-bold">Customer Edge:</span> {{ site.router || '-' }}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="currentCustomer.vpns && currentCustomer.vpns.length" class="mt-2">
+          <div class="font-bold text-lg mb-2">VPNs</div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div
+              v-for="vpn in currentCustomer.vpns"
+              :key="vpn.id"
+              class="p-3 rounded vpn-card"
+            >
+              <div class="font-semibold">{{ vpn.name }}</div>
+              <div class="text-sm text-color-secondary">{{ vpn.description }}</div>
+              <div class="mt-1 text-xs">
+                <span class="font-bold">Connects:</span>
+                <div v-if="vpn.sites && vpn.sites.length" class="flex flex-wrap gap-2 mt-1">
+                  <Tag
+                    v-for="site in vpn.sites"
+                    :key="site.id"
+                    :value="site.name"
+                    class="mb-1"
+                    style="max-width: 100%; white-space: normal;"
+                  />
+                </div>
+                <span v-else>-</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -208,6 +283,22 @@
         <Button label="Yes" icon="pi pi-check" severity="danger" @click="deleteSelectedCustomers" />
       </template>
     </Dialog>
+
+    <!-- Floating Message Alert -->
+    <Toast ref="toast" position="top-right" />
+    <div v-if="message" class="fixed top-0 right-0 z-5 m-3" style="z-index: 1100">
+      <Message
+        :severity="messageType === 'error' ? 'error' : 'success'"
+        :closable="true"
+        @close="message = ''"
+        class="shadow-3"
+      >
+        <template #messageicon>
+          <i :class="getIcon(messageType)" class="mr-2"></i>
+        </template>
+        {{ message }}
+      </Message>
+    </div>
   </div>
 </template>
 
@@ -217,6 +308,7 @@ import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
 import CustomerService from '@/service/CustomerService'
 import { FilterMatchMode } from '@primevue/core/api'
+import Tag from 'primevue/tag'
 
 // State
 const customers = ref([])
@@ -234,9 +326,41 @@ const filters = ref({
   global: { value: null, matchMode: FilterMatchMode.CONTAINS },
 })
 
-// Toast and Confirm
+// Message state (like SiteCrud)
 const toast = useToast()
-const confirm = useConfirm()
+const message = ref('')
+const messageType = ref('success')
+
+// Icon helper (like SiteCrud)
+const getIcon = (type) => {
+  switch (type) {
+    case 'error':
+      return 'pi pi-times-circle'
+    case 'success':
+      return 'pi pi-check-circle'
+    case 'warning':
+      return 'pi pi-exclamation-triangle'
+    case 'info':
+      return 'pi pi-info-circle'
+    default:
+      return 'pi pi-check-circle'
+  }
+}
+
+// Unified message function
+const showMessage = (msg, type = 'success') => {
+  toast.add({
+    severity: type === 'error' ? 'error' : 'success',
+    summary: type === 'error' ? 'Error' : 'Success',
+    detail: msg,
+    life: 5000,
+  })
+  message.value = msg
+  messageType.value = type
+  setTimeout(() => {
+    message.value = ''
+  }, 5000)
+}
 
 // Fetch Customers
 const fetchCustomers = async () => {
@@ -246,21 +370,21 @@ const fetchCustomers = async () => {
     customers.value = Array.isArray(response) ? response : [] // Ensure it's an array
   } catch (error) {
     customers.value = [] // Fallback to an empty array on error
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: 'Failed to fetch customers',
-      life: 3000,
-    })
+    showMessage('Failed to fetch customers', 'error')
   } finally {
     loading.value = false
   }
 }
 
-// Open Customer Details Dialog
-const viewCustomer = (customer) => {
-  currentCustomer.value = { ...customer }
-  customerDetailsDialogVisible.value = true
+// Fetch and show customer details (with sites and vpns)
+const viewCustomer = async (customer) => {
+  try {
+    const data = await CustomerService.getCustomer(customer.id)
+    currentCustomer.value = data
+    customerDetailsDialogVisible.value = true
+  } catch (error) {
+    showMessage('Failed to fetch customer details', 'error')
+  }
 }
 
 // Open New Customer Dialog
@@ -286,20 +410,15 @@ const saveCustomer = async () => {
   try {
     if (isEditing.value) {
       await CustomerService.updateCustomer(currentCustomer.value.id, currentCustomer.value)
-      toast.add({ severity: 'success', summary: 'Success', detail: 'Customer Updated', life: 3000 })
+      showMessage('Customer updated successfully')
     } else {
       await CustomerService.createCustomer(currentCustomer.value)
-      toast.add({ severity: 'success', summary: 'Success', detail: 'Customer Created', life: 3000 })
+      showMessage('Customer created successfully')
     }
     fetchCustomers()
     customerDialogVisible.value = false
   } catch (error) {
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: 'Failed to save customer',
-      life: 3000,
-    })
+    showMessage('Failed to save customer', 'error')
   }
 }
 
@@ -313,15 +432,10 @@ const confirmDeleteCustomer = (customer) => {
 const deleteCustomer = async () => {
   try {
     await CustomerService.deleteCustomer(currentCustomer.value.id)
-    toast.add({ severity: 'success', summary: 'Success', detail: 'Customer Deleted', life: 3000 })
+    showMessage('Customer deleted successfully')
     fetchCustomers()
   } catch (error) {
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: 'Failed to delete customer',
-      life: 3000,
-    })
+    showMessage('Failed to delete customer', 'error')
   } finally {
     deleteCustomerDialog.value = false
   }
@@ -337,15 +451,10 @@ const deleteSelectedCustomers = async () => {
   try {
     const ids = selectedCustomers.value.map((customer) => customer.id)
     await Promise.all(ids.map((id) => CustomerService.deleteCustomer(id)))
-    toast.add({ severity: 'success', summary: 'Success', detail: 'Customers Deleted', life: 3000 })
+    showMessage('Customers deleted successfully')
     fetchCustomers()
   } catch (error) {
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: 'Failed to delete customers',
-      life: 3000,
-    })
+    showMessage('Failed to delete customers', 'error')
   } finally {
     deleteCustomersDialog.value = false
     selectedCustomers.value = []
@@ -366,6 +475,21 @@ const formatDate = (dateString) => {
   return new Date(dateString).toLocaleDateString()
 }
 
+// Utility: Format Date and Time
+const formatDateTime = (dateString) => {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  // Format: YYYY-MM-DD HH:mm:ss
+  const pad = (n) => n.toString().padStart(2, '0')
+  const year = date.getFullYear()
+  const month = pad(date.getMonth() + 1)
+  const day = pad(date.getDate())
+  const hours = pad(date.getHours())
+  const minutes = pad(date.getMinutes())
+  const seconds = pad(date.getSeconds())
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+}
+
 // Lifecycle
 onMounted(fetchCustomers)
 </script>
@@ -373,5 +497,49 @@ onMounted(fetchCustomers)
 <style scoped>
 .field {
   margin-bottom: 1rem;
+}
+/* Center actions in the Actions column */
+.actions-center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Darken the card background color using a pseudo element overlay */
+.site-card,
+.vpn-card {
+  position: relative;
+  border: none;
+  overflow: hidden;
+}
+.site-card::before,
+.vpn-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.02); /* subtle dark overlay */
+  z-index: 1;
+  border-radius: inherit;
+  transition: background 0.2s;
+}
+.site-card > *,
+.vpn-card > * {
+  position: relative;
+  z-index: 2;
+}
+
+/* Floating message positioning (like SiteCrud) */
+.fixed {
+  position: fixed !important;
+}
+.top-0 {
+  top: 0 !important;
+}
+.right-0 {
+  right: 0 !important;
+}
+.z-5 {
+  z-index: 1100 !important;
 }
 </style>

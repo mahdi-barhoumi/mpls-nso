@@ -216,8 +216,15 @@
       datalabels: {
         display: true,
         color: chartTextColor.value,
-        font: { weight: 'bold', size: 11 }, // smaller font size
-        formatter: (value) => value,
+        font: { weight: 'bold', size: 11 },
+        formatter: (value, context) => {
+          const data = context.chart.data.datasets[0].data;
+          // Hide all labels if fully up or fully down
+          if ((data[0] === 0 && data[1] > 0) || (data[1] === 0 && data[0] > 0) || (data[0] === 0 && data[1] === 0)) {
+            return '';
+          }
+          return value === 0 ? '' : value;
+        },
       },
     },
     cutout: '70%',
@@ -248,8 +255,15 @@
       datalabels: {
         display: true,
         color: chartTextColor.value,
-        font: { weight: 'bold', size: 11 }, // smaller font size
-        formatter: (value) => value,
+        font: { weight: 'bold', size: 11 },
+        formatter: (value, context) => {
+          const data = context.chart.data.datasets[0].data;
+          // Hide all labels if fully up or fully down
+          if ((data[0] === 0 && data[1] > 0) || (data[1] === 0 && data[0] > 0) || (data[0] === 0 && data[1] === 0)) {
+            return '';
+          }
+          return value === 0 ? '' : value;
+        },
       },
     },
     cutout: '70%',

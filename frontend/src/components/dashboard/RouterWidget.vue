@@ -35,7 +35,7 @@
       <!-- Device Info Summary -->
       <div class="surface-100 p-3 border-round mb-1 grid grid-cols-3 gap-2 text-xs">
         <div class="flex items-center gap-3">
-          <i class="pi pi-user text-green-500"></i>
+          <i class="pi pi-wrench text-green-500"></i>
           <div>
             <div class="text-muted-color">Role</div>
             <div class="font-medium">{{ routerData?.role || 'N/A' }}</div>

@@ -1,7 +1,7 @@
 from django.urls import path
 from core.views import utils, discovery, dhcp, tftp
 from core.views.customers import CustomerView
-from core.views.routers import RouterView, RouterInterfaceView  
+from core.views.routers import RouterView, RouterInterfaceView, RouterVRFView, RouterOSPFView  
 from core.views.sites import SiteView, SiteRoutingView
 from core.views.network_map import NetworkMapView
 from core.views.vpns import VPNView, VPNSiteView
@@ -48,6 +48,10 @@ urlpatterns = [
     path('routers/<str:router_id>/', RouterView.as_view()),
     path('routers/<str:router_id>/interfaces/', RouterInterfaceView.as_view()),
     path('routers/<str:router_id>/interfaces/<int:interface_id>/', RouterInterfaceView.as_view()),
+    path('routers/<str:router_id>/vrfs/', RouterVRFView.as_view()),
+    path('routers/<str:router_id>/vrfs/<int:vrf_id>/', RouterVRFView.as_view()),
+    path('routers/<str:router_id>/ospf/', RouterOSPFView.as_view()),
+    path('routers/<str:router_id>/ospf/<int:process_id>/', RouterOSPFView.as_view()),
 
     ## Site endpoints
     path('sites/', SiteView.as_view()),  
