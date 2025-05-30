@@ -41,7 +41,9 @@ class SetupStatusView(View):
             'dhcp_sites_network_address': settings.dhcp_sites_network_address,
             'dhcp_sites_network_subnet_mask': settings.dhcp_sites_network_subnet_mask,
             'management_vrf': settings.management_vrf,
-            'bgp_as': settings.bgp_as
+            'bgp_as': settings.bgp_as,
+            'monitoring_interval': settings.monitoring_interval,
+            'discovery_interval': settings.discovery_interval,
         }
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -100,7 +102,8 @@ class SettingsSetupView(View):
             required_fields = [
                 'restconf_username', 'restconf_password', 'host_interface_id', 
                 'host_address', 'host_subnet_mask', 'dhcp_sites_network_address', 
-                'dhcp_sites_network_subnet_mask', 'management_vrf', 'bgp_as'
+                'dhcp_sites_network_subnet_mask', 'management_vrf', 'bgp_as',
+                'monitoring_interval', 'discovery_interval'
             ]
             
             # Check for missing or empty fields
@@ -115,6 +118,14 @@ class SettingsSetupView(View):
                 return JsonResponse({
                     'message': 'BGP AS must be an integer'
                 }, status=400)
+            if not isinstance(data.get('monitoring_interval'), int):
+                return JsonResponse({
+                    'message': 'Monitoring interval must be an integer'
+                }, status=400)
+            if not isinstance(data.get('discovery_interval'), int):
+                return JsonResponse({
+                    'message': 'Discovery interval must be an integer'
+                }, status=400)
 
             # Create settings
             settings = Settings(
@@ -128,7 +139,9 @@ class SettingsSetupView(View):
                 dhcp_sites_network_address=data['dhcp_sites_network_address'],
                 dhcp_sites_network_subnet_mask=data['dhcp_sites_network_subnet_mask'],
                 management_vrf=data['management_vrf'],
-                bgp_as=data['bgp_as']
+                bgp_as=data['bgp_as'],
+                monitoring_interval=data['monitoring_interval'],
+                discovery_interval=data['discovery_interval'],
             )
 
             # Validate and save

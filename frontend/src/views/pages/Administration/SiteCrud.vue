@@ -255,21 +255,27 @@
       :header="isEditing ? 'Edit Site' : 'New Site'" :modal="true">
       <div class="flex flex-col gap-6">
         <div>
-          <label for="name" class="block font-bold mb-3">Name</label>
+          <label for="name" class="block font-bold mb-3">Name:</label>
           <InputText id="name" v-model.trim="formData.name" required="true" autofocus
-            :invalid="submitted && !formData.name" fluid />
+            :invalid="submitted && !formData.name" fluid
+            placeholder="Enter site name"
+          />
           <small v-if="submitted && !formData.name" class="text-red-500">Name is required.</small>
         </div>
         <div>
-          <label for="location" class="block font-bold mb-3">Location</label>
-          <InputText id="location" v-model="formData.location" fluid />
+          <label for="location" class="block font-bold mb-3">Location:</label>
+          <InputText id="location" v-model="formData.location" fluid
+            placeholder="Enter location"
+          />
         </div>
         <div>
-          <label for="description" class="block font-bold mb-3">Description</label>
-          <Textarea id="description" v-model="formData.description" rows="3" cols="20" fluid />
+          <label for="description" class="block font-bold mb-3">Description:</label>
+          <Textarea id="description" v-model="formData.description" rows="3" cols="20" fluid
+            placeholder="Enter description"
+          />
         </div>
         <div v-if="!isEditing">
-          <label for="customer" class="block font-bold mb-3">Customer</label>
+          <label for="customer" class="block font-bold mb-3">Customer:</label>
           <Dropdown
             id="customer"
             v-model="formData.customer_id"
@@ -288,19 +294,25 @@
           </small>
         </div>
         <div v-if="!isEditing">
-          <label for="peRouter" class="block font-bold mb-3">PE Router</label>
+          <label for="peRouter" class="block font-bold mb-3">Provider Edge:</label>
           <Dropdown id="peRouter" v-model="selectedPERouter" :options="peRouters" optionLabel="hostname"
-            optionValue="id" placeholder="Select PE Router" :class="{ 'p-invalid': submitted && !selectedPERouter }"
-            class="w-full" @change="handlePERouterChange" />
+            optionValue="id" placeholder="Select provider edge" :class="{ 'p-invalid': submitted && !selectedPERouter }"
+            class="w-full" @change="handlePERouterChange"
+            filter
+            filterPlaceholder="Search PE routers ..."
+          />
           <small v-if="submitted && !selectedPERouter" class="text-red-500">
             PE Router is required.
           </small>
         </div>
         <div v-if="!isEditing && selectedPERouter">
-          <label for="interface" class="block font-bold mb-3">PE Interface</label>
+          <label for="interface" class="block font-bold mb-3">Interface</label>
           <Dropdown id="interface" v-model="formData.assigned_interface_id" :options="peInterfaces" optionLabel="name"
-            optionValue="id" placeholder="Select Interface"
-            :class="{ 'p-invalid': submitted && !formData.assigned_interface_id }" class="w-full" />
+            optionValue="id" placeholder="Select interface"
+            :class="{ 'p-invalid': submitted && !formData.assigned_interface_id }" class="w-full"
+            filter
+            filterPlaceholder="Search interfaces ..."
+          />
           <small v-if="submitted && !formData.assigned_interface_id" class="text-red-500">
             Interface is required.
           </small>

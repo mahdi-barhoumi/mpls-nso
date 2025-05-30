@@ -116,7 +116,7 @@ onUnmounted(() => {
   <div class="card">
     <div class="flex justify-between mb-4">
       <div>
-        <span class="text-xl text-900 font-bold">System Logs</span>
+        <span class="text-xl text-900 font-bold">Logs</span>
       </div>
       <div class="flex gap-2 items-center">
         <Dropdown

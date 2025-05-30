@@ -95,7 +95,12 @@ class VPNView(View):
                 
             # Handle site updates if provided
             if 'sites' in data:
-                new_site_ids = set(data['sites'])
+                # Accept both list of IDs or list of dicts with 'id'
+                raw_sites = data['sites']
+                if raw_sites and isinstance(raw_sites[0], dict):
+                    new_site_ids = set(site['id'] for site in raw_sites if 'id' in site)
+                else:
+                    new_site_ids = set(raw_sites)
                 current_site_ids = set(vpn.sites.values_list('id', flat=True))
                 
                 # Sites to add
@@ -131,6 +136,9 @@ class VPNView(View):
                             }, status=500)
                     except Site.DoesNotExist:
                         pass  # Skip if site no longer exists
+
+                # Update the VPN's sites m2m field to match the new set
+                vpn.sites.set(list(new_site_ids))
             
             vpn.save()
             

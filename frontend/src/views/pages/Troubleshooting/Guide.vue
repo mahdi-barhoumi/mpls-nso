@@ -2,16 +2,14 @@
   <div class="card">
     <div class="grid">
       <div class="col-12">
-        <h1 class="text-3xl mb-4">Application Guide</h1>
-
-        <!-- Table of Contents -->
+        <h1 class="text-3xl mb-4">Documentation</h1>
+        <!--
         <div class="mb-4">
           <TabMenu
             :model="sections.map((s) => ({ label: s.title, command: () => scrollTo(s.id) }))"
           />
         </div>
 
-        <!-- Guide Sections -->
         <ScrollPanel class="guide-scroll custom-scrollbar">
           <div v-for="(section, index) in sections" :key="index" :id="section.id" class="mb-4">
             <Card>
@@ -42,6 +40,10 @@
             </Card>
           </div>
         </ScrollPanel>
+        -->
+        <div class="p-6 text-center text-xl text-gray-500">
+          This documentation page is unfinished.
+        </div>
       </div>
     </div>
   </div>

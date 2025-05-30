@@ -209,7 +209,7 @@
     >
       <div class="flex flex-col gap-6">
         <div>
-          <label for="name" class="block font-bold mb-3">Name</label>
+          <label for="name" class="block font-bold mb-3">Name:</label>
           <InputText
             id="name"
             v-model.trim="currentCustomer.name"
@@ -217,27 +217,40 @@
             autofocus
             :invalid="submitted && !currentCustomer.name"
             fluid
+            placeholder="Enter customer name"
           />
           <small v-if="submitted && !currentCustomer.name" class="text-red-500"
             >Name is required.</small
           >
         </div>
         <div>
-          <label for="email" class="block font-bold mb-3">Email</label>
-          <InputText id="email" v-model="currentCustomer.email" type="email" fluid />
+          <label for="email" class="block font-bold mb-3">Email:</label>
+          <InputText
+            id="email"
+            v-model="currentCustomer.email"
+            type="email"
+            fluid
+            placeholder="Enter email address"
+          />
         </div>
         <div>
-          <label for="phone_number" class="block font-bold mb-3">Phone Number</label>
-          <InputText id="phone_number" v-model="currentCustomer.phone_number" fluid />
+          <label for="phone_number" class="block font-bold mb-3">Phone Number:</label>
+          <InputText
+            id="phone_number"
+            v-model="currentCustomer.phone_number"
+            fluid
+            placeholder="Enter phone number"
+          />
         </div>
         <div>
-          <label for="description" class="block font-bold mb-3">Description</label>
+          <label for="description" class="block font-bold mb-3">Description:</label>
           <Textarea
             id="description"
             v-model="currentCustomer.description"
             rows="3"
             cols="20"
             fluid
+            placeholder="Enter description"
           />
         </div>
       </div>
@@ -393,6 +406,11 @@ const openNewCustomerDialog = () => {
   submitted.value = false
   isEditing.value = false
   customerDialogVisible.value = true
+}
+
+// Add this function to close the customer dialog
+const closeDialog = () => {
+  customerDialogVisible.value = false
 }
 
 // Edit Customer

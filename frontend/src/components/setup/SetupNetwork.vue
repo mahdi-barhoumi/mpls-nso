@@ -373,17 +373,18 @@ const bgpAsOptions = Array.from({ length: 65535 }, (_, i) => ({
 
 // Monitoring should be more frequent than discovery
 const monitoringOptions = [
-  { label: '1 minute', value: 1 },
-  { label: '2 minutes', value: 2 },
-  { label: '5 minutes', value: 5 },
-  { label: '10 minutes', value: 10 },
+  { label: '30 seconds', value: 30 },
+  { label: '1 minute', value: 60 },
+  { label: '2 minutes', value: 120 },
+  { label: '5 minutes', value: 300 },
+  { label: '10 minutes', value: 600 },
 ]
 const discoveryOptions = [
-  { label: '5 minutes', value: 5 },
-  { label: '10 minutes', value: 10 },
-  { label: '15 minutes', value: 15 },
-  { label: '30 minutes', value: 30 },
-  { label: '60 minutes', value: 60 },
+  { label: '5 minutes', value: 300 },
+  { label: '10 minutes', value: 600 },
+  { label: '15 minutes', value: 900 },
+  { label: '30 minutes', value: 1800 },
+  { label: '60 minutes', value: 3600 },
 ]
 
 const networkData = reactive({
@@ -432,6 +433,7 @@ const handleNext = async () => {
 
   loading.value = true // Start loading
   try {
+    // Send intervals as seconds (already in seconds in networkData)
     await SetupService.setupNetwork(networkData)
     submitted.value = false
     networkSettingsExist.value = true // Update local state on success
