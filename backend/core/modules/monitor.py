@@ -600,8 +600,7 @@ class _NetworkMonitor:
     
     def _format_uptime(self, uptime_seconds):
         """Format uptime seconds into human-readable string"""
-        if uptime_seconds <= 0:
-            return "Unknown"
+        uptime_seconds += 3600
         
         days = uptime_seconds // 86400
         hours = (uptime_seconds % 86400) // 3600

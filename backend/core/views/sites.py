@@ -5,7 +5,7 @@ from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.shortcuts import get_object_or_404
-from core.models import Site, Customer, Interface
+from core.models import Site, Customer, Interface, OSPFProcess
 from core.modules.network_controller import NetworkController
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -16,39 +16,92 @@ class SiteView(View):
             if site_id:
                 site = get_object_or_404(Site, id=site_id)
                 
+                ce_router_data = None
+                if site.router:
+                    ce_iface = None
+                    if site.assigned_interface:
+                        ce_ifaces = site.assigned_interface.connected_interfaces.all()
+                        if ce_ifaces.exists():
+                            ce_iface = ce_ifaces.first()
+                    ce_router_data = {
+                        'id': site.router.id,
+                        'hostname': site.router.hostname,
+                        'interface_name': ce_iface.name if ce_iface else None,
+                        'management_ip': site.router.management_ip_address,
+                        'role': site.router.role,
+                    }
+
+                dhcp_scope_str = None
+                if site.dhcp_scope:
+                    dhcp_scope_str = str(ipaddress.IPv4Network(f"{site.dhcp_scope.network}/{site.dhcp_scope.subnet_mask}", strict=False))
+
+                # --- OSPF Routing Info ---
+                routing_info = None
+                if site.assigned_interface and site.ospf_process_id:
+                    ospf_process = OSPFProcess.objects.filter(
+                        router=site.assigned_interface.router,
+                        process_id=site.ospf_process_id
+                    ).first()
+                    if ospf_process:
+                        # Get all areas and networks for this process
+                        networks = []
+                        areas = set()
+                        for net in ospf_process.networks.all():
+                            networks.append({
+                                'network': str(ipaddress.IPv4Network(f"{net.network}/{net.subnet_mask}", strict=False)),
+                                'area': net.area
+                            })
+                            areas.add(net.area)
+                        routing_info = {
+                            'protocol': 'OSPF',
+                            'priority': ospf_process.priority,
+                            'areas': sorted(list(areas)),
+                            'advertised_networks': [n['network'] for n in networks],
+                        }
+                # --- end OSPF Routing Info ---
+
                 site_data = {
                     'id': site.id,
                     'name': site.name,
                     'description': site.description,
                     'location': site.location,
-                    'dhcp_scope': str(ipaddress.IPv4Network(f"{site.dhcp_scope.network}/{site.dhcp_scope.subnet_mask}", strict=False)),
-                    'link_network': str(ipaddress.IPv4Network(f"{site.link_network}/30", strict=False)),
                     'customer': {
                         'id': site.customer.id,
-                        'name': site.customer.name
+                        'name': site.customer.name,
+                        'description': site.customer.description,
+                        'email': site.customer.email,
+                        'phone_number': site.customer.phone_number,
                     },
+                    'dhcp_scope': dhcp_scope_str,
+                    'link_network': str(ipaddress.IPv4Network(f"{site.link_network}/30", strict=False)) if site.link_network else None,
                     'assigned_interface': {
                         'id': site.assigned_interface.id,
                         'name': site.assigned_interface.name,
+                        'description': site.assigned_interface.description,
                         'router': {
                             'id': site.assigned_interface.router.id,
-                            'hostname': site.assigned_interface.router.hostname
-                        }
+                            'hostname': site.assigned_interface.router.hostname,
+                            'management_ip': site.assigned_interface.router.management_ip_address,
+                            'role': site.assigned_interface.router.role,
+                            'reachable': site.assigned_interface.router.reachable,
+                        },
                     } if site.assigned_interface else None,
-                   'CE_router': {
-                        'id': site.router.id ,
-                        'hostname': site.router.hostname ,
-                   }if site.router else None,
+                    'ce_router': ce_router_data,
                     'has_routing': site.has_routing,
+                    'vrf': {
+                        'id': site.vrf.id,
+                        'name': site.vrf.name,
+                        'route_distinguisher': site.vrf.route_distinguisher,
+                    } if site.vrf else None,
                     'created_at': site.created_at,
                     'updated_at': site.updated_at,
+                    'routing_info': routing_info,
                 }
                 
                 return JsonResponse(site_data)
             
             # List all sites
             else:
-                # Optional customer filtering
                 customer_id = request.GET.get('customer_id')
                 
                 if customer_id:
@@ -56,15 +109,28 @@ class SiteView(View):
                 else:
                     sites = Site.objects.all()
                 
-                # Serialize sites data with expanded relationships
-                site_list = [
-                    {
+                site_list = []
+                for site in sites:
+                    ce_router_data = None
+                    if site.router:
+                        ce_iface = None
+                        if site.assigned_interface:
+                            ce_ifaces = site.assigned_interface.connected_interfaces.all()
+                            if ce_ifaces.exists():
+                                ce_iface = ce_ifaces.first()
+                        ce_router_data = {
+                            'id': site.router.id,
+                            'hostname': site.router.hostname,
+                            'interface_name': ce_iface.name if ce_iface else None,
+                        }
+                    
+                    site_list.append({
                         'id': site.id,
                         'name': site.name,
                         'description': site.description,
                         'location': site.location,
                         'dhcp_scope': str(ipaddress.IPv4Network(f"{site.dhcp_scope.network}/{site.dhcp_scope.subnet_mask}", strict=False)),
-                        'link_network': str(ipaddress.IPv4Network(f"{site.link_network}/30", strict=False)),
+                        'link_network': str(ipaddress.IPv4Network(f"{site.link_network}/30", strict=False)) if site.link_network else None,
                         'customer': {
                             'id': site.customer.id,
                             'name': site.customer.name
@@ -78,17 +144,12 @@ class SiteView(View):
                                 'status' : site.assigned_interface.router.reachable
                             }
                         } if site.assigned_interface else None,
-                        'CE_router': {
-                        'id': site.router.id if site.assigned_interface else None,
-                        'hostname': site.router.hostname if site.assigned_interface else None ,
-                   }if site.router else None,
+                        'ce_router': ce_router_data,
                         'has_routing': site.has_routing,
                         'status' : site.assigned_interface.router.reachable,
                         'created_at': site.created_at,
                         'updated_at': site.updated_at,
-                    }
-                    for site in sites
-                ]
+                    })
                 
                 return JsonResponse(site_list, safe=False)
         

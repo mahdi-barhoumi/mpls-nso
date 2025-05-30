@@ -386,6 +386,13 @@ class _NetworkDiscoverer:
         if created:
             self.logger.info(f"Created new router: {hostname} (Role: {role})")
             self.stats["routers"]["created"] += 1
+            # Create notification for new router discovery
+            Notification.objects.create(
+                title=f"New device discovered",
+                message=f"New device discovered at {ip_address}",
+                severity="info",
+                source="discovery"
+            )
         else:
             self.logger.info(f"Updated existing router: {hostname} (Role: {role})")
             self.stats["routers"]["updated"] += 1
@@ -404,7 +411,7 @@ class _NetworkDiscoverer:
     
     def assign_ce_to_site(self, router, ip_address):
         # If router already has a site then skip
-        if router.site is None:
+        if hasattr(router, 'site'):
             return
         
         try:

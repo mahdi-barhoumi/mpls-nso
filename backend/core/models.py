@@ -262,16 +262,17 @@ class Customer(models.Model):
         return self.name
 
 class Site(models.Model):
+    id = models.PositiveIntegerField(primary_key=True, editable=False)
     name = models.CharField(max_length=255, help_text="Site name")
     description = models.TextField(max_length=255, null=True, blank=True, help_text="Site description")
     location = models.CharField(max_length=255, null=True, blank=True, help_text="Site location")
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='sites', help_text="Customer this site belongs to")
     dhcp_scope = models.OneToOneField(DHCPScope, null=True, on_delete=models.SET_NULL, help_text="DHCP scope for customer edge management (/30 subnet)")
-    link_network = models.GenericIPAddressField(protocol='IPv4', help_text="P2P link network (/30 subnet) for site connectivity")
+    link_network = models.GenericIPAddressField(null=True, protocol='IPv4', help_text="P2P link network (/30 subnet) for site connectivity")
     assigned_interface = models.ForeignKey(Interface, null=True, on_delete=models.SET_NULL, related_name='site', help_text="Assigned provider interface for this site")
     vrf = models.ForeignKey(VRF, null=True, on_delete=models.SET_NULL, related_name='site', help_text="VRF for this site")
     ospf_process_id = models.PositiveIntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(65535)], help_text="OSPF process ID used by the PE router for this site's routing")
-    router = models.ForeignKey(Router, null=True, on_delete=models.SET_NULL, related_name='site', help_text="Customer edge router for this site")
+    router = models.OneToOneField(Router, null=True, on_delete=models.SET_NULL, related_name='site', help_text="Customer edge router for this site")
     has_routing = models.BooleanField(default=False, help_text="Whether routing is enabled for this site")
     created_at = models.DateTimeField(auto_now_add=True, help_text="When this VPN was created or discovered")
     updated_at = models.DateTimeField(auto_now=True, help_text="When this VPN was last updated")
@@ -282,6 +283,14 @@ class Site(models.Model):
     def __str__(self):
         return f"{self.customer.name} - {self.name}"
     
+    def get_min_available_id(self):
+        # Get all used IDs and find the smallest missing positive integer
+        used_ids = set(Site.objects.values_list('id', flat=True))
+        i = 1
+        while i in used_ids:
+            i += 1
+        return i
+
     def validate(self):
         # Validate if the assigned interface belongs to a PE router
         if self.assigned_interface and self.assigned_interface.router.role != 'PE':
@@ -299,16 +308,19 @@ class Site(models.Model):
             raise ValidationError(f"Router '{self.router.hostname}' must have a CE role for site assignment")
         
         # Validate link_network is not used by another site from the same customer
-        existing_sites = Site.objects.filter(
-            customer=self.customer,
-            link_network=self.link_network
-        ).exclude(pk=self.pk)
-        
-        if existing_sites.exists():
-            conflicting_site = existing_sites.first()
-            raise ValidationError(f"Link network is already in use by site '{conflicting_site.name}' for the same customer")
+        if self.link_network:
+            existing_sites = Site.objects.filter(
+                customer=self.customer,
+                link_network=self.link_network
+            ).exclude(pk=self.pk)
+            
+            if existing_sites.exists():
+                conflicting_site = existing_sites.first()
+                raise ValidationError(f"Link network is already in use by site '{conflicting_site.name}' for the same customer")
     
-    def save(self, *args, **kwargs):        
+    def save(self, *args, **kwargs):
+        if not self.id:
+            self.id = self.get_min_available_id()
         # Validate before saving
         self.validate()
         super().save(*args, **kwargs)

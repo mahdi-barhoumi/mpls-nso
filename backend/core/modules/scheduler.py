@@ -16,7 +16,7 @@ class _Scheduler:
         
         # Intervals (in seconds)
         self.network_discovery_interval = 300  # 5 minutes
-        self.network_monitor_interval = 30     # 30 seconds
+        self.network_monitor_interval = 60     # 60 seconds
         
     def schedule_discovery(self, ip_address: str, is_first_time: bool = True):
         with self.lock:

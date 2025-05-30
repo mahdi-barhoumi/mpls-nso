@@ -51,7 +51,6 @@ const fetchLogs = async () => {
     }
     const response = await LogService.getLogs(params)
     logs.value = response.logs
-    console.log('Fetched logs:', logs.value)
   } catch (error) {
     toast.add({
       severity: 'error',
@@ -161,42 +160,49 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <DataTable
-      :value="logs"
-      :loading="loading"
-      stripedRows
-      scrollable
-      scrollHeight="70vh"
-      class="p-datatable-sm"
-      sortField="timestamp"
-      :sortOrder="-1"
-    >
-      <Column field="timestamp" header="Timestamp" sortable>
-        <template #body="slotProps">
-          {{ formatTimestamp(slotProps.data.timestamp) }}
-        </template>
-      </Column>
-      <Column field="level" header="Level" sortable>
-        <template #body="slotProps">
-          <Tag
-            :severity="getLogLevelSeverity(slotProps.data.level).severity"
-            :icon="getLogLevelSeverity(slotProps.data.level).icon"
-          >
-            {{ slotProps.data.level }}
-          </Tag>
-        </template>
-      </Column>
-      <Column field="module" header="Module" sortable style="min-width: 200px">
-        <template #body="slotProps">
-          <Button severity="contrast" variant="text">{{ slotProps.data.module }}</Button>
-        </template>
-      </Column>
-      <Column field="message" header="Message" style="min-width: 50%">
-        <template #body="slotProps">
-          <div class="whitespace-normal break-words">{{ slotProps.data.message }}</div>
-        </template>
-      </Column>
-    </DataTable>
+    <div class="datatable-padding">
+      <div v-if="loading" class="flex flex-col items-center justify-center py-12 text-lg text-500">
+        <span class="pi pi-spin pi-spinner text-3xl mb-3"></span>
+        Loading logs...
+      </div>
+      <DataTable
+        v-else
+        :value="logs"
+        stripedRows
+        scrollable
+        showGridlines
+        scrollHeight="70vh"
+        class="p-datatable-sm"
+        sortField="timestamp"
+        :sortOrder="-1"
+      >
+        <Column field="timestamp" header="Timestamp" sortable>
+          <template #body="slotProps">
+            {{ formatTimestamp(slotProps.data.timestamp) }}
+          </template>
+        </Column>
+        <Column field="level" header="Level" sortable>
+          <template #body="slotProps">
+            <Tag
+              :severity="getLogLevelSeverity(slotProps.data.level).severity"
+              :icon="getLogLevelSeverity(slotProps.data.level).icon"
+            >
+              {{ slotProps.data.level }}
+            </Tag>
+          </template>
+        </Column>
+        <Column field="module" header="Module" sortable style="min-width: 200px">
+          <template #body="slotProps">
+            <Button severity="contrast" variant="text">{{ slotProps.data.module }}</Button>
+          </template>
+        </Column>
+        <Column field="message" header="Message" style="min-width: 50%">
+          <template #body="slotProps">
+            <div class="whitespace-normal break-words">{{ slotProps.data.message }}</div>
+          </template>
+        </Column>
+      </DataTable>
+    </div>
   </div>
 </template>
 
@@ -204,5 +210,10 @@ onUnmounted(() => {
 .p-tag.yellow {
   background-color: #fbbf24;
   color: #92400e;
+}
+
+.datatable-padding {
+  padding-right: 0.5rem;
+  padding-left: 0.5rem;
 }
 </style>

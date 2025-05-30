@@ -338,7 +338,14 @@
       <div class="col-span-3 mt-0">
         <div class="flex items-center justify-between">
           <Button label="Back" icon="pi pi-arrow-left" text @click="$emit('prev')" />
-          <Button label="Next" icon="pi pi-arrow-right" iconPos="right" @click="handleNext" />
+          <Button
+            label="Next"
+            icon="pi pi-arrow-right"
+            iconPos="right"
+            @click="handleNext"
+            :loading="loading"
+            :disabled="loading"
+          />
         </div>
       </div>
     </div>
@@ -354,6 +361,7 @@ const toast = useToast()
 const emit = defineEmits(['prev', 'next'])
 
 const submitted = ref(false)
+const loading = ref(false) // Add loading state
 const hostInterfaces = ref([])
 const networkSettingsExist = ref(false)
 
@@ -422,6 +430,7 @@ const handleNext = async () => {
     return
   }
 
+  loading.value = true // Start loading
   try {
     await SetupService.setupNetwork(networkData)
     submitted.value = false
@@ -441,6 +450,8 @@ const handleNext = async () => {
     ) {
       networkSettingsExist.value = true
     }
+  } finally {
+    loading.value = false // Stop loading
   }
 }
 

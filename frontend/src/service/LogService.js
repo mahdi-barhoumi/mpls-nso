@@ -8,7 +8,6 @@ export default {
       const response = await axios.get(API_URL, { params })
       return response.data
     } catch (error) {
-      console.error('Error fetching logs:', error)
       throw error
     }
   },

@@ -43,7 +43,7 @@ const model = ref([
             to: '/sites',
           },
           {
-            label: 'VPN',
+            label: 'VPNs',
             icon: 'pi pi-fw pi-shield',
             to: '/vpns',
           }

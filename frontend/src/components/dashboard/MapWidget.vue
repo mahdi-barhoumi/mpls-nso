@@ -100,10 +100,9 @@
         <!-- Custom edge labels -->
         <template #edge-label="{ edge, scale = 1, ...slotProps }">
           <v-edge-label
-            v-if="edge.sourceInterfaceType === 'physical' && edge.targetInterfaceType === 'physical'"
             :text="edge.subnet"
             align="center"
-            vertical-align="above"
+            :vertical-align="(edge.sourceInterfaceType === 'logical' || edge.targetInterfaceType === 'logical') ? 'below' : 'above'"
             v-bind="slotProps"
             :fill="getEdgeLabelColor()"
             :font-size="10 * (scale || 1)"
@@ -111,10 +110,9 @@
             style="letter-spacing:0.2px;"
           />
           <v-edge-label
-            v-if="edge.sourceInterfaceType === 'physical' && edge.targetInterfaceType === 'physical'"
             :text="abbreviateIface(edge.sourceInterfaceName)"
             align="source"
-            vertical-align="above"
+            :vertical-align="(edge.sourceInterfaceType === 'logical' || edge.targetInterfaceType === 'logical') ? 'below' : 'above'"
             v-bind="slotProps"
             :fill="getIfaceLabelColor()"
             :font-size="9 * (scale || 1)"
@@ -122,10 +120,9 @@
             style="letter-spacing:0.2px;"
           />
           <v-edge-label
-            v-if="edge.sourceInterfaceType === 'physical' && edge.targetInterfaceType === 'physical'"
             :text="abbreviateIface(edge.targetInterfaceName)"
             align="target"
-            vertical-align="above"
+            :vertical-align="(edge.sourceInterfaceType === 'logical' || edge.targetInterfaceType === 'logical') ? 'below' : 'above'"
             v-bind="slotProps"
             :font-size="9 * (scale || 1)"
             font-weight="400"
