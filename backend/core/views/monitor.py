@@ -59,7 +59,13 @@ class RouterMetricsView(View):
                             'cpu_usage_1m': latest_metric.cpu_usage_1m or 0,
                             'cpu_usage_5m': latest_metric.cpu_usage_5m or 0,
                             'mem_used_percent': latest_metric.mem_used_percent or 0,
-                            'storage_used_percent': latest_metric.storage_used_percent or 0
+                            'mem_total': latest_metric.mem_total or 0,
+                            'mem_used': latest_metric.mem_used or 0,
+                            'mem_free': latest_metric.mem_free or 0,
+                            'storage_used_percent': latest_metric.storage_used_percent or 0,
+                            'storage_total': latest_metric.storage_total or 0,
+                            'storage_used': latest_metric.storage_used or 0,
+                            'storage_free': latest_metric.storage_free or 0
                         })
 
                 return JsonResponse(latest_metrics, safe=False)
@@ -110,6 +116,12 @@ class InterfaceMetricsView(View):
                             'router_hostname': interface.router.hostname,
                             'timestamp': latest_metric.timestamp.isoformat(),
                             'operational_status': latest_metric.operational_status,
+                            'in_octets': latest_metric.in_octets,
+                            'out_octets': latest_metric.out_octets,
+                            'in_errors': latest_metric.in_errors,
+                            'out_errors': latest_metric.out_errors,
+                            'in_discards': latest_metric.in_discards,
+                            'out_discards': latest_metric.out_discards,
                             'bps_in': latest_metric.bps_in,
                             'bps_out': latest_metric.bps_out
                         })

@@ -106,10 +106,10 @@ class _NetworkMonitor:
         # Collect memory metrics
         memory_data = self.restconf.get(
             router.management_ip_address,
-            "Cisco-IOS-XE-memory-oper:memory-statistics/memory-statistic"
+            "Cisco-IOS-XE-platform-software-oper:cisco-platform-software/control-processes/control-process=fru-rp,0,0,-1/memory-stats"
         )
         
-        if not memory_data or 'Cisco-IOS-XE-memory-oper:memory-statistic' not in memory_data:
+        if not memory_data or 'Cisco-IOS-XE-platform-software-oper:memory-stats' not in memory_data:
             self.logger.warning(f"Failed to collect memory metrics for {router.hostname}")
             return
         
@@ -127,11 +127,7 @@ class _NetworkMonitor:
         cpu_util = cpu_data.get('Cisco-IOS-XE-process-cpu-oper:cpu-utilization', {})
         
         # Get main memory stats (Processor memory)
-        memory_stats = None
-        for mem_stat in memory_data.get('Cisco-IOS-XE-memory-oper:memory-statistic', []):
-            if mem_stat.get('name') == 'Processor':
-                memory_stats = mem_stat
-                break
+        memory_stats = memory_data.get('Cisco-IOS-XE-platform-software-oper:memory-stats', {})
         
         if not memory_stats:
             self.logger.warning(f"No processor memory stats found for {router.hostname}")
@@ -155,9 +151,9 @@ class _NetworkMonitor:
         cpu_1m = float(cpu_util.get('one-minute', 0))
         cpu_5m = float(cpu_util.get('five-minutes', 0))
         
-        mem_total = int(memory_stats.get('total-memory', 0))
-        mem_used = int(memory_stats.get('used-memory', 0))
-        mem_free = int(memory_stats.get('free-memory', 0))
+        mem_total = int(memory_stats.get('total', 0))
+        mem_used = int(memory_stats.get('used-number', 0))
+        mem_free = int(memory_stats.get('free-number', 0))
         mem_used_percent = (mem_used / mem_total * 100) if mem_total > 0 else 0
         
         storage_total = int(storage_stats.get('total-size', 0))
@@ -520,6 +516,13 @@ class _NetworkMonitor:
                     # Get filesystem info
                     partitions = []
                     for partition in filesystem[0].get('partitions', []):
+                        if partition.get('name') == 'bootflash:':
+                            total_system_storage = int(partition.get('total-size'))
+                            device_info.update({
+                                'total_system_storage_kb': total_system_storage,
+                                'total_system_storage_mb': round(total_system_storage / 1024, 2)
+                            })
+
                         partitions.append({
                             'name': partition.get('name'),
                             'total_size_kb': partition.get('total-size'),
@@ -562,32 +565,15 @@ class _NetworkMonitor:
             # Get total system memory information
             memory_data = self.restconf.get(
                 router.management_ip_address,
-                "Cisco-IOS-XE-memory-oper:memory-statistics/memory-statistic"
+                "Cisco-IOS-XE-platform-software-oper:cisco-platform-software/control-processes/control-process=fru-rp,0,0,-1/memory-stats"
             )
             
-            if memory_data and 'Cisco-IOS-XE-memory-oper:memory-statistic' in memory_data:
-                memory_pools = []
-                total_system_memory = 0
-                
-                for mem_stat in memory_data['Cisco-IOS-XE-memory-oper:memory-statistic']:
-                    pool_info = {
-                        'name': mem_stat.get('name'),
-                        'total_bytes': int(mem_stat.get('total-memory', 0)),
-                        'used_bytes': int(mem_stat.get('used-memory', 0)),
-                        'free_bytes': int(mem_stat.get('free-memory', 0)),
-                        'lowest_usage_bytes': int(mem_stat.get('lowest-usage', 0)),
-                        'highest_usage_bytes': int(mem_stat.get('highest-usage', 0))
-                    }
-                    memory_pools.append(pool_info)
-                    
-                    # Sum up total system memory (excluding reserve pools)
-                    if not mem_stat.get('name', '').startswith('reserve'):
-                        total_system_memory += pool_info['total_bytes']
-                
+            if memory_data and 'Cisco-IOS-XE-platform-software-oper:memory-stats' in memory_data:
+                memory_data = memory_data.get('Cisco-IOS-XE-platform-software-oper:memory-stats')
+                total_system_memory = int(memory_data.get('total', 0))
                 device_info.update({
-                    'memory_pools': memory_pools,
-                    'total_system_memory_bytes': total_system_memory,
-                    'total_system_memory_mb': round(total_system_memory / (1024 * 1024), 2)
+                    'total_system_memory_kb': total_system_memory,
+                    'total_system_memory_mb': round(total_system_memory / 1024, 2)
                 })
             
             self.logger.info(f"Retrieved device info for {router}")

@@ -28,7 +28,15 @@ class MonitoringService {
 
     const response = await fetch(url)
     if (!response.ok) throw new Error('Failed to fetch interface metrics')
-    return response.json()
+    const data = await response.json()
+    // If fetching all interfaces, ensure all stats are present
+    if (!interfaceId) {
+      // The backend only returns a subset for all interfaces, so fetch details for each if needed
+      // But for now, just return as is (the backend should be updated to include all stats)
+      return data
+    }
+    // If fetching a single interface, all stats are present
+    return data
   }
 
   async getDeviceInfo(routerId) {

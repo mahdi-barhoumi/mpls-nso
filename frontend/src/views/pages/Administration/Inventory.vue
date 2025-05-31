@@ -107,12 +107,6 @@
                   </span>
                   <span v-else>N/A</span>
                 </span></div>
-                <div class="mb-2"><b>Boot Image:</b> <span class="details-value">
-                  <span v-if="slotProps.data.reachable && deviceInfo[slotProps.data.id]">
-                    {{ deviceInfo[slotProps.data.id].boot_image }}
-                  </span>
-                  <span v-else>N/A</span>
-                </span></div>
                 <div class="mb-2"><b>Manufacturer:</b> <span class="details-value">
                   <span v-if="slotProps.data.reachable && deviceInfo[slotProps.data.id]">
                     {{ deviceInfo[slotProps.data.id].manufacturer }}
@@ -152,6 +146,12 @@
                 <div class="mb-2"><b>Total System Memory:</b> <span class="details-value">
                   <span v-if="slotProps.data.reachable && deviceInfo[slotProps.data.id]">
                     {{ deviceInfo[slotProps.data.id].total_system_memory_mb }} MB
+                  </span>
+                  <span v-else>N/A</span>
+                </span></div>
+                <div class="mb-2"><b>Total System Storage:</b> <span class="details-value">
+                  <span v-if="slotProps.data.reachable && deviceInfo[slotProps.data.id]">
+                    {{ deviceInfo[slotProps.data.id].total_system_storage_mb }} MB
                   </span>
                   <span v-else>N/A</span>
                 </span></div>

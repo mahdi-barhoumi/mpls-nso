@@ -58,7 +58,7 @@
                     >
                       <i class="pi pi-user" />
                     </span>
-                    <span class="text-sm text-center">Administrator</span>
+                    <span class="text-sm text-center">Account</span>
                   </button>
                   <Divider />
                 </div>
@@ -81,7 +81,7 @@
                     >
                       <i class="pi pi-cog" />
                     </span>
-                    <span class="text-sm text-center">Network</span>
+                    <span class="text-sm text-center">Settings</span>
                   </button>
                   <Divider />
                 </div>

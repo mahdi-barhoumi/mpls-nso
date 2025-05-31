@@ -1,49 +1,46 @@
 <template>
   <div class="grid">
-    <div class="col-12 md:col-10 md:col-offset-1 lg:col-8 lg:col-offset-2">
-      <div class="card">
+    <div class="flex justify-content-center w-full">
+      <div class="card" style="max-width: 450px; width: 100%;">
         <!-- Simple Profile Header -->
         <div class="flex align-items-center mb-4 pb-2 border-bottom-1 surface-border">
-          <i class="pi pi-user-edit text-2xl text-primary mr-3"></i>
           <h5 class="text-xl m-0">Profile Settings</h5>
         </div>
 
         <!-- Basic Form -->
         <div class="p-fluid formgrid grid">
           <div class="field col-12 md:col-6 mb-4">
-            <label for="username" class="block font-medium mb-2">Username</label>
+            <label for="username" class="block font-medium mb-2">Username:</label>
             <span class="p-input-icon-left w-full">
-              <i class="pi pi-user"></i>
               <InputText
                 id="username"
                 v-model="formData.username"
-                placeholder="Username"
+                placeholder="Enter a new username"
                 class="w-full"
               />
             </span>
           </div>
 
           <div class="field col-12 md:col-6 mb-4">
-            <label for="email" class="block font-medium mb-2">Email</label>
+            <label for="email" class="block font-medium mb-2">Email:</label>
             <span class="p-input-icon-left w-full">
-              <i class="pi pi-envelope"></i>
               <InputText
                 id="email"
                 type="email"
                 v-model="formData.email"
-                placeholder="Email address"
+                placeholder="Enter a new email address"
                 class="w-full"
               />
             </span>
           </div>
 
           <div class="field col-12 md:col-6 mb-4">
-            <label for="new-password" class="block font-medium mb-2">New Password</label>
+            <label for="new-password" class="block font-medium mb-2">New Password:</label>
             <Password
               id="new-password"
               v-model="formData.new_password"
               :toggleMask="true"
-              placeholder="Enter new password"
+              placeholder="Enter a new password"
               class="w-full"
               :inputStyle="{ width: '100%' }"
               :feedback="true"
@@ -51,7 +48,7 @@
           </div>
 
           <div class="field col-12 md:col-6 mb-4">
-            <label for="confirm-password" class="block font-medium mb-2">Confirm Password</label>
+            <label for="confirm-password" class="block font-medium mb-2">Confirm Password:</label>
             <Password
               id="confirm-password"
               v-model="formData.confirm_password"
@@ -65,13 +62,13 @@
         </div>
 
         <!-- Action Buttons -->
-        <div class="flex flex-wrap justify-content-end gap-2 pt-3 border-top-1 surface-border">
-          <Button label="Cancel" icon="pi pi-times" class="p-button-outlined" :disabled="loading" />
+        <div class="flex pt-3 border-top-1 surface-border">
           <Button
             label="Save Changes"
             icon="pi pi-check"
             @click="updateProfile"
             :loading="loading"
+            class="ml-auto"
           />
         </div>
       </div>
