@@ -11,7 +11,7 @@ class VPNView(View):
     def get(self, request, vpn_id=None):
         if vpn_id:
             try:
-                vpn = VPN.objects.prefetch_related('sites').get(id=vpn_id)
+                vpn = VPN.objects.prefetch_related('sites__vrf', 'sites__router', 'sites__customer').select_related('customer').get(id=vpn_id)
                 return JsonResponse({
                     'id': vpn.id,
                     'name': vpn.name,
@@ -20,7 +20,9 @@ class VPNView(View):
                     'updated_at': vpn.updated_at,
                     'customer': {
                         'id': vpn.customer.id,
-                        'name': vpn.customer.name
+                        'name': vpn.customer.name,
+                        'email': getattr(vpn.customer, 'email', None),
+                        'phone_number': getattr(vpn.customer, 'phone_number', None),
                     },
                     'sites': [{
                         'id': site.id,
@@ -28,6 +30,13 @@ class VPNView(View):
                         'location': site.location,
                         'created_at': site.created_at,
                         'updated_at': site.updated_at,
+                        'vrf': {
+                            'name': site.vrf.name if site.vrf else None,
+                            'rd': site.vrf.route_distinguisher if site.vrf and hasattr(site.vrf, 'route_distinguisher') else None,
+                        } if site.vrf else None,
+                        'router': {
+                            'hostname': site.router.hostname if site.router else None,
+                        } if site.router else None,
                     } for site in vpn.sites.all()]
                 })
             except VPN.DoesNotExist:

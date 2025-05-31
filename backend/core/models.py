@@ -329,7 +329,7 @@ class VPN(models.Model):
     name = models.CharField(max_length=255, help_text="VPN name")
     description = models.TextField(max_length=255, null=True, blank=True, help_text="VPN description")
     customer = models.ForeignKey(Customer, null=True, on_delete=models.CASCADE, related_name='vpns', help_text="Customer who owns this VPN, if applicable")
-    sites = models.ManyToManyField(Site, related_name='vpns', help_text="VPNs this VRF belongs to")
+    sites = models.ManyToManyField(Site, related_name='vpns', help_text="Site that belong to this VPN")
     discovered = models.BooleanField(default=False, help_text="If the VPN was discovered or created")
     created_at = models.DateTimeField(auto_now_add=True, help_text="When this VPN was created or discovered")
     updated_at = models.DateTimeField(auto_now=True, help_text="When this VPN was last updated")

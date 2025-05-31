@@ -240,52 +240,65 @@
     <!-- VPN Details Dialog -->
     <Dialog
       v-model:visible="vpnDetailsDialogVisible"
-      :style="{ width: '600px', maxWidth: '95vw' }"
+      :style="{ width: '700px', maxWidth: '95vw' }"
       header="VPN Details"
       :modal="true"
     >
-      <div v-if="vpn" class="flex flex-col gap-4">
-        <div class="grid">
-          <!-- Basic Info -->
-          <div class="col-12 md:col-6">
-            <div class="card">
-              <h5>Basic Information</h5>
-              <div class="flex flex-col gap-3">
-                <div>
-                  <span class="font-bold">Name:</span>
-                  <div class="mt-1">{{ vpn.name }}</div>
-                </div>
-                <div>
-                  <span class="font-bold">Customer:</span>
-                  <div class="mt-1">
-                    <span class="text-700">{{ vpn.customer?.name || vpn.customer || 'N/A' }}</span>
-                  </div>
-                </div>
-                <div>
-                  <span class="font-bold">Description:</span>
-                  <div class="mt-1">{{ vpn.description || 'N/A' }}</div>
-                </div>
+      <div v-if="vpn" class="flex flex-col gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pl-4">
+          <div>
+            <div class="font-bold mb-1">Name:</div>
+            <div class="mb-2">{{ vpn.name }}</div>
+            <div class="font-bold mb-1">Customer:</div>
+            <div class="mb-2">
+              <div>{{ vpn.customer?.name || '-' }}</div>
+              <div v-if="vpn.customer">
+                <small class="text-500">Email: {{ vpn.customer.email || '-' }}</small><br>
+                <small class="text-500">Phone: {{ vpn.customer.phone_number || '-' }}</small>
               </div>
             </div>
-          </div>
-
-          <!-- Sites -->
-          <div class="col-12">
-            <div class="card">
-              <h5>Connected Sites</h5>
-              <DataTable
-                :value="vpn.sites"
-                :scrollable="true"
-                scrollHeight="200px"
-                class="p-datatable-sm"
-                stripedRows
-                showGridlines
-              >
-                <Column field="name" header="Site" />
-                <Column field="location" header="Location" />
-              </DataTable>
+            <div class="font-bold mb-1">Description:</div>
+            <div class="mb-2 whitespace-pre-line">
+              {{ vpn.description && vpn.description.trim() ? vpn.description : 'No description' }}
             </div>
           </div>
+          <div>
+            <div class="font-bold mb-1">Created:</div>
+            <div class="mb-2">{{ formatDateTime(vpn.created_at) || '-' }}</div>
+            <div class="font-bold mb-1">Last Updated:</div>
+            <div class="mb-2">{{ formatDateTime(vpn.updated_at) || '-' }}</div>
+          </div>
+        </div>
+        <div>
+          <div class="font-bold mb-2">Connected Sites:</div>
+          <DataTable
+            :value="vpn.sites"
+            :scrollable="true"
+            scrollHeight="220px"
+            class="p-datatable-sm"
+            stripedRows
+            showGridlines
+          >
+            <Column field="name" header="Site" />
+            <Column field="location" header="Location" />
+            <Column header="VRF">
+              <template #body="slotProps">
+                <span v-if="slotProps.data.vrf">
+                  {{ slotProps.data.vrf.name || '-' }}
+                  <small v-if="slotProps.data.vrf.rd" class="text-500">(RD: {{ slotProps.data.vrf.rd }})</small>
+                </span>
+                <span v-else>-</span>
+              </template>
+            </Column>
+            <Column header="Customer Edge">
+              <template #body="slotProps">
+                <span v-if="slotProps.data.router">
+                  {{ slotProps.data.router.hostname || '-' }}
+                </span>
+                <span v-else>-</span>
+              </template>
+            </Column>
+          </DataTable>
         </div>
       </div>
       <template #footer>
@@ -307,7 +320,7 @@
   </div>
 </template>
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
@@ -354,6 +367,7 @@ const formData = ref({
   site_ids: [],
 })
 const currentVPN = ref({})
+const vpn = ref(null) // Add this line to define the vpn ref
 
 // Helper for floating message icon
 const getIcon = (type) => {
@@ -470,35 +484,53 @@ const editVPN = async (vpnData) => {
   try {
     // Fetch full VPN details
     const vpnDetails = await VPNService.getVPN(vpnData.id)
+    
+    // Set form data first
     formData.value = {
       id: vpnDetails.id,
       name: vpnDetails.name,
       description: vpnDetails.description || '',
       customer_id: vpnDetails.customer.id || vpnDetails.customer_id,
-      site_ids: [], // will set after loading customerSites
+      site_ids: [], // This will be populated with site objects, not just IDs
     }
+    
     currentVPN.value = vpnDetails
     isEditing.value = true
+    
     // Load customer sites for this customer
     try {
       const response = await CustomerService.getCustomer(formData.value.customer_id)
       customerSites.value = response.sites || []
+      
+      // Set selected sites AFTER customerSites is loaded
+      // IMPORTANT: Store site OBJECTS, not just IDs, for DataTable selection
+      if (vpnDetails.sites && Array.isArray(vpnDetails.sites)) {
+        formData.value.site_ids = customerSites.value.filter(site =>
+          vpnDetails.sites.some(vpnSite => vpnSite.id === site.id)
+        )
+      } else {
+        formData.value.site_ids = []
+      }
     } catch (error) {
       customerSites.value = []
-    }
-    // Set selected sites to those already in the VPN (after customerSites is loaded)
-    if (vpnDetails.sites && Array.isArray(vpnDetails.sites)) {
-      // Only select sites that are still available for this customer
-      const availableSiteIds = customerSites.value.map(site => site.id)
-      formData.value.site_ids = vpnDetails.sites
-        .map(site => site.id)
-        .filter(id => availableSiteIds.includes(id))
-    } else {
       formData.value.site_ids = []
+      showMessage('Failed to load customer sites', 'error')
     }
+    
     vpnDialogVisible.value = true
     formError.value = ''
     submitted.value = false
+  } catch (error) {
+    showMessage('Failed to load VPN details', 'error')
+  }
+}
+
+// View VPN details
+const viewVPN = async (vpnData) => {
+  try {
+    const vpnDetails = await VPNService.getVPN(vpnData.id)
+    vpn.value = vpnDetails
+    vpnDetailsDialogVisible.value = true
   } catch (error) {
     showMessage('Failed to load VPN details', 'error')
   }
@@ -521,11 +553,14 @@ const handleSave = async () => {
   }
   saving.value = true
   try {
+    // Extract site IDs from site objects for API calls
+    const siteIds = formData.value.site_ids.map(site => site.id)
+    
     if (isEditing.value) {
       await VPNService.updateVPN(formData.value.id, {
         name: formData.value.name,
         description: formData.value.description,
-        sites: formData.value.site_ids,
+        sites: siteIds, // Send IDs to API
       })
       showMessage('VPN updated successfully')
     } else {
@@ -536,7 +571,7 @@ const handleSave = async () => {
         customer_id: formData.value.customer_id,
       })
       await VPNService.updateVPN(created.id, {
-        sites: formData.value.site_ids,
+        sites: siteIds, // Send IDs to API
       })
       showMessage('VPN created successfully')
     }
