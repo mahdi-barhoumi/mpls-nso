@@ -157,37 +157,88 @@
         <h4 style="font-weight: 600; font-size: 1.25rem;">{{ selectedRouter.hostname }} Details</h4>
         <!-- StatusCards -->
         <div class="current-status">
-          <div class="status-card">
-            <h4>CPU Usage</h4>
-            <div class="metric-display">
-              <span
-                class="metric-value large"
-                :class="{
-                  alert: selectedRouter.cpu_usage_5m >= 70,
-                  warning: selectedRouter.cpu_usage_5m >= 50,
-                }"
-              >
-                {{ formatUtils.formatPercentage(selectedRouter.cpu_usage_5m) }}
-              </span>
+          <div class="status-card usage-card">
+            <div class="usage-label">CPU Usage</div>
+            <div class="usage-circle-outer">
+              <svg class="usage-circle" width="64" height="64">
+                <circle
+                  class="usage-bg"
+                  cx="32" cy="32" r="28"
+                  stroke-width="6"
+                  fill="none"
+                />
+                <circle
+                  class="usage-fg"
+                  :class="{
+                    alert: selectedRouter.cpu_usage_5m >= 70,
+                    warning: selectedRouter.cpu_usage_5m >= 50 && selectedRouter.cpu_usage_5m < 70
+                  }"
+                  cx="32" cy="32" r="28"
+                  stroke-width="6"
+                  fill="none"
+                  :stroke-dasharray="175.9"
+                  :stroke-dashoffset="175.9 - (175.9 * (selectedRouter.cpu_usage_5m || 0) / 100)"
+                  transform="rotate(-90 32 32)"
+                />
+                <text
+                  x="32"
+                  y="32"
+                  text-anchor="middle"
+                  dominant-baseline="middle"
+                  alignment-baseline="middle"
+                  class="usage-value"
+                  :class="{
+                    alert: selectedRouter.cpu_usage_5m >= 70,
+                    warning: selectedRouter.cpu_usage_5m >= 50,
+                  }"
+                >
+                  {{ formatUtils.formatPercentage(selectedRouter.cpu_usage_5m) }}
+                </text>
+              </svg>
+            </div>
+            <div class="usage-metrics">
               <div class="metric-breakdown">
-                <div>5 seconds: {{ formatUtils.formatPercentage(selectedRouter.cpu_usage_5s) }}</div>
-                <div>1 minute: {{ formatUtils.formatPercentage(selectedRouter.cpu_usage_1m) }}</div>
-                <div>5 minutes: {{ formatUtils.formatPercentage(selectedRouter.cpu_usage_5m) }}</div>
+                <div>5s: {{ formatUtils.formatPercentage(selectedRouter.cpu_usage_5s) }}</div>
+                <div>1m: {{ formatUtils.formatPercentage(selectedRouter.cpu_usage_1m) }}</div>
+                <div>5m: {{ formatUtils.formatPercentage(selectedRouter.cpu_usage_5m) }}</div>
               </div>
             </div>
           </div>
-          <div class="status-card">
-            <h4>Memory Usage</h4>
-            <div class="metric-display">
-              <span
-                class="metric-value large"
-                :class="{
-                  alert: selectedRouter.mem_used_percent >= 80,
-                  warning: selectedRouter.mem_used_percent >= 60,
-                }"
-              >
-                {{ formatUtils.formatPercentage(selectedRouter.mem_used_percent) }}
-              </span>
+          <div class="status-card usage-card">
+            <div class="usage-label">Memory Usage</div>
+            <div class="usage-circle-outer">
+              <svg class="usage-circle" width="64" height="64">
+                <circle class="usage-bg" cx="32" cy="32" r="28" stroke-width="6" fill="none" />
+                <circle
+                  class="usage-fg"
+                  :class="{
+                    alert: selectedRouter.mem_used_percent >= 80,
+                    warning: selectedRouter.mem_used_percent >= 60 && selectedRouter.mem_used_percent < 80
+                  }"
+                  cx="32" cy="32" r="28"
+                  stroke-width="6"
+                  fill="none"
+                  :stroke-dasharray="175.9"
+                  :stroke-dashoffset="175.9 - (175.9 * (selectedRouter.mem_used_percent || 0) / 100)"
+                  transform="rotate(-90 32 32)"
+                />
+                <text
+                  x="32"
+                  y="32"
+                  text-anchor="middle"
+                  dominant-baseline="middle"
+                  alignment-baseline="middle"
+                  class="usage-value"
+                  :class="{
+                    alert: selectedRouter.mem_used_percent >= 80,
+                    warning: selectedRouter.mem_used_percent >= 60,
+                  }"
+                >
+                  {{ formatUtils.formatPercentage(selectedRouter.mem_used_percent) }}
+                </text>
+              </svg>
+            </div>
+            <div class="usage-metrics">
               <div class="metric-breakdown" v-if="selectedRouter.mem_total">
                 <div>Used: {{ formatUtils.formatBytes(selectedRouter.mem_used || 0) }}</div>
                 <div>Free: {{ formatUtils.formatBytes(selectedRouter.mem_free || 0) }}</div>
@@ -195,18 +246,42 @@
               </div>
             </div>
           </div>
-          <div class="status-card">
-            <h4>Storage Usage</h4>
-            <div class="metric-display">
-              <span
-                class="metric-value large"
-                :class="{
-                  alert: selectedRouter.storage_used_percent >= 80,
-                  warning: selectedRouter.storage_used_percent >= 60,
-                }"
-              >
-                {{ formatUtils.formatPercentage(selectedRouter.storage_used_percent) }}
-              </span>
+          <div class="status-card usage-card">
+            <div class="usage-label">Storage Usage</div>
+            <div class="usage-circle-outer">
+              <svg class="usage-circle" width="64" height="64">
+                <circle class="usage-bg" cx="32" cy="32" r="28" stroke-width="6" fill="none" />
+                <circle
+                  class="usage-fg"
+                  :class="{
+                    alert: selectedRouter.storage_used_percent >= 80,
+                    warning: selectedRouter.storage_used_percent >= 60 && selectedRouter.storage_used_percent < 80
+                  }"
+                  cx="32" cy="32"
+                  r="28"
+                  stroke-width="6"
+                  fill="none"
+                  :stroke-dasharray="175.9"
+                  :stroke-dashoffset="175.9 - (175.9 * (selectedRouter.storage_used_percent || 0) / 100)"
+                  transform="rotate(-90 32 32)"
+                />
+                <text
+                  x="32"
+                  y="32"
+                  text-anchor="middle"
+                  dominant-baseline="middle"
+                  alignment-baseline="middle"
+                  class="usage-value"
+                  :class="{
+                    alert: selectedRouter.storage_used_percent >= 80,
+                    warning: selectedRouter.storage_used_percent >= 60,
+                  }"
+                >
+                  {{ formatUtils.formatPercentage(selectedRouter.storage_used_percent) }}
+                </text>
+              </svg>
+            </div>
+            <div class="usage-metrics">
               <div class="metric-breakdown" v-if="selectedRouter.storage_total">
                 <div>Used: {{ formatUtils.formatBytes(selectedRouter.storage_used || 0) }}</div>
                 <div>Free: {{ formatUtils.formatBytes(selectedRouter.storage_free || 0) }}</div>
@@ -996,9 +1071,9 @@ onUnmounted(() => {
 }
 .current-status {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 1.25rem;
-  margin-bottom: 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.7rem;
+  margin-bottom: 1.2rem;
 }
 .status-card {
   background: var(--surface-card);
@@ -1036,6 +1111,87 @@ onUnmounted(() => {
 }
 .metric-breakdown div {
   margin-bottom: 4px;
+  text-align: right;
+}
+
+/* UsageCard */
+.status-card.usage-card {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.7rem;
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border, #e0e0e0);
+  border-radius: 0.7rem;
+  box-shadow: 0 1px 4px 0 rgba(0,0,0,0.03);
+  margin-bottom: 0;
+}
+.usage-label {
+  flex: 1 1 0;
+  text-align: left;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-color);
+  margin-top: 0.3rem;
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+.usage-circle-outer {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 60px;
+}
+.usage-metrics {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-end;
+}
+.usage-bg {
+  stroke: var(--surface-border, #e0e0e0);
+  opacity: 0.5;
+}
+.usage-fg {
+  stroke: var(--green-500, #28a745);
+  transition: stroke 0.2s, stroke-dashoffset 0.5s;
+}
+.usage-fg.warning {
+  stroke: var(--yellow-500, #ffc107);
+}
+.usage-fg.alert {
+  stroke: var(--red-500, #dc3545);
+}
+.usage-value {
+  font-size: 0.9rem;
+  font-weight: 700;
+  fill: var(--green-500, #28a745);
+  pointer-events: none;
+  dominant-baseline: middle;
+  alignment-baseline: middle;
+}
+.usage-value.warning {
+  fill: var(--yellow-500, #ffc107);
+}
+.usage-value.alert {
+  fill: var(--red-500, #dc3545);
+}
+.usage-metrics .metric-breakdown {
+  margin-top: 0.1rem;
+  font-size: 0.90rem;
+  color: var(--text-secondary-color, #aaa);
+  text-align: left;
+  line-height: 1.2;
+  padding: 0;
+}
+.usage-metrics .metric-breakdown div {
+  margin-bottom: 0;
 }
 
 /* PerformanceChart, ChartLegend */
