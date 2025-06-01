@@ -523,16 +523,6 @@ const loadRouters = async () => {
   }
 }
 
-const editDevice = (device) => {
-  // TODO: Implement edit functionality
-  console.log('Edit device:', device)
-}
-
-const configureDevice = (device) => {
-  // TODO: Implement configure functionality
-  console.log('Configure device:', device)
-}
-
 // Expansion details state
 const interfaces = reactive({})
 const interfacesLoading = reactive({})

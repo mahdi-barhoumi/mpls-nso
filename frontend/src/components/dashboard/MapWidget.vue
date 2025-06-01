@@ -282,9 +282,6 @@ export default {
 
     // Use both event handlers to ensure we catch the drag event regardless of library version
     onLayoutUpdated(event) {
-      // This is called whenever the layout is changed
-      console.log('Layout updated:', event)
-
       // Debounce the save operation to avoid excessive writes
       if (this.saveDebounce) {
         clearTimeout(this.saveDebounce)
