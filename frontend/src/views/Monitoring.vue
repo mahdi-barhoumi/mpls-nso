@@ -628,7 +628,7 @@ const chartData = computed(() => {
           : v >= warning ? 'rgba(255, 193, 7, 1)'
           : 'rgba(40, 167, 69, 1)'
         ),
-        pointRadius: 2,
+        pointRadius: 1,
         pointHoverRadius: 5,
         showLine: true,
         tension: 0.4,
@@ -900,7 +900,7 @@ watch(selectedRouter, () => {
 
 <style scoped>
 .performance-chart {
-  height: 400px;
+  height: 360px;
   width: 100%;
 }
 
@@ -1410,7 +1410,7 @@ watch(selectedRouter, () => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 120px;
+  max-width: 160px;
 }
 
 .status-up {
@@ -1571,7 +1571,7 @@ watch(selectedRouter, () => {
 }
 
 .interface-bandwidth-chart {
-  height: 320px;
+  height: 280px;
   width: 100%;
   margin-top: 0.5rem;
 }

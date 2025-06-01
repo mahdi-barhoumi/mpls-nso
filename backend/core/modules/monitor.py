@@ -40,7 +40,7 @@ class _NetworkMonitor:
         
     def monitor_all_routers(self):
         routers = Router.objects.all()  # Monitor all routers, not just reachable ones
-        self.logger.info(f"Starting network-wide monitoring cycle for {routers.count()} routers")
+        self.logger.info(f"Starting network-wide monitoring cycle for {routers.count()} devices")
         
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             future_to_router = {executor.submit(self.monitor_router, router): router for router in routers}
@@ -50,23 +50,23 @@ class _NetworkMonitor:
                 try:
                     future.result()
                 except Exception as e:
-                    self.logger.error(f"Error monitoring router {router.hostname}: {str(e)}")
+                    self.logger.error(f"Error monitoring device {router.hostname}: {str(e)}")
         
         self.logger.info("Completed network-wide monitoring cycle")
 
     def monitor_router(self, router):
-        self.logger.info(f"Monitoring router {router.hostname} ({router.management_ip_address})")
+        self.logger.info(f"Monitoring device {router.hostname} ({router.management_ip_address})")
         
         # Check if RESTCONF is available
         if not self.restconf.is_available(router.management_ip_address):
-            self.logger.warning(f"Router {router.hostname} is not reachable via RESTCONF")
+            self.logger.warning(f"Device {router.hostname} is not reachable via RESTCONF")
             if router.reachable:  # Only update if status changed
                 router.reachable = False
                 router.save()
-                self.logger.info(f"Marked router {router.hostname} as unreachable")
+                self.logger.info(f"Marked device {router.hostname} as unreachable")
                 self._create_notification(
-                    title=f"Router {router.hostname} is unreachable",
-                    message=f"Lost connection to router {router.hostname} ({router.management_ip_address})",
+                    title=f"Device {router.hostname} is unreachable",
+                    message=f"Lost connection to device {router.hostname} ({router.management_ip_address})",
                     severity="critical",
                     source="monitoring"
                 )
@@ -76,10 +76,10 @@ class _NetworkMonitor:
         if not router.reachable:  # Only update if status changed
             router.reachable = True
             router.save()
-            self.logger.info(f"Marked router {router.hostname} as reachable")
+            self.logger.info(f"Marked device {router.hostname} as reachable")
             self._create_notification(
-                title=f"Router {router.hostname} is now reachable",
-                message=f"Restored connection to router {router.hostname} ({router.management_ip_address})",
+                title=f"Device {router.hostname} is now reachable",
+                message=f"Restored connection to device {router.hostname} ({router.management_ip_address})",
                 severity="info",
                 source="monitoring"
             )
@@ -90,7 +90,7 @@ class _NetworkMonitor:
         # Collect interface metrics
         self.collect_interface_metrics(router)
         
-        self.logger.info(f"Completed monitoring for router {router.hostname}")
+        self.logger.info(f"Completed monitoring for device {router.hostname}")
 
     def collect_system_metrics(self, router):
         # Collect CPU usage metrics
@@ -244,7 +244,7 @@ class _NetworkMonitor:
             try:
                 interface = router.interfaces.get(name=interface_name)
             except router.interfaces.model.DoesNotExist:
-                self.logger.debug(f"Interface {interface_name} not found in database for {router.hostname}")
+                self.logger.debug(f"Interface {interface_name} not found in database for device {router.hostname}")
                 continue
             
             # Get interface metrics
@@ -423,7 +423,7 @@ class _NetworkMonitor:
         cutoff_date = timezone.now() - timedelta(days=days)
         
         deleted_router_metrics = RouterMetric.objects.filter(timestamp__lt=cutoff_date).delete()
-        self.logger.info(f"Purged {deleted_router_metrics[0]} old router metrics")
+        self.logger.info(f"Purged {deleted_router_metrics[0]} old device metrics")
         
         deleted_interface_metrics = InterfaceMetric.objects.filter(timestamp__lt=cutoff_date).delete()
         self.logger.info(f"Purged {deleted_interface_metrics[0]} old interface metrics")
