@@ -875,16 +875,24 @@ watch(selectedRouter, () => {
 
 .card.monitoring-card {
   background: var(--surface-card);
-  padding: 2rem 2.5rem;
+  padding: 0;
   position: relative;
   color: var(--text-color);
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
 }
 
 .dashboard {
-  padding: 0;
+  padding: 2rem 2.5rem;
   max-width: 100%;
   margin: 0;
   color: var(--text-color);
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
 }
 
 .stats-section {

@@ -171,7 +171,7 @@ onUnmounted(() => {
         stripedRows
         scrollable
         showGridlines
-        scrollHeight="70vh"
+        scrollHeight="74vh"
         class="p-datatable-sm"
         sortField="timestamp"
         :sortOrder="-1"
