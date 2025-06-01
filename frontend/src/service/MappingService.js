@@ -13,6 +13,7 @@ export const MappingService = {
           role: node.role,
           vrfs: node.vrfs,
           interfaceCounts: node.interface_counts,
+          reachable: node.reachable
         })),
         edges: data.links.map((link) => ({
           id: link.id,

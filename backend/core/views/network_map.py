@@ -20,13 +20,14 @@ class NetworkMapView(View):
 
         # Create nodes and links
         for router in routers:
-            # Add router as a node
+            # Add router as a node, now including 'reachable'
             nodes.append({
                 'id': router.id,
                 'hostname': router.hostname,
                 'role': router.role,
                 'chassis_id': router.chassis_id,
-                'management_ip': router.management_ip_address
+                'management_ip': router.management_ip_address,
+                'reachable': router.reachable,  # <-- Added
             })
 
             # Process interfaces and create links

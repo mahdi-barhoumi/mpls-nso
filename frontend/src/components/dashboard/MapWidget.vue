@@ -75,6 +75,17 @@
         <!-- Custom node rendering -->
         <template #override-node="{ nodeId, scale = 1, config, ...slotProps }">
           <g>
+            <!-- Status dot: up (green), down (red), unknown (gray) -->
+            <circle
+              v-if="graphData.nodes[nodeId]"
+              :cx="(config.radius - 6) * scale * 0.85"
+              :cy="-(config.radius - 6) * scale * 0.85"
+              :r="4 * scale"
+              :fill="graphData.nodes[nodeId].reachable === true ? '#22c55e' : graphData.nodes[nodeId].reachable === false ? '#ef4444' : '#94a3b8'"
+              stroke="#fff"
+              stroke-width="1"
+              style="z-index: 100; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.08));"
+            />
             <image
               :xlink:href="getNodeIcon(nodeId)"
               :x="-(selectedNodeId === nodeId ? (config.radius - 8) * 1.15 * scale : (config.radius - 8) * scale)"
@@ -146,6 +157,7 @@ const STORAGE_KEYS = {
   NODES: 'network-graph-nodes',
   LAYOUTS: 'network-graph-layouts',
   FETCHED_NODES: 'network-graph-fetched-nodes',
+  ZOOM: 'network-graph-zoom', // Add zoom key
 }
 
 export default {
@@ -167,6 +179,7 @@ export default {
       },
       fetchedNodeIds: new Set(),
       selectedNodeId: null, // Track selected node
+      currentZoom: 1, // Track current zoom
       configs: {
         view: {
           panEnabled: true,
@@ -221,6 +234,17 @@ export default {
     // Load persisted data
     this.loadPersistedData()
 
+    // Restore zoom level from localStorage
+    const zoom = localStorage.getItem(STORAGE_KEYS.ZOOM)
+    if (zoom) {
+      this.currentZoom = Number(zoom)
+      this.$nextTick(() => {
+        if (this.$refs.graph && typeof this.$refs.graph.setZoom === 'function') {
+          this.$refs.graph.setZoom(this.currentZoom)
+        }
+      })
+    }
+
     // Initial fetch
     this.fetchNetworkData()
 
@@ -260,6 +284,12 @@ export default {
         if (nodesJson) {
           this.graphData.nodes = JSON.parse(nodesJson)
         }
+
+        // Load zoom level
+        const zoom = localStorage.getItem(STORAGE_KEYS.ZOOM)
+        if (zoom) {
+          this.currentZoom = Number(zoom)
+        }
       } catch (error) {
         console.error('Error loading persisted data:', error)
         // If there's an error loading persisted data, fallback to default behavior
@@ -278,6 +308,9 @@ export default {
 
         // Save nodes
         localStorage.setItem(STORAGE_KEYS.NODES, JSON.stringify(this.graphData.nodes))
+
+        // Save zoom level
+        localStorage.setItem(STORAGE_KEYS.ZOOM, String(this.currentZoom))
       } catch (error) {
         console.error('Error persisting data:', error)
       }
@@ -449,15 +482,42 @@ export default {
     },
 
     zoomIn() {
-      this.$refs.graph.zoomIn()
+      if (this.$refs.graph && typeof this.$refs.graph.zoomIn === 'function') {
+        this.$refs.graph.zoomIn()
+        // Get new zoom value after zooming in
+        this.$nextTick(() => {
+          if (typeof this.$refs.graph.getZoom === 'function') {
+            this.currentZoom = this.$refs.graph.getZoom()
+            localStorage.setItem(STORAGE_KEYS.ZOOM, String(this.currentZoom))
+          }
+        })
+      }
     },
 
     zoomOut() {
-      this.$refs.graph.zoomOut()
+      if (this.$refs.graph && typeof this.$refs.graph.zoomOut === 'function') {
+        this.$refs.graph.zoomOut()
+        // Get new zoom value after zooming out
+        this.$nextTick(() => {
+          if (typeof this.$refs.graph.getZoom === 'function') {
+            this.currentZoom = this.$refs.graph.getZoom()
+            localStorage.setItem(STORAGE_KEYS.ZOOM, String(this.currentZoom))
+          }
+        })
+      }
     },
 
     resetView() {
-      this.$refs.graph.fitToContents()
+      if (this.$refs.graph && typeof this.$refs.graph.fitToContents === 'function') {
+        this.$refs.graph.fitToContents()
+        // After fitting, update zoom value
+        this.$nextTick(() => {
+          if (typeof this.$refs.graph.getZoom === 'function') {
+            this.currentZoom = this.$refs.graph.getZoom()
+            localStorage.setItem(STORAGE_KEYS.ZOOM, String(this.currentZoom))
+          }
+        })
+      }
     },
   },
 }
