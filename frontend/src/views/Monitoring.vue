@@ -59,7 +59,10 @@
           </div>
         </div>
         <div class="table-hint-below">
-          <small>Click on a device row to view detailed information and performance history.</small>
+          <small>
+            <i class="pi pi-info-circle" style="vertical-align: middle; margin-right: 0.25em; font-size: 1em;"></i>
+            Click on a device row to view detailed information and performance history.
+          </small>
         </div>
         <DataTable :value="sortedAndFilteredRouters" dataKey="id" selectionMode="single" :selection="selectedRouter"
           @rowSelect="onRowSelect" @rowUnselect="onRowUnselect" :rowClass="routerRowClass" responsiveLayout="scroll"
@@ -248,8 +251,21 @@
         </div>
         <div class="interfaces-section">
           <h4 class="interfaces-title">Interfaces</h4>
+          <div class="table-hint-below">
+            <small>
+              <i class="pi pi-info-circle" style="vertical-align: middle; margin-right: 0.25em; font-size: 1em;"></i>
+              Click on an interface card to view bandwidth history.
+            </small>
+          </div>
           <div v-if="routerInterfaces.length" class="interfaces-grid">
-            <div v-for="iface in routerInterfaces" :key="iface.interface_id" class="interface-card">
+            <div
+              v-for="iface in routerInterfaces"
+              :key="iface.interface_id"
+              class="interface-card"
+              :class="{ selected: selectedInterface && selectedInterface.interface_id === iface.interface_id }"
+              @click="selectedInterface = iface"
+              style="cursor:pointer"
+            >
               <div class="interface-header compact">
                 <span class="iface-name">{{ iface.name }}</span>
                 <span
@@ -300,6 +316,26 @@
           </div>
           <div v-else class="no-data">
             <p>No interface data available</p>
+          </div>
+          <div v-if="selectedInterface && interfaceHistory.length">
+            <div class="metrics-header-row">
+              <h4 style="padding: 0; margin: 0; font-weight:600; font-size: 1.25rem;">Bandwidth History: {{ selectedInterface.name }}</h4>
+              <div class="chart-controls">
+                <select v-model="interfaceTimeRange">
+                  <option value="1">Last 1 Hour</option>
+                  <option value="6">Last 6 Hours</option>
+                  <option value="24">Last 24 Hours</option>
+                  <option value="168">Last 7 Days</option>
+                </select>
+              </div>
+            </div>
+            <div class="interface-chart-container">
+              <Chart type="line" :data="interfaceChartData" :options="interfaceChartOptions" class="interface-bandwidth-chart" />
+            </div>
+          </div>
+          <div v-if="selectedInterface && !interfaceHistory.length" class="no-data">
+            <p>No historical data available for this interface</p>
+            <button @click="loadInterfaceHistory(selectedInterface)" class="retry-btn">Retry Loading</button>
           </div>
         </div>
       </div>
@@ -709,6 +745,126 @@ watch(
   { deep: true }
 )
 
+// New: State for selected interface and its history
+const selectedInterface = ref(null)
+const interfaceHistory = ref([])
+const interfaceTimeRange = ref('24')
+const interfaceChartData = computed(() => {
+  if (!interfaceHistory.value.length) return { labels: [], datasets: [] }
+  const dataPoints = interfaceHistory.value
+    .map(point => ({
+      timestamp: new Date(point.timestamp),
+      bps_in: point.bps_in || 0,
+      bps_out: point.bps_out || 0,
+    }))
+    .filter(point => !isNaN(point.timestamp.getTime()))
+    .sort((a, b) => a.timestamp - b.timestamp)
+  const labels = dataPoints.map(point =>
+    point.timestamp.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  )
+  return {
+    labels,
+    datasets: [
+      {
+        label: 'Inbound Bandwidth',
+        data: dataPoints.map(p => p.bps_in),
+        fill: 'origin',
+        borderColor: 'rgba(40, 167, 69, 1)',
+        backgroundColor: 'rgba(40, 167, 69, 0.13)', // greenish
+        tension: 0.3,
+        pointRadius: 1,
+        pointHoverRadius: 4,
+      },
+      {
+        label: 'Outbound Bandwidth',
+        data: dataPoints.map(p => p.bps_out),
+        fill: 'origin',
+        borderColor: 'rgba(0, 123, 255, 1)',
+        backgroundColor: 'rgba(0, 123, 255, 0.13)', // blueish
+        tension: 0.3,
+        pointRadius: 1,
+        pointHoverRadius: 4,
+      },
+    ],
+  }
+})
+const interfaceChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      display: true,
+      labels: { usePointStyle: true }
+    },
+    tooltip: {
+      callbacks: {
+        label: function(context) {
+          // Format as bandwidth
+          const value = context.raw || 0
+          if (value >= 1e9) return `${context.dataset.label}: ${(value / 1e9).toFixed(2)} Gbps`
+          if (value >= 1e6) return `${context.dataset.label}: ${(value / 1e6).toFixed(2)} Mbps`
+          if (value >= 1e3) return `${context.dataset.label}: ${(value / 1e3).toFixed(2)} Kbps`
+          return `${context.dataset.label}: ${value} bps`
+        }
+      }
+    }
+  },
+  scales: {
+    x: {
+      display: true,
+      title: { display: true, text: 'Time' },
+      ticks: { maxRotation: 45, minRotation: 45 }
+    },
+    y: {
+      display: true,
+      title: { display: true, text: 'Bandwidth (bps)' },
+      min: 0,
+      ticks: {
+        callback: function(value) {
+          if (value >= 1e9) return (value / 1e9).toFixed(1) + 'G'
+          if (value >= 1e6) return (value / 1e6).toFixed(1) + 'M'
+          if (value >= 1e3) return (value / 1e3).toFixed(1) + 'K'
+          return value
+        }
+      }
+    }
+  }
+}
+
+// New: Load interface history when an interface is selected
+const loadInterfaceHistory = async (iface) => {
+  if (!iface) return
+  try {
+    const history = await monitoringService.getInterfaceMetrics(iface.interface_id, parseInt(interfaceTimeRange.value))
+    interfaceHistory.value = Array.isArray(history)
+      ? history.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+      : []
+  } catch (err) {
+    error.value = `Error loading interface history: ${err.message}`
+    interfaceHistory.value = []
+  }
+}
+
+// Watch for interface selection
+watch(selectedInterface, async (iface) => {
+  await loadInterfaceHistory(iface)
+})
+
+// Watch for interface time range change
+watch(interfaceTimeRange, async () => {
+  await loadInterfaceHistory(selectedInterface.value)
+})
+
+// Clear interface chart/history when router changes
+watch(selectedRouter, () => {
+  selectedInterface.value = null
+  interfaceHistory.value = []
+})
 </script>
 
 <style scoped>
@@ -1106,7 +1262,7 @@ watch(
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  margin-bottom: 1.25rem;
+  margin: 1.5rem 0 1rem 0;
 }
 
 .metrics-title {
@@ -1359,6 +1515,26 @@ watch(
   padding: 0;
   margin-left: 0.7rem;
   color: var(--text-color);
+}
+
+.interface-card.selected {
+  background: var(--surface-color, rgba(0, 0, 0, 0.15));
+  box-shadow: none;
+}
+
+.interface-chart-container {
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border, #dee2e6);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
+  color: var(--text-color);
+}
+
+.interface-bandwidth-chart {
+  height: 320px;
+  width: 100%;
+  margin-top: 0.5rem;
 }
 
 @media (max-width: 900px) {
