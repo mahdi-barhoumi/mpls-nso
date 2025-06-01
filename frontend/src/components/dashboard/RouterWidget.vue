@@ -76,7 +76,7 @@
 
       <!-- Interfaces Grid -->
       <div class="flex-1 min-h-0">
-        <div class="h-full overflow-y-scroll custom-scrollbar">
+        <div class="h-full overflow-y-scroll custom-scrollbar always-show-scrollbar">
           <div class="grid grid-cols-2 md:grid-cols-3 gap-2 pr-1">
             <div
               v-for="iface in interfaces"
@@ -177,6 +177,16 @@ watch(
 :deep(.custom-scrollbar::-webkit-scrollbar-thumb) {
   background-color: var(--surface-400);
   border-radius: 3px;
+}
+
+/* Always show vertical scrollbar */
+.always-show-scrollbar {
+  overflow-y: scroll !important;
+}
+
+/* For Webkit browsers, always show scrollbar even if not needed */
+:deep(.always-show-scrollbar)::-webkit-scrollbar {
+  display: block;
 }
 
 .card {

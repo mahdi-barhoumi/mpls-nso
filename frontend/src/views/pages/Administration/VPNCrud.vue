@@ -72,7 +72,7 @@
             <Badge :value="slotProps.data.site_count || 0" severRemoity="success" />
           </template>
         </Column>
-        <Column field="created_at" header="Registered" sortable style="min-width: 10rem">
+        <Column field="created_at" header="Created" sortable style="min-width: 10rem">
           <template #body="slotProps">
             <span>{{ formatDateTime(slotProps.data.created_at) }}</span>
           </template>

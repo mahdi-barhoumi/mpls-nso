@@ -574,53 +574,80 @@ const chartData = computed(() => {
 
   const values = dataPoints.map(point => point.value)
 
-  // Prepare datasets for each severity
-  const warningThreshold = getWarningThreshold()
-  const criticalThreshold = getCriticalThreshold()
-
-  // Helper to build dataset for a severity range
-  function buildDataset(label, color, bgColor, min, max) {
-    return {
-      label,
-      data: values.map(v => (v >= min && v < max ? v : null)),
-      fill: true,
-      backgroundColor: bgColor,
-      borderColor: color,
-      borderWidth: 3,
-      pointBackgroundColor: color,
-      pointBorderColor: color,
-      pointRadius: 1,
-      pointHoverRadius: 4,
-      showLine: true,
-      tension: 0.4,
-      spanGaps: true,
-    }
-  }
+  // Legend thresholds
+  const warning = getWarningThreshold()
+  const critical = getCriticalThreshold()
 
   return {
     labels,
     datasets: [
-      buildDataset(
-        `Normal (<${warningThreshold}%)`,
-        'rgba(40, 167, 69, 1)',
-        'rgba(40, 167, 69, 0.1)',
-        -Infinity,
-        warningThreshold
-      ),
-      buildDataset(
-        `Warning (${warningThreshold}-${criticalThreshold}%)`,
-        'rgba(255, 193, 7, 1)',
-        'rgba(255, 193, 7, 0.1)',
-        warningThreshold,
-        criticalThreshold
-      ),
-      buildDataset(
-        `Critical (≥${criticalThreshold}%)`,
-        'rgba(220, 53, 69, 1)',
-        'rgba(220, 53, 69, 0.1)',
-        criticalThreshold,
-        Infinity
-      ),
+      // Dummy datasets for legend (showLine: false, hidden: false)
+      {
+        label: `Normal (<${warning}%)`,
+        borderColor: 'rgba(40, 167, 69, 1)',
+        backgroundColor: 'rgba(40, 167, 69, 0.13)',
+        pointBackgroundColor: 'rgba(40, 167, 69, 1)',
+        pointBorderColor: 'rgba(40, 167, 69, 1)',
+        showLine: false,
+        hidden: false,
+        data: [],
+      },
+      {
+        label: `Warning (${warning}-${critical}%)`,
+        borderColor: 'rgba(255, 193, 7, 1)',
+        backgroundColor: 'rgba(255, 193, 7, 0.13)',
+        pointBackgroundColor: 'rgba(255, 193, 7, 1)',
+        pointBorderColor: 'rgba(255, 193, 7, 1)',
+        showLine: false,
+        hidden: false,
+        data: [],
+      },
+      {
+        label: `Critical (≥${critical}%)`,
+        borderColor: 'rgba(220, 53, 69, 1)',
+        backgroundColor: 'rgba(220, 53, 69, 0.13)',
+        pointBackgroundColor: 'rgba(220, 53, 69, 1)',
+        pointBorderColor: 'rgba(220, 53, 69, 1)',
+        showLine: false,
+        hidden: false,
+        data: [],
+      },
+      // Actual data (label: '' to hide from legend)
+      {
+        label: '',
+        data: values,
+        fill: true,
+        borderWidth: 3,
+        pointBackgroundColor: values.map(v =>
+          v >= critical ? 'rgba(220, 53, 69, 1)'
+          : v >= warning ? 'rgba(255, 193, 7, 1)'
+          : 'rgba(40, 167, 69, 1)'
+        ),
+        pointBorderColor: values.map(v =>
+          v >= critical ? 'rgba(220, 53, 69, 1)'
+          : v >= warning ? 'rgba(255, 193, 7, 1)'
+          : 'rgba(40, 167, 69, 1)'
+        ),
+        pointRadius: 2,
+        pointHoverRadius: 5,
+        showLine: true,
+        tension: 0.4,
+        spanGaps: true,
+        segment: {
+          backgroundColor: ctx => {
+            const v = ctx.p1.parsed.y
+            if (v >= critical) return 'rgba(220, 53, 69, 0.13)'
+            if (v >= warning) return 'rgba(255, 193, 7, 0.13)'
+            return 'rgba(40, 167, 69, 0.13)'
+          },
+          borderColor: ctx => {
+            const v = ctx.p1.parsed.y
+            if (v >= critical) return 'rgba(220, 53, 69, 1)'
+            if (v >= warning) return 'rgba(255, 193, 7, 1)'
+            return 'rgba(40, 167, 69, 1)'
+          }
+        }
+      }
     ]
   }
 })
@@ -641,7 +668,11 @@ const chartOptions = computed(() => {
         display: true,
         labels: {
           usePointStyle: true,
-          pointStyleWidth: 2
+          pointStyleWidth: 2,
+          filter: (legendItem, data) => {
+            // Only show legend for the first three datasets (the thresholds)
+            return legendItem.datasetIndex < 3
+          }
         }
       },
       tooltip: {

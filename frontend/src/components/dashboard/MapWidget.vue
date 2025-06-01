@@ -77,16 +77,17 @@
           <g>
             <image
               :xlink:href="getNodeIcon(nodeId)"
-              :x="-(config.radius - 8) * scale"
-              :y="-(config.radius - 8) * scale"
-              :width="(config.radius - 8) * 2 * scale"
-              :height="(config.radius - 8) * 2 * scale"
+              :x="-(selectedNodeId === nodeId ? (config.radius - 8) * 1.15 * scale : (config.radius - 8) * scale)"
+              :y="-(selectedNodeId === nodeId ? (config.radius - 8) * 1.15 * scale : (config.radius - 8) * scale)"
+              :width="(selectedNodeId === nodeId ? (config.radius - 8) * 2 * 1.15 * scale : (config.radius - 8) * 2 * scale)"
+              :height="(selectedNodeId === nodeId ? (config.radius - 8) * 2 * 1.15 * scale : (config.radius - 8) * 2 * scale)"
+              :style="selectedNodeId === nodeId ? 'filter: brightness(0.8);' : ''"
             />
             <text
               :x="0"
               :y="(config.radius + 12) * scale"
-              :font-size="13 * scale"
-              font-weight="400"
+              :font-size="(selectedNodeId === nodeId ? 15 : 13) * scale"
+              font-weight="500"
               text-anchor="middle"
               dominant-baseline="central"
               :fill="getLabelColor()"
@@ -165,6 +166,7 @@ export default {
         nodes: {},
       },
       fetchedNodeIds: new Set(),
+      selectedNodeId: null, // Track selected node
       configs: {
         view: {
           panEnabled: true,
@@ -205,7 +207,8 @@ export default {
         'node:click': ({ node }) => {
           const nodeData = this.graphData.nodes[node]
           if (nodeData) {
-            this.$emit('node-selected', node) // Just emit the node ID
+            this.selectedNodeId = node // Set selected node
+            this.$emit('node-selected', node)
           }
         },
         'edge:click': ({ edge }) => {

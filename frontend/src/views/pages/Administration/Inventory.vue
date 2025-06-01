@@ -23,357 +23,359 @@
     </div>
 
     <!-- DataTable -->
-    <DataTable
-      :value="routers"
-      :loading="loading"
-      v-model:filters="filters"
-      filterMode="lenient"
-      filterDisplay="menu"
-      :globalFilterFields="['hostname', 'role', 'management_ip_address', 'chassis_id']"
-      :rows="10"
-      :rowsPerPageOptions="[10, 20, 50]"
-      paginator
-      :totalRecords="totalRecords"
-      tableStyle="min-width: 50rem"
-      stripedRows
-      showGridlines
-      v-model:expandedRows="expandedRows"
-      dataKey="id"
-      @rowExpand="onRowExpand"
-    >
-      <!-- Expansion Template -->
-      <template #expansion="slotProps">
-        <div class="expand-section">
-          <div v-if="deviceInfoLoading[slotProps.data.id]" class="expand-loading">Loading device details...</div>
-          <div v-else>
-            <!-- Two column layout: RouterService + Buttons | MonitoringService -->
-            <div class="expand-details-row">
-              <!-- Left column: RouterService info at top, buttons at bottom -->
-              <div class="expand-col expand-col-left">
-                <!-- Device Details header moved here -->
-                <h5 class="expand-title">Device Details</h5>
-                <!-- RouterService details at top -->
-                <div class="router-service-details">
-                  <div class="mb-2"><b>Reachable:</b> <span class="details-value">
-                    <span :class="slotProps.data.reachable ? 'text-green-600' : 'text-red-500'">
-                      {{ slotProps.data.reachable ? 'Yes' : 'No' }}
-                    </span>
-                  </span></div>
-                  <div class="mb-2"><b>Role:</b> <span class="details-value">{{ slotProps.data.role }}</span></div>
-                  <div class="mb-2"><b>Hostname:</b> <span class="details-value">{{ slotProps.data.hostname }}</span></div>
-                  <div class="mb-2"><b>Management IP:</b> <span class="details-value">{{ slotProps.data.management_ip_address }}</span></div>
-                  <div class="mb-2"><b>Chassis MAC:</b> <span class="details-value">{{ formatMac(slotProps.data.chassis_id) }}</span></div>
-                  <div class="mb-2"><b>First Discovered:</b> <span class="details-value">{{ formatDate(slotProps.data.first_discovered) }}</span></div>
-                  <div class="mb-2"><b>Last Discovered:</b> <span class="details-value">{{ formatDate(slotProps.data.last_discovered) }}</span></div>
+    <div class="inventory-scroll-container">
+      <DataTable
+        :value="routers"
+        :loading="loading"
+        v-model:filters="filters"
+        filterMode="lenient"
+        filterDisplay="menu"
+        :globalFilterFields="['hostname', 'role', 'management_ip_address', 'chassis_id']"
+        :rows="10"
+        :rowsPerPageOptions="[10, 20, 50]"
+        paginator
+        :totalRecords="totalRecords"
+        tableStyle="min-width: 50rem"
+        stripedRows
+        showGridlines
+        v-model:expandedRows="expandedRows"
+        dataKey="id"
+        @rowExpand="onRowExpand"
+      >
+        <!-- Expansion Template -->
+        <template #expansion="slotProps">
+          <div class="expand-section">
+            <div v-if="deviceInfoLoading[slotProps.data.id]" class="expand-loading">Loading device details...</div>
+            <div v-else>
+              <!-- Two column layout: RouterService + Buttons | MonitoringService -->
+              <div class="expand-details-row">
+                <!-- Left column: RouterService info at top, buttons at bottom -->
+                <div class="expand-col expand-col-left">
+                  <!-- Device Details header moved here -->
+                  <h5 class="expand-title">Device Details</h5>
+                  <!-- RouterService details at top -->
+                  <div class="router-service-details">
+                    <div class="mb-2"><b>Reachable:</b> <span class="details-value">
+                      <span :class="slotProps.data.reachable ? 'text-green-600' : 'text-red-500'">
+                        {{ slotProps.data.reachable ? 'Yes' : 'No' }}
+                      </span>
+                    </span></div>
+                    <div class="mb-2"><b>Role:</b> <span class="details-value">{{ slotProps.data.role }}</span></div>
+                    <div class="mb-2"><b>Hostname:</b> <span class="details-value">{{ slotProps.data.hostname }}</span></div>
+                    <div class="mb-2"><b>Management IP:</b> <span class="details-value">{{ slotProps.data.management_ip_address }}</span></div>
+                    <div class="mb-2"><b>Chassis MAC:</b> <span class="details-value">{{ formatMac(slotProps.data.chassis_id) }}</span></div>
+                    <div class="mb-2"><b>First Discovered:</b> <span class="details-value">{{ formatDate(slotProps.data.first_discovered) }}</span></div>
+                    <div class="mb-2"><b>Last Discovered:</b> <span class="details-value">{{ formatDate(slotProps.data.last_discovered) }}</span></div>
+                  </div>
+                  
+                  <!-- Action buttons at bottom of left column -->
+                  <div class="expand-actions-left-bottom-horizontal">
+                    <Button
+                      label="Show Interfaces"
+                      icon="pi pi-sitemap"
+                      size="small"
+                      @click="toggleInterfaces(slotProps.data.id)"
+                      :disabled="interfacesLoading[slotProps.data.id]"
+                    />
+                    <Button
+                      label="Show VRFs"
+                      icon="pi pi-database"
+                      size="small"
+                      @click="toggleVRFs(slotProps.data.id)"
+                      :disabled="vrfsLoading[slotProps.data.id]"
+                    />
+                    <Button
+                      label="Show OSPF"
+                      icon="pi pi-share-alt"
+                      size="small"
+                      @click="toggleOSPF(slotProps.data.id)"
+                      :disabled="ospfLoading[slotProps.data.id]"
+                    />
+                  </div>
                 </div>
                 
-                <!-- Action buttons at bottom of left column -->
-                <div class="expand-actions-left-bottom-horizontal">
-                  <Button
-                    label="Show Interfaces"
-                    icon="pi pi-sitemap"
-                    size="small"
-                    @click="toggleInterfaces(slotProps.data.id)"
-                    :disabled="interfacesLoading[slotProps.data.id]"
-                  />
-                  <Button
-                    label="Show VRFs"
-                    icon="pi pi-database"
-                    size="small"
-                    @click="toggleVRFs(slotProps.data.id)"
-                    :disabled="vrfsLoading[slotProps.data.id]"
-                  />
-                  <Button
-                    label="Show OSPF"
-                    icon="pi pi-share-alt"
-                    size="small"
-                    @click="toggleOSPF(slotProps.data.id)"
-                    :disabled="ospfLoading[slotProps.data.id]"
-                  />
+                <!-- Right column: MonitoringService info -->
+                <div class="expand-col expand-col-right">
+                  <div class="mb-2"><b>Uptime:</b> <span class="details-value">
+                    <span v-if="slotProps.data.reachable && deviceInfo[slotProps.data.id]">
+                      {{ deviceInfo[slotProps.data.id].uptime_formatted }}
+                    </span>
+                    <span v-else>N/A</span>
+                  </span></div>
+                  <div class="mb-2"><b>Software Version:</b> <span class="details-value">
+                    <span v-if="slotProps.data.reachable && deviceInfo[slotProps.data.id]">
+                      {{ deviceInfo[slotProps.data.id].ios_version }}
+                    </span>
+                    <span v-else>N/A</span>
+                  </span></div>
+                  <div class="mb-2"><b>Manufacturer:</b> <span class="details-value">
+                    <span v-if="slotProps.data.reachable && deviceInfo[slotProps.data.id]">
+                      {{ deviceInfo[slotProps.data.id].manufacturer }}
+                    </span>
+                    <span v-else>N/A</span>
+                  </span></div>
+                  <div class="mb-2"><b>Serial Number:</b> <span class="details-value">
+                    <span v-if="slotProps.data.reachable && deviceInfo[slotProps.data.id]">
+                      {{ deviceInfo[slotProps.data.id].serial_number }}
+                    </span>
+                    <span v-else>N/A</span>
+                  </span></div>
+                  <div class="mb-2"><b>Chassis:</b> <span class="details-value">
+                    <span v-if="slotProps.data.reachable && deviceInfo[slotProps.data.id]">
+                      {{ deviceInfo[slotProps.data.id].chassis_description }}
+                    </span>
+                    <span v-else>N/A</span>
+                  </span></div>
+                  <div class="mb-2"><b>Hardware Version:</b> <span class="details-value">
+                    <span v-if="slotProps.data.reachable && deviceInfo[slotProps.data.id]">
+                      {{ deviceInfo[slotProps.data.id].hardware_version }}
+                    </span>
+                    <span v-else>N/A</span>
+                  </span></div>
+                  <div class="mb-2"><b>Part Number:</b> <span class="details-value">
+                    <span v-if="slotProps.data.reachable && deviceInfo[slotProps.data.id]">
+                      {{ deviceInfo[slotProps.data.id].part_number }}
+                    </span>
+                    <span v-else>N/A</span>
+                  </span></div>
+                  <div class="mb-2"><b>CPU Cores:</b> <span class="details-value">
+                    <span v-if="slotProps.data.reachable && deviceInfo[slotProps.data.id]">
+                      {{ deviceInfo[slotProps.data.id].cpu_cores }}
+                    </span>
+                    <span v-else>N/A</span>
+                  </span></div>
+                  <div class="mb-2"><b>Total System Memory:</b> <span class="details-value">
+                    <span v-if="slotProps.data.reachable && deviceInfo[slotProps.data.id]">
+                      {{ deviceInfo[slotProps.data.id].total_system_memory_mb }} MB
+                    </span>
+                    <span v-else>N/A</span>
+                  </span></div>
+                  <div class="mb-2"><b>Total System Storage:</b> <span class="details-value">
+                    <span v-if="slotProps.data.reachable && deviceInfo[slotProps.data.id]">
+                      {{ deviceInfo[slotProps.data.id].total_system_storage_mb }} MB
+                    </span>
+                    <span v-else>N/A</span>
+                  </span></div>
+                  <div class="mb-2"><b>Current Time:</b> <span class="details-value">
+                    <span v-if="slotProps.data.reachable && deviceInfo[slotProps.data.id]">
+                      {{ formatDeviceTime(deviceInfo[slotProps.data.id].current_datetime) }}
+                    </span>
+                    <span v-else>N/A</span>
+                  </span></div>
+                  <div class="mb-2"><b>Manufacturing Date:</b> <span class="details-value">
+                    <span v-if="slotProps.data.reachable && deviceInfo[slotProps.data.id]">
+                      {{ formatDeviceTime(deviceInfo[slotProps.data.id].manufacturing_date) }}
+                    </span>
+                    <span v-else>N/A</span>
+                  </span></div>
                 </div>
               </div>
-              
-              <!-- Right column: MonitoringService info -->
-              <div class="expand-col expand-col-right">
-                <div class="mb-2"><b>Uptime:</b> <span class="details-value">
-                  <span v-if="slotProps.data.reachable && deviceInfo[slotProps.data.id]">
-                    {{ deviceInfo[slotProps.data.id].uptime_formatted }}
-                  </span>
-                  <span v-else>N/A</span>
-                </span></div>
-                <div class="mb-2"><b>Software Version:</b> <span class="details-value">
-                  <span v-if="slotProps.data.reachable && deviceInfo[slotProps.data.id]">
-                    {{ deviceInfo[slotProps.data.id].ios_version }}
-                  </span>
-                  <span v-else>N/A</span>
-                </span></div>
-                <div class="mb-2"><b>Manufacturer:</b> <span class="details-value">
-                  <span v-if="slotProps.data.reachable && deviceInfo[slotProps.data.id]">
-                    {{ deviceInfo[slotProps.data.id].manufacturer }}
-                  </span>
-                  <span v-else>N/A</span>
-                </span></div>
-                <div class="mb-2"><b>Serial Number:</b> <span class="details-value">
-                  <span v-if="slotProps.data.reachable && deviceInfo[slotProps.data.id]">
-                    {{ deviceInfo[slotProps.data.id].serial_number }}
-                  </span>
-                  <span v-else>N/A</span>
-                </span></div>
-                <div class="mb-2"><b>Chassis:</b> <span class="details-value">
-                  <span v-if="slotProps.data.reachable && deviceInfo[slotProps.data.id]">
-                    {{ deviceInfo[slotProps.data.id].chassis_description }}
-                  </span>
-                  <span v-else>N/A</span>
-                </span></div>
-                <div class="mb-2"><b>Hardware Version:</b> <span class="details-value">
-                  <span v-if="slotProps.data.reachable && deviceInfo[slotProps.data.id]">
-                    {{ deviceInfo[slotProps.data.id].hardware_version }}
-                  </span>
-                  <span v-else>N/A</span>
-                </span></div>
-                <div class="mb-2"><b>Part Number:</b> <span class="details-value">
-                  <span v-if="slotProps.data.reachable && deviceInfo[slotProps.data.id]">
-                    {{ deviceInfo[slotProps.data.id].part_number }}
-                  </span>
-                  <span v-else>N/A</span>
-                </span></div>
-                <div class="mb-2"><b>CPU Cores:</b> <span class="details-value">
-                  <span v-if="slotProps.data.reachable && deviceInfo[slotProps.data.id]">
-                    {{ deviceInfo[slotProps.data.id].cpu_cores }}
-                  </span>
-                  <span v-else>N/A</span>
-                </span></div>
-                <div class="mb-2"><b>Total System Memory:</b> <span class="details-value">
-                  <span v-if="slotProps.data.reachable && deviceInfo[slotProps.data.id]">
-                    {{ deviceInfo[slotProps.data.id].total_system_memory_mb }} MB
-                  </span>
-                  <span v-else>N/A</span>
-                </span></div>
-                <div class="mb-2"><b>Total System Storage:</b> <span class="details-value">
-                  <span v-if="slotProps.data.reachable && deviceInfo[slotProps.data.id]">
-                    {{ deviceInfo[slotProps.data.id].total_system_storage_mb }} MB
-                  </span>
-                  <span v-else>N/A</span>
-                </span></div>
-                <div class="mb-2"><b>Current Time:</b> <span class="details-value">
-                  <span v-if="slotProps.data.reachable && deviceInfo[slotProps.data.id]">
-                    {{ formatDeviceTime(deviceInfo[slotProps.data.id].current_datetime) }}
-                  </span>
-                  <span v-else>N/A</span>
-                </span></div>
-                <div class="mb-2"><b>Manufacturing Date:</b> <span class="details-value">
-                  <span v-if="slotProps.data.reachable && deviceInfo[slotProps.data.id]">
-                    {{ formatDeviceTime(deviceInfo[slotProps.data.id].manufacturing_date) }}
-                  </span>
-                  <span v-else>N/A</span>
-                </span></div>
-              </div>
+            </div>
+            
+            <!-- Expandable tables remain at the bottom -->
+            <div v-if="showInterfaces[slotProps.data.id]" class="expand-table">
+              <h6>Interfaces</h6>
+              <div v-if="interfacesLoading[slotProps.data.id]" class="expand-loading">Loading interfaces...</div>
+              <table v-else class="min-w-full text-sm">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Addressing</th>
+                    <th>IP</th>
+                    <th>MAC</th>
+                    <th>Enabled</th>
+                    <th>VRF</th>
+                    <th>Category</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="iface in interfaces[slotProps.data.id]" :key="iface.id">
+                    <td>{{ iface.name }}</td>
+                    <td>
+                      {{ getAddressingType(iface) }}
+                    </td>
+                    <td>{{ iface.ip_address || '-' }}</td>
+                    <td>{{ formatMac(iface.mac_address) }}</td>
+                    <td class="text-center">
+                      <i :class="iface.enabled ? 'pi pi-check text-green-600' : 'pi pi-times text-red-500'"></i>
+                    </td>
+                    <td>{{ iface.vrf || '-' }}</td>
+                    <td>{{ getCategoryLabel(iface.category) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div v-if="showVRFs[slotProps.data.id]" class="expand-table">
+              <h6>VRFs</h6>
+              <div v-if="vrfsLoading[slotProps.data.id]" class="expand-loading">Loading VRFs...</div>
+              <table v-else class="min-w-full text-sm">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>RD</th>
+                    <th>Import RTs</th>
+                    <th>Export RTs</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="vrf in vrfs[slotProps.data.id]" :key="vrf.id">
+                    <td>{{ vrf.name || '-' }}</td>
+                    <td>{{ vrf.route_distinguisher || '-' }}</td>
+                    <td>
+                      <span v-if="vrf.import_targets && vrf.import_targets.length">
+                        <span v-for="rt in vrf.import_targets" :key="rt" class="mr-1">{{ rt }}</span>
+                      </span>
+                      <span v-else>-</span>
+                    </td>
+                    <td>
+                      <span v-if="vrf.export_targets && vrf.export_targets.length">
+                        <span v-for="rt in vrf.export_targets" :key="rt" class="mr-1">{{ rt }}</span>
+                      </span>
+                      <span v-else>-</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div v-if="showOSPF[slotProps.data.id]" class="expand-table">
+              <h6>OSPF Processes</h6>
+              <div v-if="ospfLoading[slotProps.data.id]" class="expand-loading">Loading OSPF processes...</div>
+              <table v-else class="min-w-full text-sm">
+                <thead>
+                  <tr>
+                    <th></th>
+                    <th>Process ID</th>
+                    <th>Router ID</th>
+                    <th>Priority</th>
+                    <th>VRF</th>
+                    <th>Networks</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template v-for="proc in ospf[slotProps.data.id] || []" :key="proc.id">
+                    <tr>
+                      <td>
+                        <Button
+                          icon="pi pi-chevron-down"
+                          size="small"
+                          text
+                          v-if="!ospfExpanded[proc.id]"
+                          @click="expandOSPFProcess(slotProps.data.id, proc.id)"
+                        />
+                        <Button
+                          icon="pi pi-chevron-up"
+                          size="small"
+                          text
+                          v-if="ospfExpanded[proc.id]"
+                          @click="ospfExpanded[proc.id] = false"
+                        />
+                      </td>
+                      <td>{{ proc.process_id || '-' }}</td>
+                      <td>{{ proc.ospf_router_id || '-' }}</td>
+                      <td>{{ proc.priority !== undefined && proc.priority !== null ? proc.priority : '-' }}</td>
+                      <td>{{ proc.vrf || '-' }}</td>
+                      <td>{{ proc.network_count !== undefined && proc.network_count !== null ? proc.network_count : '-' }}</td>
+                    </tr>
+                    <tr v-if="ospfExpanded[proc.id]">
+                      <td colspan="6" style="padding: 0;">
+                        <div v-if="ospfProcessLoading[proc.id]" class="p-2">Loading networks...</div>
+                        <table v-else class="min-w-full text-xs">
+                          <thead style="border-top: 0;">
+                            <tr>
+                              <th>Area</th>
+                              <th>Network</th>
+                              <th>Subnet Mask</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr v-for="net in ospfProcessDetail[proc.id]?.networks || []" :key="net.id">
+                              <td>{{ (net.area !== undefined && net.area !== null && net.area !== '') ? net.area : '-' }}</td>
+                              <td>{{ net.network || '-' }}</td>
+                              <td>{{ net.subnet_mask || '-' }}</td>
+                            </tr>
+                            <tr v-if="(ospfProcessDetail[proc.id]?.networks || []).length === 0">
+                              <td colspan="3" class="text-center text-600">No networks</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
             </div>
           </div>
-          
-          <!-- Expandable tables remain at the bottom -->
-          <div v-if="showInterfaces[slotProps.data.id]" class="expand-table">
-            <h6>Interfaces</h6>
-            <div v-if="interfacesLoading[slotProps.data.id]" class="expand-loading">Loading interfaces...</div>
-            <table v-else class="min-w-full text-sm">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Addressing</th>
-                  <th>IP</th>
-                  <th>MAC</th>
-                  <th>Enabled</th>
-                  <th>VRF</th>
-                  <th>Category</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="iface in interfaces[slotProps.data.id]" :key="iface.id">
-                  <td>{{ iface.name }}</td>
-                  <td>
-                    {{ getAddressingType(iface) }}
-                  </td>
-                  <td>{{ iface.ip_address || '-' }}</td>
-                  <td>{{ formatMac(iface.mac_address) }}</td>
-                  <td class="text-center">
-                    <i :class="iface.enabled ? 'pi pi-check text-green-600' : 'pi pi-times text-red-500'"></i>
-                  </td>
-                  <td>{{ iface.vrf || '-' }}</td>
-                  <td>{{ getCategoryLabel(iface.category) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div v-if="showVRFs[slotProps.data.id]" class="expand-table">
-            <h6>VRFs</h6>
-            <div v-if="vrfsLoading[slotProps.data.id]" class="expand-loading">Loading VRFs...</div>
-            <table v-else class="min-w-full text-sm">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>RD</th>
-                  <th>Import RTs</th>
-                  <th>Export RTs</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="vrf in vrfs[slotProps.data.id]" :key="vrf.id">
-                  <td>{{ vrf.name || '-' }}</td>
-                  <td>{{ vrf.route_distinguisher || '-' }}</td>
-                  <td>
-                    <span v-if="vrf.import_targets && vrf.import_targets.length">
-                      <span v-for="rt in vrf.import_targets" :key="rt" class="mr-1">{{ rt }}</span>
-                    </span>
-                    <span v-else>-</span>
-                  </td>
-                  <td>
-                    <span v-if="vrf.export_targets && vrf.export_targets.length">
-                      <span v-for="rt in vrf.export_targets" :key="rt" class="mr-1">{{ rt }}</span>
-                    </span>
-                    <span v-else>-</span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div v-if="showOSPF[slotProps.data.id]" class="expand-table">
-            <h6>OSPF Processes</h6>
-            <div v-if="ospfLoading[slotProps.data.id]" class="expand-loading">Loading OSPF processes...</div>
-            <table v-else class="min-w-full text-sm">
-              <thead>
-                <tr>
-                  <th></th>
-                  <th>Process ID</th>
-                  <th>Router ID</th>
-                  <th>Priority</th>
-                  <th>VRF</th>
-                  <th>Networks</th>
-                </tr>
-              </thead>
-              <tbody>
-                <template v-for="proc in ospf[slotProps.data.id] || []" :key="proc.id">
-                  <tr>
-                    <td>
-                      <Button
-                        icon="pi pi-chevron-down"
-                        size="small"
-                        text
-                        v-if="!ospfExpanded[proc.id]"
-                        @click="expandOSPFProcess(slotProps.data.id, proc.id)"
-                      />
-                      <Button
-                        icon="pi pi-chevron-up"
-                        size="small"
-                        text
-                        v-if="ospfExpanded[proc.id]"
-                        @click="ospfExpanded[proc.id] = false"
-                      />
-                    </td>
-                    <td>{{ proc.process_id || '-' }}</td>
-                    <td>{{ proc.ospf_router_id || '-' }}</td>
-                    <td>{{ proc.priority !== undefined && proc.priority !== null ? proc.priority : '-' }}</td>
-                    <td>{{ proc.vrf || '-' }}</td>
-                    <td>{{ proc.network_count !== undefined && proc.network_count !== null ? proc.network_count : '-' }}</td>
-                  </tr>
-                  <tr v-if="ospfExpanded[proc.id]">
-                    <td colspan="6" style="padding: 0;">
-                      <div v-if="ospfProcessLoading[proc.id]" class="p-2">Loading networks...</div>
-                      <table v-else class="min-w-full text-xs">
-                        <thead style="border-top: 0;">
-                          <tr>
-                            <th>Area</th>
-                            <th>Network</th>
-                            <th>Subnet Mask</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr v-for="net in ospfProcessDetail[proc.id]?.networks || []" :key="net.id">
-                            <td>{{ (net.area !== undefined && net.area !== null && net.area !== '') ? net.area : '-' }}</td>
-                            <td>{{ net.network || '-' }}</td>
-                            <td>{{ net.subnet_mask || '-' }}</td>
-                          </tr>
-                          <tr v-if="(ospfProcessDetail[proc.id]?.networks || []).length === 0">
-                            <td colspan="3" class="text-center text-600">No networks</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </template>
+        </template>
 
-      <!-- Table Columns -->
-      <Column expander />
-      <Column field="hostname" sortable>
-        <template #header>
-          <i class="pi pi-desktop text-primary"></i> Hostname
-        </template>
-        <template #body="{ data }">
-          <span>{{ data.hostname }}</span>
-        </template>
-      </Column>
+        <!-- Table Columns -->
+        <Column expander />
+        <Column field="hostname" sortable>
+          <template #header>
+            <i class="pi pi-desktop text-primary"></i> Hostname
+          </template>
+          <template #body="{ data }">
+            <span>{{ data.hostname }}</span>
+          </template>
+        </Column>
 
-      <Column field="role" sortable>
-        <template #header>
-          <i class="pi pi-wrench text-primary"></i> Role
-        </template>
-        <template #body="{ data }">
-          <Tag :value="data.role" :severity="getRoleSeverity(data.role)" />
-        </template>
-        <template #filter="{ filterCallback }">
-          <Dropdown
-            v-model="roleFilter"
-            :options="roleOptions"
-            optionLabel="label"
-            optionValue="value"
-            placeholder="Any"
-            class="p-column-filter"
-            :showClear="true"
-            @change="filterCallback"
-          >
-            <template #value="slotProps">
-              <Tag
-                v-if="slotProps.value"
-                :value="getRoleLabel(slotProps.value)"
-                :severity="getRoleSeverity(slotProps.value)"
-              />
-              <span v-else>Any</span>
-            </template>
-          </Dropdown>
-        </template>
-      </Column>
+        <Column field="role" sortable>
+          <template #header>
+            <i class="pi pi-wrench text-primary"></i> Role
+          </template>
+          <template #body="{ data }">
+            <Tag :value="data.role" :severity="getRoleSeverity(data.role)" />
+          </template>
+          <template #filter="{ filterCallback }">
+            <Dropdown
+              v-model="roleFilter"
+              :options="roleOptions"
+              optionLabel="label"
+              optionValue="value"
+              placeholder="Any"
+              class="p-column-filter"
+              :showClear="true"
+              @change="filterCallback"
+            >
+              <template #value="slotProps">
+                <Tag
+                  v-if="slotProps.value"
+                  :value="getRoleLabel(slotProps.value)"
+                  :severity="getRoleSeverity(slotProps.value)"
+                />
+                <span v-else>Any</span>
+              </template>
+            </Dropdown>
+          </template>
+        </Column>
 
-      <Column field="management_ip_address" sortable>
-        <template #header>
-          <i class="pi pi-globe text-primary"></i> Management IP
-        </template>
-        <template #body="{ data }">
-          <span>{{ data.management_ip_address }}</span>
-        </template>
-      </Column>
+        <Column field="management_ip_address" sortable>
+          <template #header>
+            <i class="pi pi-globe text-primary"></i> Management IP
+          </template>
+          <template #body="{ data }">
+            <span>{{ data.management_ip_address }}</span>
+          </template>
+        </Column>
 
-      <Column field="chassis_id" sortable>
-        <template #header>
-          <i class="pi pi-box text-primary"></i> Chassis MAC
-        </template>
-        <template #body="{ data }">
-          <span>{{ formatMac(data.chassis_id) }}</span>
-        </template>
-      </Column>
+        <Column field="chassis_id" sortable>
+          <template #header>
+            <i class="pi pi-box text-primary"></i> Chassis MAC
+          </template>
+          <template #body="{ data }">
+            <span>{{ formatMac(data.chassis_id) }}</span>
+          </template>
+        </Column>
 
-      <Column field="first_discovered" sortable>
-        <template #header>
-          <i class="pi pi-calendar text-primary"></i> First Discovered
-        </template>
-        <template #body="{ data }">
-          <span>{{ formatDate(data.first_discovered) }}</span>
-        </template>
-      </Column>
-    </DataTable>
+        <Column field="first_discovered" sortable>
+          <template #header>
+            <i class="pi pi-calendar text-primary"></i> First Discovered
+          </template>
+          <template #body="{ data }">
+            <span>{{ formatDate(data.first_discovered) }}</span>
+          </template>
+        </Column>
+      </DataTable>
+    </div>
   </div>
 </template>
 
@@ -771,5 +773,22 @@ onMounted(() => {
 .details-value {
   margin-left: 0.25em;
   display: inline;
+}
+
+.inventory-scroll-container {
+  height: 100%;
+  max-height: 77vh;
+  min-height: 0;
+  overflow-y: auto;
+  /* Prevent horizontal overflow */
+  overflow-x: auto;
+  /* Match monitoring page look */
+  padding-bottom: 0.5rem;
+}
+
+.card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 </style>
