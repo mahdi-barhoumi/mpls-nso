@@ -1,10 +1,10 @@
 <template>
   <div
-    class="bg-surface-0 dark:bg-surface-900 py-3 px-2 sm:px-20 rounded-[2.5rem] w-full max-w-[80rem] mx-auto pb-0"
+    class="bg-surface-0 dark:bg-surface-900 py-2 px-2 sm:px-4 rounded-2xl w-full max-w-full md:max-w-5xl mx-auto pb-0"
   >
     <div
       v-if="networkSettingsExist"
-      class="flex flex-col items-center justify-center text-center py-12"
+      class="flex flex-col items-center justify-center text-center py-6"
     >
       <i class="pi pi-cog text-4xl text-primary mb-4"></i>
       <div class="text-surface-900 dark:text-surface-0 font-medium text-2xl mb-2">
@@ -15,11 +15,11 @@
       </div>
       <Button label="Next" icon="pi pi-arrow-right" iconPos="right" @click="$emit('next')" />
     </div>
-    <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-10">
+    <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-6">
       <!-- Host Settings + Scheduling Settings Column -->
-      <div class="col-span-1 flex flex-col gap-0">
+      <div class="col-span-1 flex flex-col gap-1">
         <!-- Host Settings -->
-        <div class="bg-surface-50 dark:bg-surface-900 px-8 py-4 rounded-2xl flex flex-col gap-1">
+        <div class="bg-surface-50 dark:bg-surface-900 px-3 py-2 rounded-xl flex flex-col gap-1">
           <div class="flex items-center mb-4">
             <span
               class="inline-flex items-center justify-center bg-primary-50 dark:bg-primary-400/10 rounded-full w-8 h-8 mr-3"
@@ -84,7 +84,7 @@
           </div>
         </div>
         <!-- Scheduling Settings (now stacked below Host Settings) -->
-        <div class="bg-surface-50 dark:bg-surface-900 px-8 py-4 rounded-2xl flex flex-col gap-1">
+        <div class="bg-surface-50 dark:bg-surface-900 px-3 py-2 rounded-xl flex flex-col gap-1 mt-1">
           <div class="flex items-center mb-4">
             <span
               class="inline-flex items-center justify-center bg-primary-50 dark:bg-primary-400/10 rounded-full w-8 h-8 mr-3"
@@ -140,8 +140,8 @@
         </div>
       </div>
       <!-- Management Configurations Section -->
-      <div class="col-span-1 flex flex-col">
-        <div class="bg-surface-50 dark:bg-surface-900 px-8 py-4 rounded-2xl flex flex-col gap-2 h-full">
+      <div class="col-span-1 flex flex-col mt-2 md:mt-0">
+        <div class="bg-surface-50 dark:bg-surface-900 px-3 py-2 rounded-xl flex flex-col gap-2 h-full">
           <div class="flex items-center mb-4">
             <span
               class="inline-flex items-center justify-center bg-primary-50 dark:bg-primary-400/10 rounded-full w-8 h-8 mr-3"
@@ -238,8 +238,8 @@
         </div>
       </div>
       <!-- Site Service Settings Section -->
-      <div class="col-span-1 flex flex-col">
-        <div class="bg-surface-50 dark:bg-surface-900 px-8 py-4 rounded-2xl flex flex-col gap-2 h-full">
+      <div class="col-span-1 flex flex-col mt-2 md:mt-0">
+        <div class="bg-surface-50 dark:bg-surface-900 px-3 py-2 rounded-xl flex flex-col gap-2 h-full">
           <div class="flex items-center mb-4">
             <span
               class="inline-flex items-center justify-center bg-primary-50 dark:bg-primary-400/10 rounded-full w-8 h-8 mr-3"
@@ -335,9 +335,9 @@
         </div>
       </div>
       <!-- Navigation Buttons -->
-      <div class="col-span-3 mt-0">
+      <div class="col-span-1 md:col-span-3 mt-2">
         <div class="flex items-center justify-between">
-          <Button label="Back" icon="pi pi-arrow-left" text @click="$emit('prev')" />
+          <Button label="Back" icon="pi pi-arrow-left" text @click="$emit('prev')" class="min-w-[6rem]" />
           <Button
             label="Next"
             icon="pi pi-arrow-right"
@@ -345,6 +345,7 @@
             @click="handleNext"
             :loading="loading"
             :disabled="loading"
+            class="min-w-[6rem]"
           />
         </div>
       </div>
@@ -488,5 +489,16 @@ onMounted(async () => {
 }
 :deep(.p-inputnumber) {
   width: 100%;
+}
+@media (max-width: 768px) {
+  .md\:grid-cols-3 {
+    grid-template-columns: 1fr !important;
+  }
+  .md\:col-span-3 {
+    grid-column: span 1 / span 1 !important;
+  }
+  .md\:mt-0 {
+    margin-top: 1rem !important;
+  }
 }
 </style>

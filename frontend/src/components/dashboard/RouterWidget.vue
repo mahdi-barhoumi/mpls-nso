@@ -2,14 +2,14 @@
   <div class="card h-full flex flex-col">
     <div v-if="selectedRouter" class="h-full flex flex-col">
       <!-- Header -->
-      <div class="flex-none flex justify-between items-center mb-3">
+      <div class="flex-none flex justify-between items-center mb-2"> <!-- mb-3 -> mb-2 -->
         <div>
-          <div class="flex items-center gap-3">
-            <!-- ↓ gap-3 for moderate spacing -->
-            <h5 class="text-lg m-0 font-semibold">
+          <div class="flex items-center gap-2"> <!-- gap-3 -> gap-2 -->
+            <!-- ↓ gap-2 for tighter spacing -->
+            <h5 class="text-base m-0 font-semibold"> <!-- text-lg -> text-base -->
               Device: {{ routerData?.hostname || 'N/A' }}
             </h5>
-            <div class="flex items-center gap-1">
+            <div class="flex items-center gap-0.5"> <!-- gap-1 -> gap-0.5 -->
               <span
                 v-if="routerData"
                 class="iface-status-dot"
@@ -22,50 +22,50 @@
               </span>
             </div>
           </div>
-          <div class="text-surface-500 dark:text-surface-0 text-sm mt-1">
+          <div class="text-surface-500 dark:text-surface-0 text-xs mt-0.5"> <!-- text-sm -> text-xs, mt-1 -> mt-0.5 -->
             {{ routerData?.management_ip_address || 'No IP' }}
           </div>
         </div>
-        <div class="rounded-lg w-8 h-8 flex items-center justify-center bg-blue-100 dark:bg-blue-400/10">
+        <div class="rounded-lg w-7 h-7 flex items-center justify-center bg-blue-100 dark:bg-blue-400/10"> <!-- w-8 h-8 -> w-7 h-7 -->
           <!-- Static icon instead of role text -->
-          <i class="pi pi-server text-blue-500 text-lg"></i>
+          <i class="pi pi-server text-blue-500 text-base"></i> <!-- text-lg -> text-base -->
         </div>
       </div>
 
       <!-- Device Info Summary -->
-      <div class="surface-100 p-3 border-round mb-1 grid grid-cols-3 gap-2 text-xs">
-        <div class="flex items-center gap-3">
-          <i class="pi pi-wrench text-green-500"></i>
+      <div class="surface-100 p-2 border-round mb-1 grid grid-cols-3 gap-1 text-xs"> <!-- p-3 -> p-2, gap-2 -> gap-1 -->
+        <div class="flex items-center gap-2"> <!-- gap-3 -> gap-2 -->
+          <i class="pi pi-wrench text-green-500 text-sm"></i> <!-- add text-sm -->
           <div>
-            <div class="text-muted-color">Role</div>
+            <div class="text-muted-color text-2xs">Role</div> <!-- add text-2xs -->
             <div class="font-medium">{{ routerData?.role || 'N/A' }}</div>
           </div>
         </div>
-        <div class="flex items-center gap-3">
-          <i class="pi pi-box text-green-500"></i>
+        <div class="flex items-center gap-2">
+          <i class="pi pi-box text-green-500 text-sm"></i>
           <div>
-            <div class="text-muted-color">Model</div>
+            <div class="text-muted-color text-2xs">Model</div>
             <div class="font-medium">{{ deviceInfo?.chassis_description || 'N/A' }}</div>
           </div>
         </div>
-        <div class="flex items-center gap-3">
-          <i class="pi pi-database text-green-500"></i>
+        <div class="flex items-center gap-2">
+          <i class="pi pi-database text-green-500 text-sm"></i>
           <div>
-            <div class="text-muted-color">Software Version</div>
+            <div class="text-muted-color text-2xs">Software Version</div>
             <div class="font-medium">{{ deviceInfo?.ios_version || 'N/A' }}</div>
           </div>
         </div>
-        <div class="flex items-center gap-3">
-          <i class="pi pi-clock text-green-500"></i>
+        <div class="flex items-center gap-2">
+          <i class="pi pi-clock text-green-500 text-sm"></i>
           <div>
-            <div class="text-muted-color">Uptime</div>
+            <div class="text-muted-color text-2xs">Uptime</div>
             <div class="font-medium">{{ deviceInfo?.uptime_formatted || 'N/A' }}</div>
           </div>
         </div>
-        <div class="flex items-center gap-3">
-          <i class="pi pi-sitemap text-green-500"></i>
+        <div class="flex items-center gap-2">
+          <i class="pi pi-sitemap text-green-500 text-sm"></i>
           <div>
-            <div class="text-muted-color">Interfaces</div>
+            <div class="text-muted-color text-2xs">Interfaces</div>
             <div class="font-medium">{{ interfaces?.length || 0 }}</div>
           </div>
         </div>

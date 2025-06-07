@@ -1,19 +1,23 @@
 <template>
   <FloatingConfigurator />
   <div
-    class="bg-surface-50 dark:bg-surface-950 flex items-center justify-center min-h-screen min-w-[100vw] overflow-hidden"
+    class="bg-surface-50 dark:bg-surface-950 flex items-center justify-center overflow-auto min-h-screen min-w-full"
+    style="height: 100vh; width: 100vw;"
   >
-    <div class="flex flex-col items-center justify-center">
+    <div class="flex flex-col items-center justify-center w-full"
+         style="height: 95vh;">
       <div
         style="
-          border-radius: 56px;
-          padding: 0.3rem;
+          border-radius: 2rem;
+          padding: 0.2rem;
           background: linear-gradient(180deg, var(--primary-color) 10%, rgba(33, 150, 243, 0) 30%);
+          height: 95vh;
         "
+        class="w-full max-w-[1000px] mx-auto"
       >
         <div
-          class="w-full min-w-[32rem] bg-surface-0 dark:bg-surface-900 py-20 px-8 sm:px-20"
-          style="border-radius: 53px"
+          class="w-full max-w-full sm:max-w-4xl md:max-w-5xl lg:max-w-[1400px] bg-surface-0 dark:bg-surface-900 py-6 px-4 sm:py-8 sm:px-8 overflow-auto"
+          style="border-radius: 1.8rem; height: 100%;"
         >
           <Stepper v-model:value="activeStep" class="w-full">
             <StepList>
@@ -157,5 +161,15 @@ const goToLogin = () => {
 <style scoped>
 .surface-card {
   background: var(--surface-card);
+}
+@media (max-width: 640px) {
+  .sm\:px-20 {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+  .sm\:py-10 {
+    padding-top: 1.5rem !important;
+    padding-bottom: 1.5rem !important;
+  }
 }
 </style>
