@@ -1,13 +1,18 @@
 .layout-main-container {
     display: flex;
     flex-direction: column;
-    min-height: 100vh;
-    justify-content: space-between;
+    min-height: 0; // changed from 100vh to 0
+    height: 100vh; // 4rem is the topbar height
+    justify-content: flex-start;
     padding: 6rem 2rem 0 2rem;
     transition: margin-left var(--layout-section-transition-duration);
+    box-sizing: border-box;
 }
 
 .layout-main {
     flex: 1 1 auto;
+    min-height: 0;
     padding-bottom: 2rem;
+    display: flex;
+    flex-direction: column;
 }

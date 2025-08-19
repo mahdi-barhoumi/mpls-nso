@@ -4,26 +4,39 @@ from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from core.models import VPN, Site, Customer
-from core.modules.controller import NetworkController
+from core.modules.network_controller import NetworkController
 
 @method_decorator(csrf_exempt, name='dispatch')
 class VPNView(View):
     def get(self, request, vpn_id=None):
         if vpn_id:
             try:
-                vpn = VPN.objects.prefetch_related('sites').get(id=vpn_id)
+                vpn = VPN.objects.prefetch_related('sites__vrf', 'sites__router', 'sites__customer').select_related('customer').get(id=vpn_id)
                 return JsonResponse({
                     'id': vpn.id,
                     'name': vpn.name,
                     'description': vpn.description,
+                    'created_at': vpn.created_at,
+                    'updated_at': vpn.updated_at,
                     'customer': {
                         'id': vpn.customer.id,
-                        'name': vpn.customer.name
+                        'name': vpn.customer.name,
+                        'email': getattr(vpn.customer, 'email', None),
+                        'phone_number': getattr(vpn.customer, 'phone_number', None),
                     },
                     'sites': [{
                         'id': site.id,
                         'name': site.name,
                         'location': site.location,
+                        'created_at': site.created_at,
+                        'updated_at': site.updated_at,
+                        'vrf': {
+                            'name': site.vrf.name if site.vrf else None,
+                            'rd': site.vrf.route_distinguisher if site.vrf and hasattr(site.vrf, 'route_distinguisher') else None,
+                        } if site.vrf else None,
+                        'router': {
+                            'hostname': site.router.hostname if site.router else None,
+                        } if site.router else None,
                     } for site in vpn.sites.all()]
                 })
             except VPN.DoesNotExist:
@@ -36,6 +49,8 @@ class VPNView(View):
                 'name': vpn.name,
                 'customer': vpn.customer.name,
                 'customer_id': vpn.customer.id,
+                'created_at': vpn.created_at,
+                'updated_at': vpn.updated_at,
                 'description': vpn.description,
                 'site_count': vpn.sites.count()
             } for vpn in vpns],
@@ -89,7 +104,12 @@ class VPNView(View):
                 
             # Handle site updates if provided
             if 'sites' in data:
-                new_site_ids = set(data['sites'])
+                # Accept both list of IDs or list of dicts with 'id'
+                raw_sites = data['sites']
+                if raw_sites and isinstance(raw_sites[0], dict):
+                    new_site_ids = set(site['id'] for site in raw_sites if 'id' in site)
+                else:
+                    new_site_ids = set(raw_sites)
                 current_site_ids = set(vpn.sites.values_list('id', flat=True))
                 
                 # Sites to add
@@ -125,6 +145,9 @@ class VPNView(View):
                             }, status=500)
                     except Site.DoesNotExist:
                         pass  # Skip if site no longer exists
+
+                # Update the VPN's sites m2m field to match the new set
+                vpn.sites.set(list(new_site_ids))
             
             vpn.save()
             
@@ -140,6 +163,8 @@ class VPNView(View):
                     'id': site.id,
                     'name': site.name,
                     'location': site.location,
+                    'created_at': site.created_at,
+                    'updated_at': site.updated_at,
                 } for site in vpn.sites.all()]
             })
             

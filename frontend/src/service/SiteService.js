@@ -16,6 +16,22 @@ export default {
       throw error
     }
   },
+
+  /**
+   * Fetch a single site by ID (with all details)
+   * @param {string|number} id
+   * @returns {Promise<Object>}
+   */
+  async getSite(id) {
+    try {
+      const response = await axios.get(`${API_URL}${id}/`)
+      return response.data
+    } catch (error) {
+      console.error('Error fetching site details:', error)
+      throw error
+    }
+  },
+
   async createSite(site) {
     try {
       const response = await axios.post(API_URL, site)
@@ -59,14 +75,35 @@ export default {
   /**
    * Enable routing for a site
    * @param {number} siteId - Site ID
+   * @param {Object} params - Routing parameters
    * @returns {Promise<Object>} Response data
    */
-  async enableRouting(siteId) {
+  async enableRouting(siteId, params = {}) {
     try {
-      const response = await axios.post(`http://127.0.0.1:8000/api/sites/${siteId}/enable-routing/`)
+      const response = await axios.post(
+        `http://127.0.0.1:8000/api/sites/${siteId}/enable-routing/`,
+        params
+      )
       return response.data
     } catch (error) {
       console.error('Error enabling routing for site:', error)
+      throw error
+    }
+  },
+
+  /**
+   * Disable routing for a site
+   * @param {number} siteId - Site ID
+   * @returns {Promise<Object>} Response data
+   */
+  async disableRouting(siteId) {
+    try {
+      const response = await axios.delete(
+        `http://127.0.0.1:8000/api/sites/${siteId}/enable-routing/`,
+      )
+      return response.data
+    } catch (error) {
+      console.error('Error disabling routing for site:', error)
       throw error
     }
   },

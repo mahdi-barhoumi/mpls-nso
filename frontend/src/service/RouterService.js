@@ -46,6 +46,21 @@ export default {
   },
 
   /**
+   * Fetch a router by its ID
+   * @param {string} routerId - ID of the router to fetch
+   * @returns {Promise<Object>} Router details
+   */
+  async getRouterById(routerId) {
+    try {
+      const response = await axios.get(`${API_URL}${routerId}/`)
+      return response.data
+    } catch (error) {
+      console.error(`Error fetching router ${routerId}:`, error)
+      throw error
+    }
+  },
+
+  /**
    * Fetch interfaces for a specific router
    * @param {string} routerId - ID of the router
    * @returns {Promise<Array>} List of interfaces for the router
@@ -59,6 +74,7 @@ export default {
       throw error
     }
   },
+
   async getConnectedInterfaces(routerId) {
     try {
       const response = await this.getRouterInterfaces(routerId)
@@ -71,6 +87,52 @@ export default {
       )
     } catch (error) {
       console.error(`Error fetching connected interfaces for router ${routerId}:`, error)
+      throw error
+    }
+  },
+
+  /**
+   * Fetch VRFs for a specific router
+   * @param {string} routerId - ID of the router
+   * @returns {Promise<Array>} List of VRFs for the router
+   */
+  async getRouterVRFs(routerId) {
+    try {
+      const response = await axios.get(`${API_URL}${routerId}/vrfs/`)
+      return response.data.vrfs || []
+    } catch (error) {
+      console.error(`Error fetching VRFs for router ${routerId}:`, error)
+      throw error
+    }
+  },
+
+  /**
+   * Fetch OSPF processes for a specific router
+   * @param {string} routerId - ID of the router
+   * @returns {Promise<Array>} List of OSPF processes for the router
+   */
+  async getRouterOSPF(routerId) {
+    try {
+      const response = await axios.get(`${API_URL}${routerId}/ospf/`)
+      return response.data.processes || []
+    } catch (error) {
+      console.error(`Error fetching OSPF processes for router ${routerId}:`, error)
+      throw error
+    }
+  },
+
+  /**
+   * Fetch a single OSPF process (with networks) for a router
+   * @param {string} routerId
+   * @param {number} processId
+   * @returns {Promise<Object>} OSPF process detail
+   */
+  async getRouterOSPFProcess(routerId, processId) {
+    try {
+      const response = await axios.get(`${API_URL}${routerId}/ospf/${processId}/`)
+      return response.data
+    } catch (error) {
+      console.error(`Error fetching OSPF process ${processId} for router ${routerId}:`, error)
       throw error
     }
   },

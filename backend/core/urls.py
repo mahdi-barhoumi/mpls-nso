@@ -1,19 +1,25 @@
 from django.urls import path
 from core.views import utils, discovery, dhcp, tftp
 from core.views.customers import CustomerView
-from core.views.routers import RouterView, RouterInterfaceView  
+from core.views.routers import RouterView, RouterInterfaceView, RouterVRFView, RouterOSPFView  
 from core.views.sites import SiteView, SiteRoutingView
 from core.views.network_map import NetworkMapView
 from core.views.vpns import VPNView, VPNSiteView
 from core.views.setup import SetupStatusView, AdminSetupView, SettingsSetupView
-from core.views.test import test_view
 from core.views.logs import LogsView
 from core.views.auth import AuthView
+from core.views.users import UserProfileView
+from core.views.test import test_view
+from core.views.monitor import RouterMetricsView, InterfaceMetricsView, DashboardStatsView, RouterInfoView
+from core.views.notifications import NotificationView
 
 urlpatterns = [
     # Auth endpoints
     path('auth/login/', AuthView.as_view(), name='login'),
     path('auth/logout/', AuthView.as_view(), name='logout'),
+
+    # User endpoints
+    path('users/profile/', UserProfileView.as_view(), name='user-profile'),
 
     # Test endpoint
     path('test/', test_view, name='test'),
@@ -26,6 +32,11 @@ urlpatterns = [
     # Utility endpoints
     path('utils/host-interfaces/', utils.list_host_interfaces, name='host-interfaces'),
 
+    # Notification endpoints
+    path('notifications/', NotificationView.as_view(), name='notification-list'),
+    path('notifications/<int:notification_id>/', NotificationView.as_view(), name='notification-detail'),
+    path('notifications/<int:notification_id>/acknowledge/', NotificationView.as_view(), name='notification-acknowledge'),
+
     # Models endpoints
     
     ## Customer endpoints
@@ -37,11 +48,16 @@ urlpatterns = [
     path('routers/<str:router_id>/', RouterView.as_view()),
     path('routers/<str:router_id>/interfaces/', RouterInterfaceView.as_view()),
     path('routers/<str:router_id>/interfaces/<int:interface_id>/', RouterInterfaceView.as_view()),
+    path('routers/<str:router_id>/vrfs/', RouterVRFView.as_view()),
+    path('routers/<str:router_id>/vrfs/<int:vrf_id>/', RouterVRFView.as_view()),
+    path('routers/<str:router_id>/ospf/', RouterOSPFView.as_view()),
+    path('routers/<str:router_id>/ospf/<int:process_id>/', RouterOSPFView.as_view()),
 
     ## Site endpoints
     path('sites/', SiteView.as_view()),  
     path('sites/<int:site_id>/', SiteView.as_view()),
     path('sites/<int:site_id>/enable-routing/', SiteRoutingView.as_view()),
+    path('sites/<int:site_id>/disable-routing/', SiteRoutingView.as_view()),
 
     # VPN URLs
     path('vpns/', VPNView.as_view(), name='vpn-list-create'),
@@ -66,6 +82,14 @@ urlpatterns = [
     # Network discovery endpoints
     path('network/discover/', discovery.discover_network, name='discover-network'),
     path('network/map/', NetworkMapView.as_view(), name='map_data'),
+
+    # Monitoring endpoints
+    path('monitoring/dashboard/', DashboardStatsView.as_view(), name='dashboard-stats'),
+    path('monitoring/routers/', RouterMetricsView.as_view(), name='router-metrics'),
+    path('monitoring/routers/<int:router_id>/', RouterMetricsView.as_view(), name='router-metrics-detail'),
+    path('monitoring/interfaces/', InterfaceMetricsView.as_view(), name='interface-metrics'),
+    path('monitoring/interfaces/<int:interface_id>/', InterfaceMetricsView.as_view(), name='interface-metrics-detail'),
+    path('monitoring/device-info/<int:router_id>/', RouterInfoView.as_view(), name='router-device-info'),
 
     # Logs endpoint
     path('logs/', LogsView.as_view(), name='logs'),

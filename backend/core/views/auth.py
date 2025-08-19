@@ -9,16 +9,31 @@ class AuthView(View):
     def post(self, request):
         try:
             data = request.POST
-            username = data.get('username')
-            password = data.get('password')
+            username = data.get('username', '').strip()
+            password = data.get('password', '').strip()
             
-            if not username or not password:
+            # Validate required fields
+            if not username:
                 return JsonResponse({
-                    'error': 'Username and password are required'
+                    'error': 'Username is required',
+                    'field': 'username'
+                }, status=400)
+                
+            if not password:
+                return JsonResponse({
+                    'error': 'Password is required',
+                    'field': 'password'
                 }, status=400)
             
+            # Attempt authentication
             user = authenticate(request, username=username, password=password)
             if user is not None:
+                if not user.is_active:
+                    return JsonResponse({
+                        'error': 'Your account is disabled',
+                        'field': 'username'
+                    }, status=403)
+                    
                 login(request, user)
                 return JsonResponse({
                     'message': 'Login successful',
@@ -31,14 +46,16 @@ class AuthView(View):
                 })
             else:
                 return JsonResponse({
-                    'error': 'Invalid credentials'
+                    'error': 'Invalid username or password',
+                    'field': 'password'
                 }, status=401)
                 
         except Exception as e:
             return JsonResponse({
-                'error': str(e)
+                'error': 'An unexpected error occurred. Please try again later.',
+                'detail': str(e)
             }, status=500)
-    
+
     def delete(self, request):
         try:
             logout(request)
@@ -47,5 +64,6 @@ class AuthView(View):
             })
         except Exception as e:
             return JsonResponse({
-                'error': str(e)
+                'error': 'Failed to log out. Please try again.',
+                'detail': str(e)
             }, status=500)

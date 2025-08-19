@@ -4,11 +4,9 @@ from django.http import JsonResponse
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
-from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
-from core.settings import get_settings
-from core.models import Site, Customer, Router, Interface, DHCPScope
-from core.modules.controller import NetworkController
+from core.models import Site, Customer, Interface, OSPFProcess
+from core.modules.network_controller import NetworkController
 
 @method_decorator(csrf_exempt, name='dispatch')
 class SiteView(View):
@@ -18,32 +16,92 @@ class SiteView(View):
             if site_id:
                 site = get_object_or_404(Site, id=site_id)
                 
+                ce_router_data = None
+                if site.router:
+                    ce_iface = None
+                    if site.assigned_interface:
+                        ce_ifaces = site.assigned_interface.connected_interfaces.all()
+                        if ce_ifaces.exists():
+                            ce_iface = ce_ifaces.first()
+                    ce_router_data = {
+                        'id': site.router.id,
+                        'hostname': site.router.hostname,
+                        'interface_name': ce_iface.name if ce_iface else None,
+                        'management_ip': site.router.management_ip_address,
+                        'role': site.router.role,
+                    }
+
+                dhcp_scope_str = None
+                if site.dhcp_scope:
+                    dhcp_scope_str = str(ipaddress.IPv4Network(f"{site.dhcp_scope.network}/{site.dhcp_scope.subnet_mask}", strict=False))
+
+                # --- OSPF Routing Info ---
+                routing_info = None
+                if site.assigned_interface and site.ospf_process_id:
+                    ospf_process = OSPFProcess.objects.filter(
+                        router=site.assigned_interface.router,
+                        process_id=site.ospf_process_id
+                    ).first()
+                    if ospf_process:
+                        # Get all areas and networks for this process
+                        networks = []
+                        areas = set()
+                        for net in ospf_process.networks.all():
+                            networks.append({
+                                'network': str(ipaddress.IPv4Network(f"{net.network}/{net.subnet_mask}", strict=False)),
+                                'area': net.area
+                            })
+                            areas.add(net.area)
+                        routing_info = {
+                            'protocol': 'OSPF',
+                            'priority': ospf_process.priority,
+                            'areas': sorted(list(areas)),
+                            'advertised_networks': [n['network'] for n in networks],
+                        }
+                # --- end OSPF Routing Info ---
+
                 site_data = {
                     'id': site.id,
                     'name': site.name,
                     'description': site.description,
                     'location': site.location,
-                    'dhcp_scope': str(ipaddress.IPv4Network(f"{site.dhcp_scope.network}/{site.dhcp_scope.subnet_mask}", strict=False)),
                     'customer': {
                         'id': site.customer.id,
-                        'name': site.customer.name
+                        'name': site.customer.name,
+                        'description': site.customer.description,
+                        'email': site.customer.email,
+                        'phone_number': site.customer.phone_number,
                     },
+                    'dhcp_scope': dhcp_scope_str,
+                    'link_network': str(ipaddress.IPv4Network(f"{site.link_network}/30", strict=False)) if site.link_network else None,
                     'assigned_interface': {
                         'id': site.assigned_interface.id,
                         'name': site.assigned_interface.name,
+                        'description': site.assigned_interface.description,
                         'router': {
                             'id': site.assigned_interface.router.id,
-                            'hostname': site.assigned_interface.router.hostname
-                        }
+                            'hostname': site.assigned_interface.router.hostname,
+                            'management_ip': site.assigned_interface.router.management_ip_address,
+                            'role': site.assigned_interface.router.role,
+                            'reachable': site.assigned_interface.router.reachable,
+                        },
                     } if site.assigned_interface else None,
-                    'router_id': site.router.id if site.router else None
+                    'ce_router': ce_router_data,
+                    'has_routing': site.has_routing,
+                    'vrf': {
+                        'id': site.vrf.id,
+                        'name': site.vrf.name,
+                        'route_distinguisher': site.vrf.route_distinguisher,
+                    } if site.vrf else None,
+                    'created_at': site.created_at,
+                    'updated_at': site.updated_at,
+                    'routing_info': routing_info,
                 }
                 
                 return JsonResponse(site_data)
             
             # List all sites
             else:
-                # Optional customer filtering
                 customer_id = request.GET.get('customer_id')
                 
                 if customer_id:
@@ -51,14 +109,28 @@ class SiteView(View):
                 else:
                     sites = Site.objects.all()
                 
-                # Serialize sites data with expanded relationships
-                site_list = [
-                    {
+                site_list = []
+                for site in sites:
+                    ce_router_data = None
+                    if site.router:
+                        ce_iface = None
+                        if site.assigned_interface:
+                            ce_ifaces = site.assigned_interface.connected_interfaces.all()
+                            if ce_ifaces.exists():
+                                ce_iface = ce_ifaces.first()
+                        ce_router_data = {
+                            'id': site.router.id,
+                            'hostname': site.router.hostname,
+                            'interface_name': ce_iface.name if ce_iface else None,
+                        }
+                    
+                    site_list.append({
                         'id': site.id,
                         'name': site.name,
                         'description': site.description,
                         'location': site.location,
                         'dhcp_scope': str(ipaddress.IPv4Network(f"{site.dhcp_scope.network}/{site.dhcp_scope.subnet_mask}", strict=False)),
+                        'link_network': str(ipaddress.IPv4Network(f"{site.link_network}/30", strict=False)) if site.link_network else None,
                         'customer': {
                             'id': site.customer.id,
                             'name': site.customer.name
@@ -68,13 +140,16 @@ class SiteView(View):
                             'name': site.assigned_interface.name,
                             'router': {
                                 'id': site.assigned_interface.router.id,
-                                'hostname': site.assigned_interface.router.hostname
+                                'hostname': site.assigned_interface.router.hostname,
+                                'status' : site.assigned_interface.router.reachable
                             }
                         } if site.assigned_interface else None,
-                        'router_id': site.router.id if site.router else None
-                    }
-                    for site in sites
-                ]
+                        'ce_router': ce_router_data,
+                        'has_routing': site.has_routing,
+                        'status' : site.assigned_interface.router.reachable,
+                        'created_at': site.created_at,
+                        'updated_at': site.updated_at,
+                    })
                 
                 return JsonResponse(site_list, safe=False)
         
@@ -86,7 +161,7 @@ class SiteView(View):
             # Parse JSON data
             data = json.loads(request.body)
             
-            # Validate required fields for site creation
+            # Validate required fields
             required_fields = ['name', 'customer_id', 'assigned_interface_id']
             for field in required_fields:
                 if field not in data:
@@ -94,79 +169,35 @@ class SiteView(View):
                         'message': f'Missing required field: {field}'
                     }, status=400)
             
-            # Get customer
-            customer = get_object_or_404(Customer, id=data['customer_id'])
-            
-            # Get and validate assigned interface
             if data['assigned_interface_id'] is None:
                 return JsonResponse({
                     'message': 'assigned_interface_id cannot be null'
                 }, status=400)
-                
-            assigned_interface = get_object_or_404(Interface, id=data['assigned_interface_id'])
-            
-            # Get settings
-            settings = get_settings()
-            
-            # Parse the DHCP sites network from settings
-            dhcp_sites_network = ipaddress.IPv4Network(
-                f"{settings.dhcp_sites_network_address}/{settings.dhcp_sites_network_subnet_mask}", 
-                strict=False
-            )
-            
-            # If a DHCP scope is not provided, find an available /30 subnet
-            if 'dhcp_scope' not in data:
-                # Get all existing site DHCP scopes
-                existing_scopes = DHCPScope.objects.all()
-                used_scopes = {
-                    ipaddress.IPv4Network(f"{scope.network}/30", strict=False) 
-                    for scope in existing_scopes
-                }
-                
-                # Find the first available /30 subnet
-                for network in dhcp_sites_network.subnets(new_prefix=30):
-                    if not any(network.overlaps(used_scope) for used_scope in used_scopes):
-                        dhcp_scope_network = str(network[0])
-                        break
-                else:
-                    return JsonResponse({
-                        'message': 'No available DHCP scope found'
-                    }, status=400)
-            else:
-                dhcp_scope_network = data['dhcp_scope']
-            
-            # Create DHCP Scope
-            dhcp_scope = DHCPScope(
-                is_active=False,
-                network=dhcp_scope_network,
-                subnet_mask='255.255.255.252' 
-            )
 
-            # Validate the DHCP scope
-            dhcp_scope.save()
-            
-            # Create site with assigned interface
-            site = Site(
+            # Get required objects
+            try:
+                customer = get_object_or_404(Customer, id=data['customer_id'])
+                interface = get_object_or_404(Interface, id=data['assigned_interface_id'])
+            except:
+                return JsonResponse({
+                    'message': 'Invalid customer_id or assigned_interface_id'
+                }, status=400)
+
+            # Create site using NetworkController
+            site, success = NetworkController.create_site(
                 name=data['name'],
                 customer=customer,
+                interface=interface,
                 description=data.get('description', ''),
-                location=data.get('location', ''),
-                dhcp_scope=dhcp_scope,
+                location=data.get('location', '')
             )
-            
-            site.save()
 
-            # Assign interface using NetworkController
-            success = NetworkController.assign_interface(assigned_interface, site)
             if not success:
-                # Clean up the created DHCP scope if interface assignment fails
-                dhcp_scope.delete()
-                site.delete()
                 return JsonResponse({
-                    'message': 'Failed to assign interface to site'
+                    'message': 'Failed to create site'
                 }, status=500)
-            
-            # Include full information in the response
+
+            # Return site data
             return JsonResponse({
                 'id': site.id,
                 'name': site.name,
@@ -175,17 +206,13 @@ class SiteView(View):
                 'location': site.location,
                 'dhcp_scope': str(ipaddress.IPv4Network(f"{site.dhcp_scope.network}/{site.dhcp_scope.subnet_mask}", strict=False)),
                 'assigned_interface_id': site.assigned_interface.id,
-                'router_id': site.router.id if site.router else None
+                'router_id': site.router.id if site.router else None,
+                'status' : site.assigned_interface.router.reachable
             }, status=201)
         
         except json.JSONDecodeError:
             return JsonResponse({
                 'message': 'Invalid JSON'
-            }, status=400)
-        
-        except (ValidationError, ValueError) as e:
-            return JsonResponse({
-                'message': str(e)
             }, status=400)
         
         except Exception as e:
@@ -222,7 +249,8 @@ class SiteView(View):
                 'location': site.location,
                 'dhcp_scope': str(ipaddress.IPv4Network(f"{site.dhcp_scope.network}/{site.dhcp_scope.subnet_mask}", strict=False)),
                 'assigned_interface_id': site.assigned_interface.id,
-                'router_id': site.router.id if site.router else None
+                'router_id': site.router.id if site.router else None,
+                'status' : site.assigned_interface.router.reachable
             })
             
         except json.JSONDecodeError:
@@ -265,10 +293,8 @@ class SiteView(View):
 class SiteRoutingView(View):
     def post(self, request, site_id):
         try:
-            # Get site
             site = get_object_or_404(Site, id=site_id)
             
-            # Check if site has required components
             if not site.router:
                 return JsonResponse({
                     'message': 'Site has no assigned router'
@@ -283,12 +309,42 @@ class SiteRoutingView(View):
             success = NetworkController.enable_routing(site)
             
             if success:
+                site.has_routing = True
+                site.save()
                 return JsonResponse({
                     'message': f'Successfully configured routing for site {site.name}'
                 })
             else:
                 return JsonResponse({
                     'message': 'Failed to configure routing'
+                }, status=500)
+                
+        except Exception as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=500)
+
+    def delete(self, request, site_id):
+        try:
+            site = get_object_or_404(Site, id=site_id)
+            
+            if not site.has_routing:
+                return JsonResponse({
+                    'message': 'Site routing is not enabled'
+                }, status=400)
+            
+            # Disable routing using NetworkController
+            success = NetworkController.disable_routing(site)
+            
+            if success:
+                site.has_routing = False
+                site.save()
+                return JsonResponse({
+                    'message': f'Successfully disabled routing for site {site.name}'
+                })
+            else:
+                return JsonResponse({
+                    'message': 'Failed to disable routing'
                 }, status=500)
                 
         except Exception as e:

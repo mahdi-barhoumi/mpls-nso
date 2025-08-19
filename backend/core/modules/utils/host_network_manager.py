@@ -45,19 +45,23 @@ class _HostNetworkManager:
             if len(parts) >= 6:
                 routes.append({
                     'prefix': parts[3],
-                    'id': parts[4],
+                    'interface_id': int(parts[4]),
                     'gateway': ' '.join(parts[5:])
                 })
         
         return routes
-    
-    def add_route(self, prefix: str, gateway: str, interface: Union[int, str]) -> bool:
-        # Check if route exists and delete it
-        existing_routes = self.list_routes()
-        for route in existing_routes:
+
+    def _route_exists(self, prefix: str) -> Optional[Dict[str, str]]:
+        for route in self.list_routes():
             if route['prefix'] == prefix:
-                self.delete_route(prefix, interface)
-                break
+                return route
+        return None
+    
+    def add_route(self, prefix: str, gateway: str, interface: int) -> bool:
+        # Check if route exists and delete it if found (with its original interface)
+        existing_route = self._route_exists(prefix)
+        if existing_route:
+            self.delete_route(prefix, int(existing_route['interface_id']))
 
         cmd = [
             'netsh', 'interface', 'ipv4', 'add', 'route', f'prefix={prefix}', f'nexthop={gateway}', f'interface={interface}'
@@ -71,7 +75,16 @@ class _HostNetworkManager:
         except HostNetworkManagerError:
             return False
     
-    def delete_route(self, prefix: str, interface: Union[int, str]) -> bool:
+    def delete_route(self, prefix: str, interface: Optional[int] = None) -> bool:
+        existing_route = self._route_exists(prefix)
+        if not existing_route:
+            self.logger.info(f"Route doesn't exist: {prefix}")
+            return True
+
+        # If interface is not specified, use the one from existing route
+        if interface is None:
+            interface = existing_route['interface_id']
+
         cmd = [
             'netsh', 'interface', 'ipv4', 'delete', 'route', f'prefix={prefix}', f'interface={interface}'
         ]
@@ -84,7 +97,7 @@ class _HostNetworkManager:
         except HostNetworkManagerError:
             return False
     
-    def configure_interface(self, interface: Union[int, str], address: str, subnet_mask: str, default_gateway: Optional[str] = None) -> bool:
+    def configure_interface(self, interface: int, address: str, subnet_mask: str, default_gateway: Optional[str] = None) -> bool:
         cmd = [
             'netsh', 'interface', 'ipv4', 'set', 'address', f'name={interface}', 'static', f'address={address}', f'mask={subnet_mask}'
         ]

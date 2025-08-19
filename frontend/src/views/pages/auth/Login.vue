@@ -10,19 +10,40 @@ const toast = useToast()
 const username = ref('')
 const password = ref('')
 const checked = ref(false)
+const loading = ref(false)
+const errors = ref({
+  username: '',
+  password: '',
+})
+
+const clearErrors = () => {
+  errors.value = {
+    username: '',
+    password: '',
+  }
+}
 
 const handleLogin = async () => {
+  clearErrors()
+  loading.value = true
   try {
     const auth = new AuthService()
     await auth.login(username.value, password.value)
     router.push('/')
   } catch (error) {
+    // Set field-specific error if available
+    if (error.field) {
+      errors.value[error.field] = error.message
+    }
+
     toast.add({
       severity: 'error',
-      summary: 'Error',
-      detail: error.response?.data?.error || 'Invalid credentials',
-      life: 3000,
+      summary: 'Login Failed',
+      detail: error.message || 'Invalid credentials',
+      life: 5000,
     })
+  } finally {
+    loading.value = false
   }
 }
 </script>
@@ -62,14 +83,17 @@ const handleLogin = async () => {
                 id="username"
                 type="text"
                 placeholder="Username"
-                class="w-full md:w-[30rem] mb-8"
+                class="w-full md:w-[30rem] mb-2"
+                :class="{ 'p-invalid': errors.username }"
                 v-model="username"
                 required
+                @focus="errors.username = ''"
               />
+              <small v-if="errors.username" class="p-error block mb-4">{{ errors.username }}</small>
 
               <label
                 for="password"
-                class="block text-surface-900 dark:text-surface-0 font-medium text-xl mb-2"
+                class="block text-surface-900 dark:text-surface-0 font-medium text-xl mb-2 mt-4"
                 >Password</label
               >
               <Password
@@ -77,19 +101,27 @@ const handleLogin = async () => {
                 v-model="password"
                 placeholder="Password"
                 :toggleMask="true"
-                class="mb-4"
-                fluid
+                :class="{ 'p-invalid': errors.password }"
+                class="mb-2"
                 :feedback="false"
                 required
+                @focus="errors.password = ''"
               ></Password>
+              <small v-if="errors.password" class="p-error block mb-4">{{ errors.password }}</small>
 
-              <div class="flex items-center justify-between mt-2 mb-8 gap-8">
+              <div class="flex items-center justify-between mt-4 mb-8 gap-8">
                 <div class="flex items-center">
                   <Checkbox v-model="checked" id="rememberme1" binary class="mr-2"></Checkbox>
                   <label for="rememberme1">Remember me</label>
                 </div>
               </div>
-              <Button type="submit" label="Sign In" class="w-full"></Button>
+              <Button
+                type="submit"
+                :label="loading ? 'Signing in...' : 'Sign In'"
+                class="w-full"
+                :loading="loading"
+                :disabled="loading"
+              ></Button>
             </div>
           </form>
         </div>
@@ -107,5 +139,12 @@ const handleLogin = async () => {
 .pi-eye-slash {
   transform: scale(1.6);
   margin-right: 1rem;
+}
+
+.p-password {
+  width: 100%;
+}
+.p-password :deep(input) {
+  width: 100%;
 }
 </style>

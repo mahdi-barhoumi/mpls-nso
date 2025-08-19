@@ -48,10 +48,6 @@ class Settings(models.Model):
             )
         ],
     )
-    dhcp_lease_time = models.PositiveIntegerField(
-        validators=[MinValueValidator(86400)],
-        help_text='DHCP lease time in seconds'
-    )
     
     # Management settings
     management_vrf = models.CharField(max_length=100)
@@ -61,6 +57,16 @@ class Settings(models.Model):
             MaxValueValidator(4294967295)  # Max AS number in BGP
         ],
         help_text='BGP Autonomous System number'
+    )
+
+    # Monitoring and discovery intervals (stored in seconds)
+    monitoring_interval = models.PositiveIntegerField(
+        validators=[MinValueValidator(1)],
+        help_text='Monitoring interval in seconds'
+    )
+    discovery_interval = models.PositiveIntegerField(
+        validators=[MinValueValidator(1)],
+        help_text='Discovery interval in seconds'
     )
     
     class Meta:
@@ -79,6 +85,7 @@ class Settings(models.Model):
         self.validate_interface_id()
         self.validate_dhcp_sites_subnet_size()
         self.validate_network_overlap()
+        self.validate_intervals()
         
         # Attempt to apply network configuration before saving
         self.apply_network_configuration()
@@ -133,6 +140,11 @@ class Settings(models.Model):
                 
         except (ValueError, TypeError) as e:
             raise ValidationError(f'Network validation error: {str(e)}')
+
+    def validate_intervals(self):
+        if self.monitoring_interval and self.discovery_interval:
+            if self.monitoring_interval >= self.discovery_interval:
+                raise ValidationError('Monitoring interval must be less than discovery interval')
     
     def apply_network_configuration(self):
         if not self.host_interface_id:

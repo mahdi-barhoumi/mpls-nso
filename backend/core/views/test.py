@@ -1,8 +1,10 @@
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
-from core.modules.controller import NetworkController
+from django.core.serializers import serialize
+from core.modules.network_controller import NetworkController
 from core.modules.discovery import NetworkDiscoverer
+from core.modules.utils.host_network_manager import HostNetworkManager
 from core.models import *
 
 @csrf_exempt
@@ -10,9 +12,15 @@ from core.models import *
 def test_view(request):
     try:
 
-        interface = Interface.objects.get(pk=33)
+        #Interface.objects.filter(router=Router.objects.get(pk=5)).delete()
 
-        data = NetworkDiscoverer.discover_single_device("172.0.0.6")
+        #data = serialize('json', interface)
+
+        #data = NetworkDiscoverer.discover_single_device("172.0.0.6")
+
+        #data = NetworkController.disable_route_redistribution(site=Site.objects.get(pk=2))
+
+        data = hasattr(Router.objects.get(pk=9), 'site')
 
         return JsonResponse(data, safe=False)
 

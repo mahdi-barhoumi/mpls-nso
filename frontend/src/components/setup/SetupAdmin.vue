@@ -10,7 +10,6 @@
       <div class="text-muted-color mb-6">
         An administrator account has already been set up. You can proceed to the next step.
       </div>
-      <Button label="Next" icon="pi pi-arrow-right" iconPos="right" @click="$emit('next')" />
     </div>
     <div v-else>
       <div class="text-surface-900 dark:text-surface-0 font-medium text-2xl mb-2">
@@ -93,11 +92,10 @@
           </small>
         </div>
       </div>
-
-      <div class="flex items-center justify-between mt-8">
-        <Button label="Back" icon="pi pi-arrow-left" text @click="$emit('prev')" />
-        <Button label="Next" icon="pi pi-arrow-right" iconPos="right" @click="handleNext" />
-      </div>
+    </div>
+    <div class="flex items-center justify-between mt-8">
+      <Button label="Back" icon="pi pi-arrow-left" text @click="$emit('prev')" />
+      <Button label="Next" icon="pi pi-arrow-right" iconPos="right" @click="handleNext" />
     </div>
   </div>
 </template>

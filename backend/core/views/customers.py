@@ -27,8 +27,23 @@ class CustomerView(View):
                         {
                             'id': site.id,
                             'name': site.name,
-                            'location': site.location
+                            'location': site.location,
+                            'description': site.description,
+                            'link_network': site.link_network,
+                            'router': site.router.hostname if site.router else None,
+                            'vrf': site.vrf.name if site.vrf else None,
                         } for site in customer.sites.all()
+                    ],
+                    'vpns': [
+                        {
+                            'id': vpn.id,
+                            'name': vpn.name,
+                            'description': vpn.description,
+                            'sites': [
+                                {'id': s.id, 'name': s.name}
+                                for s in vpn.sites.all()
+                            ]
+                        } for vpn in customer.vpns.all()
                     ]
                 }
                 return JsonResponse(customer_data)

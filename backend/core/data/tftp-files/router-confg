@@ -11,7 +11,7 @@ ip ssh version 2
   transport input ssh
   login local
 exit
-
+no ip domain lookup
 restconf
 lldp run
 

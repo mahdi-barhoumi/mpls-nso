@@ -21,4 +21,25 @@ app.use(PrimeVue, {
 })
 app.use(ToastService)
 app.use(ConfirmationService)
+
+// Mount the app and hide preloader with animation
 app.mount('#app')
+
+// Hide preloader after app is mounted
+const preloader = document.querySelector('.preloader')
+if (preloader) {
+  // Wait for initial animations to complete
+  setTimeout(() => {
+    // Add fade-out class to trigger transitions
+    preloader.classList.add('fade-out')
+
+    // Remove from DOM after animation completes
+    preloader.addEventListener(
+      'transitionend',
+      () => {
+        preloader.remove()
+      },
+      { once: true },
+    )
+  }, 800)
+}

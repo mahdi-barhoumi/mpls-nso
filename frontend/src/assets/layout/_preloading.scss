@@ -1,47 +1,109 @@
 .preloader {
-    position: fixed;
-    z-index: 999999;
-    background: #edf1f5;
-    width: 100%;
-    height: 100%;
-}
-.preloader-content {
-    border: 0 solid transparent;
-    border-radius: 50%;
-    width: 150px;
-    height: 150px;
-    position: absolute;
-    top: calc(50vh - 75px);
-    left: calc(50vw - 75px);
-}
+  position: fixed;
+  z-index: 999999;
+  background: var(--surface-ground);
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  transition:
+    opacity 0.5s ease,
+    backdrop-filter 0.5s ease;
 
-.preloader-content:before, .preloader-content:after{
-    content: '';
-    border: 1em solid var(--primary-color);
-    border-radius: 50%;
-    width: inherit;
-    height: inherit;
-    position: absolute;
-    top: 0;
-    left: 0;
-    animation: loader 2s linear infinite;
+  &.fade-out {
     opacity: 0;
+    backdrop-filter: blur(8px);
+  }
 }
 
-.preloader-content:before{
-    animation-delay: 0.5s;
+.preloader-content {
+  position: relative;
+  width: 120px;
+  height: 120px;
 }
 
-@keyframes loader{
-    0%{
-        transform: scale(0);
-        opacity: 0;
-    }
-    50%{
-        opacity: 1;
-    }
-    100%{
-        transform: scale(1);
-        opacity: 0;
-    }
+.preloader-spinner {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+
+  &:nth-child(1) {
+    border: 4px solid var(--primary-color);
+    border-top-color: transparent;
+    border-left-color: transparent;
+    animation: spin 1.2s cubic-bezier(0.42, 0, 0.58, 1) infinite;
+  }
+
+  &:nth-child(2) {
+    width: 70%;
+    height: 70%;
+    top: 15%;
+    left: 15%;
+    border: 4px solid var(--primary-200);
+    border-bottom-color: transparent;
+    border-right-color: transparent;
+    animation: spin 1.8s cubic-bezier(0.42, 0, 0.58, 1) infinite reverse;
+  }
+}
+
+.preloader-text {
+  color: var(--text-color);
+  font-size: 1.2rem;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  opacity: 0;
+  animation: fadeInUp 0.5s ease forwards 0.5s;
+}
+
+.preloader-progress {
+  width: 200px;
+  height: 4px;
+  background: var(--surface-200);
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+  opacity: 0;
+  animation: fadeInUp 0.5s ease forwards 0.7s;
+
+  &::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 40%;
+    background: var(--primary-color);
+    border-radius: 4px;
+    animation: progress 2s ease infinite;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes progress {
+  0% {
+    left: -40%;
+  }
+  100% {
+    left: 100%;
+  }
 }

@@ -1,118 +1,149 @@
 <template>
-  <div class="network-container">
-    <!-- Toolbar for zoom and filtering -->
-    <div class="p-4 flex items-center justify-between surface-card shadow-2 border-round">
-      <div class="flex gap-1">
-        <Button icon="pi pi-search-plus" class="p-button-secondary" @click="zoomIn" />
-        <Button icon="pi pi-search-minus" class="p-button-secondary" @click="zoomOut" />
-        <Button label="Reset" icon="pi pi-refresh" class="p-button-secondary" @click="resetView" />
-        <Button
-          label="Save Layout"
-          icon="pi pi-save"
-          class="p-button-secondary"
-          @click="saveLayout"
-        />
+  <div class="card h-full">
+    <div class="flex justify-between mb-2">
+      <div>
+        <h5 class="text-lg m-1">Network Topology</h5>
+        <div class="flex gap-2">
+          <div class="flex items-center gap-2">
+            <div
+              class="flex items-center justify-center bg-blue-100 dark:bg-blue-400/10 rounded-border"
+              style="width: 1.5rem; height: 1.5rem"
+            >
+              <img src="/demo/images/routers/router_black.svg" class="w-4 h-4" alt="P Router" />
+            </div>
+            <span class="text-sm">P Router</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <div
+              class="flex items-center justify-center bg-orange-100 dark:bg-orange-400/10 rounded-border"
+              style="width: 1.5rem; height: 1.5rem"
+            >
+              <img src="/demo/images/routers/router_blue.svg" class="w-4 h-4" alt="PE Router" />
+            </div>
+            <span class="text-sm">PE Router</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <div
+              class="flex items-center justify-center bg-green-100 dark:bg-green-400/10 rounded-border"
+              style="width: 1.5rem; height: 1.5rem"
+            >
+              <img
+                src="/demo/images/routers/router-in-building.svg"
+                class="w-4 h-4"
+                alt="CE Router"
+              />
+            </div>
+            <span class="text-sm">CE Router</span>
+          </div>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <div
+          class="flex items-center justify-center bg-purple-100 dark:bg-purple-400/10 rounded-border p-2"
+        >
+          <Button icon="pi pi-search-plus" class="p-button-text p-button-rounded" @click="zoomIn" />
+        </div>
+        <div
+          class="flex items-center justify-center bg-cyan-100 dark:bg-cyan-400/10 rounded-border p-2"
+        >
+          <Button
+            icon="pi pi-search-minus"
+            class="p-button-text p-button-rounded"
+            @click="zoomOut"
+          />
+        </div>
+        <div
+          class="flex items-center justify-center bg-orange-100 dark:bg-orange-400/10 rounded-border p-2"
+        >
+          <Button icon="pi pi-refresh" class="p-button-text p-button-rounded" @click="resetView" />
+        </div>
       </div>
     </div>
 
-    <!-- Network Graph -->
-    <div class="network-graph-container surface-card shadow-2 border-round mt-3">
+    <div class="network-graph-container border-round mt-3">
       <v-network-graph
         ref="graph"
         :nodes="graphData.nodes"
         :edges="graphData.edges"
         :layouts="layouts"
         :configs="configs"
+        :event-handlers="eventHandlers"
         @mouseup="saveLayout"
-        @node-click="onNodeClick"
-        @edge-click="onEdgeClick"
         @layout-updated="onLayoutUpdated"
         class="h-full w-full"
       >
-        <!-- Define custom node rendering -->
+        <!-- Custom node rendering -->
         <template #override-node="{ nodeId, scale = 1, config, ...slotProps }">
-          <!-- <circle :r="config.radius * scale" :fill="`var(--p-primary-color)`" v-bind="slotProps" /> -->
-          <text
-            :x="0"
-            :y="(config.radius + 10) * scale"
-            :font-size="12 * scale"
-            text-anchor="middle"
-            dominant-baseline="central"
-            fill="var(--p-blue-600)"
-          >
-            {{ getNodeName(nodeId) }}
-          </text>
-          <image
-            :xlink:href="getNodeIcon(nodeId)"
-            :x="-(config.radius - 8) * scale"
-            :y="-(config.radius - 8) * scale"
-            :width="(config.radius - 8) * 2 * scale"
-            :height="(config.radius - 8) * 2 * scale"
-          />
+          <g>
+            <!-- Status dot: up (green), down (red), unknown (gray) -->
+            <circle
+              v-if="graphData.nodes[nodeId]"
+              :cx="(config.radius - 6) * scale * 0.85"
+              :cy="-(config.radius - 6) * scale * 0.85"
+              :r="4 * scale"
+              :fill="graphData.nodes[nodeId].reachable === true ? '#22c55e' : graphData.nodes[nodeId].reachable === false ? '#ef4444' : '#94a3b8'"
+              stroke="#fff"
+              stroke-width="1"
+              style="z-index: 100; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.08));"
+            />
+            <image
+              :xlink:href="getNodeIcon(nodeId)"
+              :x="-(selectedNodeId === nodeId ? (config.radius - 8) * 1.15 * scale : (config.radius - 8) * scale)"
+              :y="-(selectedNodeId === nodeId ? (config.radius - 8) * 1.15 * scale : (config.radius - 8) * scale)"
+              :width="(selectedNodeId === nodeId ? (config.radius - 8) * 2 * 1.15 * scale : (config.radius - 8) * 2 * scale)"
+              :height="(selectedNodeId === nodeId ? (config.radius - 8) * 2 * 1.15 * scale : (config.radius - 8) * 2 * scale)"
+              :style="selectedNodeId === nodeId ? 'filter: brightness(0.8);' : ''"
+            />
+            <text
+              :x="0"
+              :y="(config.radius + 12) * scale"
+              :font-size="(selectedNodeId === nodeId ? 15 : 13) * scale"
+              font-weight="500"
+              text-anchor="middle"
+              dominant-baseline="central"
+              :fill="getLabelColor()"
+              style="letter-spacing:0.5px;"
+            >
+              {{ getNodeName(nodeId) }}
+            </text>
+          </g>
         </template>
 
-        <!-- Define custom edge labels -->
+        <!-- Custom edge labels -->
         <template #edge-label="{ edge, scale = 1, ...slotProps }">
           <v-edge-label
-            v-if="
-              edge.sourceInterfaceType === 'physical' && edge.targetInterfaceType === 'physical'
-            "
             :text="edge.subnet"
             align="center"
-            vertical-align="above"
+            :vertical-align="(edge.sourceInterfaceType === 'logical' || edge.targetInterfaceType === 'logical') ? 'below' : 'above'"
             v-bind="slotProps"
-            fill="var(--p-primary-500)"
+            :fill="getEdgeLabelColor()"
             :font-size="10 * (scale || 1)"
+            font-weight="400"
+            style="letter-spacing:0.2px;"
           />
           <v-edge-label
-            v-if="
-              edge.sourceInterfaceType === 'physical' && edge.targetInterfaceType === 'physical'
-            "
-            :text="edge.sourceInterfaceName"
+            :text="abbreviateIface(edge.sourceInterfaceName)"
             align="source"
-            vertical-align="above"
+            :vertical-align="(edge.sourceInterfaceType === 'logical' || edge.targetInterfaceType === 'logical') ? 'below' : 'above'"
             v-bind="slotProps"
-            fill="var(--text-color)"
-            :font-size="10 * (scale || 1)"
+            :fill="getIfaceLabelColor()"
+            :font-size="9 * (scale || 1)"
+            font-weight="400"
+            style="letter-spacing:0.2px;"
           />
           <v-edge-label
-            v-if="
-              edge.sourceInterfaceType === 'physical' && edge.targetInterfaceType === 'physical'
-            "
-            :text="edge.targetInterfaceName"
+            :text="abbreviateIface(edge.targetInterfaceName)"
             align="target"
-            vertical-align="above"
+            :vertical-align="(edge.sourceInterfaceType === 'logical' || edge.targetInterfaceType === 'logical') ? 'below' : 'above'"
             v-bind="slotProps"
-            :font-size="10 * (scale || 1)"
-            fill="var(--text-color)"
+            :font-size="9 * (scale || 1)"
+            font-weight="400"
+            :fill="getIfaceLabelColor()"
+            style="letter-spacing:0.2px;"
           />
         </template>
       </v-network-graph>
     </div>
-
-    <!-- Details Dialog -->
-    <Dialog
-      v-if="selectedElement"
-      :visible="true"
-      :header="selectedElement.type === 'node' ? 'Node Details' : 'Link Details'"
-      modal
-      class="w-11 sm:w-6"
-      @hide="closeDetails"
-    >
-      <template v-if="selectedElement.type === 'node'">
-        <div v-for="(value, key) in selectedElement.data" :key="key" class="mb-2">
-          <span class="font-bold capitalize">{{ key.replace(/_/g, ' ') }}:</span>
-          <span>{{ value }}</span>
-        </div>
-      </template>
-
-      <template v-else-if="selectedElement.type === 'link'">
-        <div v-for="(value, key) in selectedElement.data" :key="key" class="mb-2">
-          <span class="font-bold capitalize">{{ key.replace(/_/g, ' ') }}:</span>
-          <span>{{ value }}</span>
-        </div>
-      </template>
-    </Dialog>
   </div>
 </template>
 
@@ -121,12 +152,12 @@ import { VNetworkGraph, VEdgeLabel } from 'v-network-graph'
 import 'v-network-graph/lib/style.css'
 import { MappingService } from '@/service/MappingService.js'
 import Button from 'primevue/button'
-import Dialog from 'primevue/dialog'
 
 const STORAGE_KEYS = {
   NODES: 'network-graph-nodes',
   LAYOUTS: 'network-graph-layouts',
   FETCHED_NODES: 'network-graph-fetched-nodes',
+  ZOOM: 'network-graph-zoom', // Add zoom key
 }
 
 export default {
@@ -135,7 +166,6 @@ export default {
     VNetworkGraph,
     VEdgeLabel,
     Button,
-    Dialog,
   },
   data() {
     return {
@@ -148,6 +178,8 @@ export default {
         nodes: {},
       },
       fetchedNodeIds: new Set(),
+      selectedNodeId: null, // Track selected node
+      currentZoom: 1, // Track current zoom
       configs: {
         view: {
           panEnabled: true,
@@ -182,13 +214,36 @@ export default {
           },
         },
       },
-      selectedElement: null,
+
       saveDebounce: null,
+      eventHandlers: {
+        'node:click': ({ node }) => {
+          const nodeData = this.graphData.nodes[node]
+          if (nodeData) {
+            this.selectedNodeId = node // Set selected node
+            this.$emit('node-selected', node)
+          }
+        },
+        'edge:click': ({ edge }) => {
+          // Optionally handle edge clicks if needed
+        },
+      },
     }
   },
   created() {
     // Load persisted data
     this.loadPersistedData()
+
+    // Restore zoom level from localStorage
+    const zoom = localStorage.getItem(STORAGE_KEYS.ZOOM)
+    if (zoom) {
+      this.currentZoom = Number(zoom)
+      this.$nextTick(() => {
+        if (this.$refs.graph && typeof this.$refs.graph.setZoom === 'function') {
+          this.$refs.graph.setZoom(this.currentZoom)
+        }
+      })
+    }
 
     // Initial fetch
     this.fetchNetworkData()
@@ -229,6 +284,12 @@ export default {
         if (nodesJson) {
           this.graphData.nodes = JSON.parse(nodesJson)
         }
+
+        // Load zoom level
+        const zoom = localStorage.getItem(STORAGE_KEYS.ZOOM)
+        if (zoom) {
+          this.currentZoom = Number(zoom)
+        }
       } catch (error) {
         console.error('Error loading persisted data:', error)
         // If there's an error loading persisted data, fallback to default behavior
@@ -247,6 +308,9 @@ export default {
 
         // Save nodes
         localStorage.setItem(STORAGE_KEYS.NODES, JSON.stringify(this.graphData.nodes))
+
+        // Save zoom level
+        localStorage.setItem(STORAGE_KEYS.ZOOM, String(this.currentZoom))
       } catch (error) {
         console.error('Error persisting data:', error)
       }
@@ -254,9 +318,6 @@ export default {
 
     // Use both event handlers to ensure we catch the drag event regardless of library version
     onLayoutUpdated(event) {
-      // This is called whenever the layout is changed
-      console.log('Layout updated:', event)
-
       // Debounce the save operation to avoid excessive writes
       if (this.saveDebounce) {
         clearTimeout(this.saveDebounce)
@@ -271,33 +332,60 @@ export default {
       try {
         const data = await MappingService.fetchNetworkData()
 
-        // Convert arrays to objects for v-network-graph, maintaining previously fetched nodes
-        const nodesObj = { ...this.graphData.nodes }
-        data.nodes.forEach((node) => {
-          nodesObj[node.id] = node
-          this.fetchedNodeIds.add(node.id)
+        // Get current node IDs from backend
+        const currentNodeIds = new Set(data.nodes.map((node) => node.id))
+
+        // Create new nodes object while preserving existing node data
+        const nodesObj = {}
+
+        // First, add all existing nodes that are still present in backend
+        Object.entries(this.graphData.nodes).forEach(([id, node]) => {
+          if (currentNodeIds.has(Number(id))) {
+            nodesObj[id] = node
+          }
         })
 
+        // Then add or update nodes from backend
+        data.nodes.forEach((node) => {
+          if (nodesObj[node.id]) {
+            // Update existing node data while preserving other properties
+            nodesObj[node.id] = { ...nodesObj[node.id], ...node }
+          } else {
+            // Add new node
+            nodesObj[node.id] = node
+          }
+        })
+
+        // Update edges
         const edgesObj = {}
         data.edges.forEach((edge) => {
           edgesObj[edge.id] = edge
         })
 
+        // Update graph data
         this.graphData = {
           nodes: nodesObj,
           edges: edgesObj,
         }
 
-        // Only generate circular layout for nodes that don't have saved positions
-        this.generateLayoutForNewNodes(Object.keys(nodesObj))
+        // Generate layout only for new nodes
+        const newNodes = data.nodes
+          .filter((node) => !this.layouts.nodes[node.id])
+          .map((node) => node.id)
+
+        if (newNodes.length > 0) {
+          this.generateLayoutForNewNodes(newNodes)
+        }
 
         // Persist the updated data
         this.persistData()
 
-        // Ensure the graph is centered after data is loaded
-        this.$nextTick(() => {
-          this.$refs.graph.fitToContents()
-        })
+        // Only fit to contents if there are new nodes
+        if (newNodes.length > 0) {
+          this.$nextTick(() => {
+            this.$refs.graph.fitToContents()
+          })
+        }
       } catch (error) {
         console.error('Error fetching network data:', error)
       }
@@ -366,42 +454,70 @@ export default {
       return node.label
     },
 
-    onNodeClick(event) {
-      const nodeId = event.node
-      const node = this.graphData.nodes[nodeId]
-      if (node) {
-        this.selectedElement = {
-          type: 'node',
-          data: node,
-        }
-      }
+    getLabelColor() {
+      // Theme-aware: dark text on light, light text on dark
+      return document.documentElement.className.includes('dark') ? '#e5e7eb' : '#222';
     },
 
-    onEdgeClick(event) {
-      const edgeId = event.edge
-      const edge = this.graphData.edges[edgeId]
-      if (edge) {
-        this.selectedElement = {
-          type: 'link',
-          data: edge,
-        }
-      }
+    getEdgeLabelColor() {
+      // Slightly muted, theme-aware
+      return document.documentElement.className.includes('dark') ? '#cbd5e1' : '#374151';
     },
 
-    closeDetails() {
-      this.selectedElement = null
+    getIfaceLabelColor() {
+      // Even more muted, theme-aware
+      return document.documentElement.className.includes('dark') ? '#94a3b8' : '#64748b';
+    },
+
+    abbreviateIface(name) {
+      if (!name) return ''
+      return name
+        .replace(/^GigabitEthernet/, 'Gi')
+        .replace(/^FastEthernet/, 'Fa')
+        .replace(/^TenGigabitEthernet/, 'Te')
+        .replace(/^Ethernet/, 'Eth')
+        .replace(/^Port-channel/, 'Po')
+        .replace(/^Loopback/, 'Lo')
+        .replace(/^Serial/, 'Se')
     },
 
     zoomIn() {
-      this.$refs.graph.zoomIn()
+      if (this.$refs.graph && typeof this.$refs.graph.zoomIn === 'function') {
+        this.$refs.graph.zoomIn()
+        // Get new zoom value after zooming in
+        this.$nextTick(() => {
+          if (typeof this.$refs.graph.getZoom === 'function') {
+            this.currentZoom = this.$refs.graph.getZoom()
+            localStorage.setItem(STORAGE_KEYS.ZOOM, String(this.currentZoom))
+          }
+        })
+      }
     },
 
     zoomOut() {
-      this.$refs.graph.zoomOut()
+      if (this.$refs.graph && typeof this.$refs.graph.zoomOut === 'function') {
+        this.$refs.graph.zoomOut()
+        // Get new zoom value after zooming out
+        this.$nextTick(() => {
+          if (typeof this.$refs.graph.getZoom === 'function') {
+            this.currentZoom = this.$refs.graph.getZoom()
+            localStorage.setItem(STORAGE_KEYS.ZOOM, String(this.currentZoom))
+          }
+        })
+      }
     },
 
     resetView() {
-      this.$refs.graph.fitToContents()
+      if (this.$refs.graph && typeof this.$refs.graph.fitToContents === 'function') {
+        this.$refs.graph.fitToContents()
+        // After fitting, update zoom value
+        this.$nextTick(() => {
+          if (typeof this.$refs.graph.getZoom === 'function') {
+            this.currentZoom = this.$refs.graph.getZoom()
+            localStorage.setItem(STORAGE_KEYS.ZOOM, String(this.currentZoom))
+          }
+        })
+      }
     },
   },
 }
@@ -410,6 +526,24 @@ export default {
 <style scoped>
 .network-graph-container {
   height: 600px;
-  background-color: var(--surface-card);
+  background-color: var(--surface-ground);
+  border: 1px solid var(--surface-border);
+}
+
+/* Subtle, visible edge lines */
+:deep(.v-network-graph-edge-path) {
+  stroke: #a3a3a3 !important;
+  stroke-width: 2.5px !important;
+  opacity: 0.85;
+}
+
+.p-button.p-button-text {
+  color: var(--primary-color);
+  padding: 0;
+}
+
+.p-button.p-button-text:hover {
+  background: transparent;
+  color: var(--primary-600);
 }
 </style>

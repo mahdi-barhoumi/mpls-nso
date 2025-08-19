@@ -1,10 +1,9 @@
 import logging
 import ipaddress
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from django.utils import timezone
 from django.db import transaction
 from core.modules.utils.restconf import RestconfWrapper
-from core.models import DHCPLease, Router, VRF, RouteTarget, Interface, Site
+from core.models import DHCPLease, Router, VRF, RouteTarget, Interface, Site, OSPFNetwork, OSPFProcess, Notification
 from core.settings import get_settings
 
 class _NetworkDiscoverer:
@@ -24,7 +23,8 @@ class _NetworkDiscoverer:
                 "provider_core": 0,
                 "provider_edge": 0,
                 "customer_edge": 0,
-                "reachable": 0
+                "reachable": 0,
+                "unreachable": 0
             },
             "vrfs": {
                 "created": 0,
@@ -32,6 +32,11 @@ class _NetworkDiscoverer:
                 "removed": 0
             },
             "interfaces": {
+                "created": 0,
+                "updated": 0,
+                "removed": 0
+            },
+            "ospf_processes": {
                 "created": 0,
                 "updated": 0,
                 "removed": 0
@@ -77,7 +82,8 @@ class _NetworkDiscoverer:
                 "provider_core": 0,
                 "provider_edge": 0,
                 "customer_edge": 0,
-                "reachable": 0
+                "reachable": 0,
+                "unreachable": 0
             },
             "vrfs": {
                 "created": 0,
@@ -89,16 +95,18 @@ class _NetworkDiscoverer:
                 "updated": 0,
                 "removed": 0
             },
+            "ospf_processes": {
+                "created": 0,
+                "updated": 0,
+                "removed": 0
+            },
             "connections": {
                 "created": 0
             }
         }
         
-        # Reset reachability status for all routers
-        Router.objects.all().update(reachable=False)
-        
         # Get all active DHCP leases
-        active_leases = DHCPLease.objects.filter(expiry_time__gt=timezone.now())
+        active_leases = DHCPLease.objects.filter(active=True)
         self.logger.info(f"Found {active_leases.count()} active DHCP leases")
         
         # Process devices in parallel with thread pool
@@ -145,7 +153,8 @@ class _NetworkDiscoverer:
                 "provider_core": 0,
                 "provider_edge": 0,
                 "customer_edge": 0,
-                "reachable": 0
+                "reachable": 0,
+                "unreachable": 0
             },
             "vrfs": {
                 "created": 0,
@@ -153,6 +162,11 @@ class _NetworkDiscoverer:
                 "removed": 0
             },
             "interfaces": {
+                "created": 0,
+                "updated": 0,
+                "removed": 0
+            },
+            "ospf_processes": {
                 "created": 0,
                 "updated": 0,
                 "removed": 0
@@ -204,6 +218,29 @@ class _NetworkDiscoverer:
         try:
             self.logger.info(f"Processing device at {ip_address}")
             
+            # First check if device responds to RESTCONF
+            if not self.restconf.is_available(ip_address):
+                # Check if this IP was a known router that became unreachable
+                try:
+                    router = Router.objects.get(management_ip_address=ip_address)
+                    if router.reachable:  # Only notify if it was previously reachable
+                        router.reachable = False
+                        router.save()
+                        self.logger.warning(f"Router {router.hostname} ({ip_address}) became unreachable")
+                        
+                        # Create notification for router becoming unreachable
+                        notification = Notification.objects.create(
+                            title=f"Router {router.hostname} is unreachable",
+                            message=f"Lost connection to router {router.hostname} ({ip_address})",
+                            severity="critical",
+                            source="discovery"
+                        )
+                        self.stats["routers"]["unreachable"] += 1
+                except Router.DoesNotExist:
+                    # Not a known router, just skip
+                    self.logger.debug(f"Device at {ip_address} is not RESTCONF capable")
+                return None
+            
             # Get LLDP information
             lldp_data = self.get_device_data(ip_address, "Cisco-IOS-XE-lldp-oper:lldp-entries")
             if not lldp_data:
@@ -247,6 +284,10 @@ class _NetworkDiscoverer:
             if device_data.get('native_interfaces'):
                 self.process_interfaces(router, device_data['native_interfaces'], device_data['oper_interfaces'])
             
+            # Process OSPF
+            if device_data.get('ospf_data'):
+                self.process_ospf(router, device_data['ospf_data'])
+            
             return {
                 "hostname": hostname,
                 "role": role,
@@ -260,15 +301,17 @@ class _NetworkDiscoverer:
     
     def fetch_device_data(self, ip_address):
         # Get router data in parallel
-        with ThreadPoolExecutor(max_workers=3) as executor:
+        with ThreadPoolExecutor(max_workers=4) as executor:
             vrf_future = executor.submit(self.get_device_data, ip_address, "Cisco-IOS-XE-native:native/vrf/definition")
             native_interfaces_future = executor.submit(self.get_device_data, ip_address, "Cisco-IOS-XE-native:native/interface")
             oper_interfaces_future = executor.submit(self.get_device_data, ip_address, "Cisco-IOS-XE-interfaces-oper:interfaces")
+            ospf_future = executor.submit(self.get_device_data, ip_address, "Cisco-IOS-XE-native:native/router/router-ospf/ospf")
             
             # Wait for all data to be fetched
             vrf_data = vrf_future.result()
             native_interfaces = native_interfaces_future.result()
             oper_interfaces_data = oper_interfaces_future.result()
+            ospf_data = ospf_future.result()
         
         # Process operational interfaces data for easier access
         oper_interfaces = self.process_oper_interfaces(oper_interfaces_data)
@@ -276,7 +319,8 @@ class _NetworkDiscoverer:
         return {
             'vrf_data': vrf_data,
             'native_interfaces': native_interfaces,
-            'oper_interfaces': oper_interfaces
+            'oper_interfaces': oper_interfaces,
+            'ospf_data': ospf_data
         }
     
     def detect_router_role(self, ip_address):
@@ -342,13 +386,34 @@ class _NetworkDiscoverer:
         if created:
             self.logger.info(f"Created new router: {hostname} (Role: {role})")
             self.stats["routers"]["created"] += 1
+            # Create notification for new router discovery
+            Notification.objects.create(
+                title=f"New device discovered",
+                message=f"New device discovered at {ip_address}",
+                severity="info",
+                source="discovery"
+            )
         else:
             self.logger.info(f"Updated existing router: {hostname} (Role: {role})")
             self.stats["routers"]["updated"] += 1
             
+            # Check if router became reachable
+            if not router.reachable:  # It was unreachable before
+                self.logger.info(f"Router {hostname} is now reachable")
+                Notification.objects.create(
+                    title=f"Router {hostname} is now reachable",
+                    message=f"Restored connection to router {hostname} ({ip_address})",
+                    severity="info",
+                    source="discovery"
+                )
+            
         return router
     
     def assign_ce_to_site(self, router, ip_address):
+        # If router already has a site then skip
+        if hasattr(router, 'site'):
+            return
+        
         try:
             # Convert IP address to IPv4Address object
             ce_ip = ipaddress.IPv4Address(ip_address)
@@ -372,6 +437,11 @@ class _NetworkDiscoverer:
                     # Assign router to site
                     site.router = router
                     site.save()
+
+                    # HACK: This shouldn't be here
+                    from core.modules.network_controller import NetworkController
+                    NetworkController.set_router_hostname(router, f'CE{site.id}')
+                    
                     self.logger.info(f"Assigned CE router {router.hostname} to site {site}")
                     return
             
@@ -453,6 +523,137 @@ class _NetworkDiscoverer:
             self.logger.info(f"Removed {removed_count} VRFs that no longer exist on router {router.hostname}")
             self.stats["vrfs"]["removed"] += removed_count
     
+    def process_ospf(self, router, ospf_data):
+        """Process OSPF configuration data and create/update OSPF processes and networks."""
+        if not ospf_data or 'Cisco-IOS-XE-ospf:ospf' not in ospf_data:
+            self.logger.debug(f"No OSPF data found for router {router.hostname}")
+            return
+        
+        ospf_config = ospf_data['Cisco-IOS-XE-ospf:ospf']
+        discovered_process_ids = set()
+        
+        # Process regular OSPF processes (without VRF)
+        regular_processes = ospf_config.get('process-id', [])
+        for process_data in regular_processes:
+            process_id = process_data.get('id')
+            if process_id is None:
+                continue
+                
+            discovered_process_ids.add(process_id)
+            self.process_single_ospf_process(router, process_data, None)
+        
+        # Process VRF-aware OSPF processes
+        vrf_processes = ospf_config.get('process-id-vrf', [])
+        for process_data in vrf_processes:
+            process_id = process_data.get('id')
+            vrf_name = process_data.get('vrf')
+            
+            if process_id is None or not vrf_name:
+                continue
+                
+            discovered_process_ids.add(process_id)
+            
+            # Find the VRF object
+            try:
+                vrf = VRF.objects.get(name=vrf_name, router=router)
+                self.process_single_ospf_process(router, process_data, vrf)
+            except VRF.DoesNotExist:
+                self.logger.warning(f"VRF {vrf_name} not found for OSPF process {process_id} on router {router.hostname}")
+                continue
+        
+        # Clean up OSPF processes that no longer exist
+        removed_count = OSPFProcess.objects.filter(router=router).exclude(process_id__in=discovered_process_ids).delete()[0]
+        if removed_count > 0:
+            self.logger.info(f"Removed {removed_count} OSPF processes that no longer exist on router {router.hostname}")
+            self.stats["ospf_processes"]["removed"] += removed_count
+
+    def process_single_ospf_process(self, router, process_data, vrf):
+        """Process a single OSPF process configuration."""
+        process_id = process_data.get('id')
+        router_id = process_data.get('router-id')
+        priority = process_data.get('priority')
+        
+        # Create or update OSPF process
+        ospf_process, created = OSPFProcess.objects.update_or_create(
+            router=router,
+            process_id=process_id,
+            defaults={
+                'vrf': vrf,
+                'ospf_router_id': router_id,
+                'priority': priority
+            }
+        )
+        
+        if created:
+            self.logger.info(f"Created OSPF process {process_id} on router {router.hostname}")
+            self.stats["ospf_processes"]["created"] += 1
+        else:
+            self.logger.info(f"Updated OSPF process {process_id} on router {router.hostname}")
+            self.stats["ospf_processes"]["updated"] += 1
+        
+        # Process networks for this OSPF process
+        networks = process_data.get('network', [])
+        discovered_networks = set()
+        
+        for network_data in networks:
+            network_ip = network_data.get('ip')
+            wildcard = network_data.get('wildcard')
+            area = network_data.get('area')
+            
+            if not network_ip or not wildcard or area is None:
+                continue
+            
+            # Convert wildcard to subnet mask (Cisco uses inverted masks)
+            try:
+                subnet_mask = self.wildcard_to_subnet_mask(wildcard)
+                discovered_networks.add((network_ip, subnet_mask, area))
+                
+                # Create or update OSPF network
+                ospf_network, created = OSPFNetwork.objects.update_or_create(
+                    process=ospf_process,
+                    network=network_ip,
+                    subnet_mask=subnet_mask,
+                    defaults={
+                        'area': area
+                    }
+                )
+                
+                if created:
+                    self.logger.debug(f"Created OSPF network {network_ip}/{subnet_mask} in area {area} for process {process_id}")
+                else:
+                    self.logger.debug(f"Updated OSPF network {network_ip}/{subnet_mask} in area {area} for process {process_id}")
+                    
+            except ValueError as e:
+                self.logger.error(f"Error processing OSPF network {network_ip}/{wildcard}: {str(e)}")
+                continue
+        
+        # Clean up OSPF networks that no longer exist for this process
+        existing_networks = OSPFNetwork.objects.filter(process=ospf_process)
+        for network in existing_networks:
+            network_tuple = (network.network, network.subnet_mask, network.area)
+            if network_tuple not in discovered_networks:
+                network.delete()
+                self.logger.debug(f"Removed OSPF network {network.network}/{network.subnet_mask} from process {process_id}")
+    
+    def wildcard_to_subnet_mask(self, wildcard):
+        try:
+            # Split wildcard into octets
+            wildcard_octets = [int(octet) for octet in wildcard.split('.')]
+            
+            # Convert each octet by bitwise NOT operation (255 - wildcard_octet)
+            subnet_octets = [255 - octet for octet in wildcard_octets]
+            
+            # Join back into dotted decimal notation
+            subnet_mask = '.'.join(map(str, subnet_octets))
+            
+            # Validate the result is a valid subnet mask
+            ipaddress.IPv4Address(subnet_mask)
+            
+            return subnet_mask
+            
+        except (ValueError, IndexError) as e:
+            raise ValueError(f"Invalid wildcard mask: {wildcard}")
+
     def process_interfaces(self, router, native_interfaces, oper_interfaces):
         self.logger.info(f"Processing interfaces for router {router.hostname}")
         
