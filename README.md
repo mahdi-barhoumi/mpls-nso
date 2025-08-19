@@ -80,10 +80,6 @@ Please open issues or submit pull requests for bug fixes, features, or improveme
 
 Released under the **MIT License**. See [LICENSE](LICENSE) for details.
 
-## 🙏 Acknowledgements
-
-Special thanks to 
-
 ## 📸 Screenshots
 
 <!-- Add screenshots below -->
@@ -100,5 +96,6 @@ Special thanks to
 ![Monitoring](docs/screenshots/light/monitoring-devices.png)
 
 </div>
+
 
 
