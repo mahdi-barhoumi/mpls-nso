@@ -91,12 +91,13 @@ Special thanks to ???
 <div align="center">
 
 ### 🏠 Dashboard
-![Dashboard](images/dashboard-placeholder.png)
+![Dashboard](docs/screenshots/light/dashboard-after-demo.png)
 
 ### ⚙️ Service Creation
-![Service Creation](images/service-creation-placeholder.png)
+![Service Creation](docs/screenshots/light/sites-create.png)
 
 ### 📊 Monitoring
-![Monitoring](images/monitoring-placeholder.png)
+![Monitoring](docs/screenshots/light/monitoring-devices.png)
 
 </div>
+
