@@ -74,15 +74,15 @@ npm run dev
 
 **Contributions are welcome!** Developed by [@mahdi-barhoumi](https://github.com/mahdi-barhoumi) and [@Fyroo](https://github.com/Fyroo). 
 
-Please open issues or submit pull requests for bug fixes, features, or improvements. Follow standard GitHub workflow, maintain clear commit history, and include relevant tests or docs. For major changes, discuss via GitHub Issues first.
+Please open issues or submit pull requests for bug fixes, features, or improvements. Follow standard GitHub workflow, maintain a clear commit history, and include relevant tests or docs. For major changes, discuss via GitHub Issues first.
 
 ## 📄 License
 
-Released under the **MIT License**. See LICENSE for details.
+Released under the **MIT License**. See [LICENSE](LICENSE) for details.
 
 ## 🙏 Acknowledgements
 
-Special thanks to ???
+Special thanks to 
 
 ## 📸 Screenshots
 
@@ -100,4 +100,5 @@ Special thanks to ???
 ![Monitoring](docs/screenshots/light/monitoring-devices.png)
 
 </div>
+
 
